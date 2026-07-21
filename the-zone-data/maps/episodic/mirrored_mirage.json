@@ -1,0 +1,933 @@
+{
+  "id": "mirrored_mirage",
+  "name": "镜像折射复合设施",
+  "background": "冷战时期建立的地下异常物质研究中心（代号M.I.R.R.O.R），在试图解析一块从‘镜面维度’掉落的陨石时引发了收容失效。现实物理法则被扭曲，设施内的人员发生了可怕的生理与心理异化，最终被整体封存。如今，空间锚点完全碎裂，镜面维度正在反向吞噬这里。",
+  "topology": "整体呈螺旋向下的深井结构。分为地表入口、生活物流区、主科研区、动力维护区、深层收容区，以及最底层的镜像深渊区。越深入底层，非欧几里得空间错乱越严重。",
+  "nodesCount": 44,
+  "visualStyle": "从锈蚀金属与腐败生物组织的交织，逐渐过渡到低保真度的失真现实，大量忽明忽暗的荧光灯、水银般流动的墙壁，以及动作异步的扭曲反光表面。",
+  "initial": {
+    "dilationFactor": 1.2,
+    "entrance": "node_01_surface_gate"
+  },
+  "nodes": {
+    "node_01_surface_gate": {
+      "name": "隔离入口",
+      "desc": "巨大的钢制闸门半开着，暴露出一条昏暗的走廊。周围布满裂缝，被风沙侵蚀得只剩残骸的废弃车辆散落在视野尽头。空气中弥漫着一股被遗弃多年的金属和灰尘的气味。",
+      "visualPrompt": "A rusty, half-open massive steel gate in a post-apocalyptic wasteland, dust particles in the air, cracked concrete floor, cinematic lighting, eerie atmosphere.",
+      "threatLevel": 1,
+      "childrenIds": [
+        "node_02_decon_chamber"
+      ]
+    },
+    "node_02_decon_chamber": {
+      "name": "失效去污室",
+      "desc": "去污喷头管道断裂，露出内部发黑的污垢。中央的排水格栅堵塞，积聚着一层薄薄的、不明来源的黏稠物。残破的紫外线灯管摇摇欲坠，闪烁着微弱的紫光。",
+      "visualPrompt": "A ruined decontamination chamber with broken shower heads, clogged floor grates oozing dark sludge, flickering purple UV lights.",
+      "threatLevel": 2,
+      "childrenIds": [
+        "node_03_reception_lobby"
+      ],
+      "interactions": [
+        {
+          "desc": "清理排水格栅处的黏稠物",
+          "results": {
+            "timeCost": 1,
+            "soundEffect": "search",
+            "narrative": "你强忍恶心拨开黏液，里面除了一堆纠结的毛发和骨渣外一无所获，浓烈的气味让你的理智受挫。",
+            "stateChange": {
+              "sanity": -5
+            }
+          }
+        }
+      ]
+    },
+    "node_03_reception_lobby": {
+      "name": "接待大厅",
+      "desc": "空气中弥漫着高浓度消毒水与血腥味混合的刺鼻气息。苍白的荧光灯管发出滋滋电流声。大面积的防爆玻璃墙面上，隐约映照出与你动作不完全同步的扭曲倒影。",
+      "visualPrompt": "Large sterile reception area, flickering pale fluorescent lights, large bulletproof glass walls showing slightly delayed and distorted reflections.",
+      "threatLevel": 3,
+      "childrenIds": [
+        "node_04_security_checkpoint"
+      ],
+      "events": [
+        "mirror_glitch_intro"
+      ],
+      "interactions": [
+        {
+          "desc": "调查前台闪烁的终端机",
+          "results": {
+            "timeCost": 1,
+            "soundEffect": "glitch",
+            "narrative": "屏幕上只有一行不断重复的代码：‘不要直视镜子。’你感到一阵轻微的头晕，但终端机吐出了一份未烧毁的简报。",
+            "stateChange": {
+              "sanity": -2,
+              "gain": [
+                {
+                  "id": "reception_briefing",
+                  "name": "设施紧急简报",
+                  "desc": "沾满咖啡渍的纸。",
+                  "type": "document",
+                  "rarity": "common",
+                  "documentContent": "致所有员工：由于共振仪发生相位偏移，所有反光表面已被列为危害源。若发现‘倒影’试图交谈，请立即注射镇静剂。"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "node_04_security_checkpoint": {
+      "name": "安保检查站",
+      "desc": "金属探测器发出刺耳的长鸣，但门控已被强行破坏。监控显示器碎裂一地。角落里蜷缩着一具穿着安保制服的干尸，它的双手死死捂住自己的眼睛。",
+      "visualPrompt": "Destroyed security checkpoint, shattered monitors emitting static. Mummified corpse in uniform covering its own eyes.",
+      "threatLevel": 4,
+      "childrenIds": [
+        "node_05_main_elevator_shaft"
+      ],
+      "items": [
+        {
+          "id": "stun_baton",
+          "name": "电击警棍",
+          "desc": "前端还闪烁着微弱的电弧。",
+          "type": "weapon",
+          "rarity": "common",
+          "quantity": 1,
+          "weaponType": "blunt",
+          "meleeDamage": 12,
+          "maxUses": 20
+        }
+      ]
+    },
+    "node_05_main_elevator_shaft": {
+      "name": "主电梯井 (枢纽)",
+      "desc": "巨大的多楼层货运电梯停滞在这里，轿厢门半开着，钢缆发出令人不安的摩擦声。这是连接设施各大核心区域的唯一通道，深不见底的井道下方不时传来重物的撞击声。",
+      "visualPrompt": "Massive heavy-duty elevator shaft, rusted steel cables, deep dark abyss below. Red emergency lights illuminating the open elevator car.",
+      "threatLevel": 3,
+      "childrenIds": [
+        "node_06_logistics_corridor",
+        "node_15_research_hub",
+        "node_23_maintenance_corridor"
+      ]
+    },
+    "node_06_logistics_corridor": {
+      "name": "生活物流走廊",
+      "desc": "墙壁上涂满了用指甲挠出的绝望字迹。空气中弥漫着食物腐败与陈旧汗水的酸臭味。走廊里的自动贩卖机已经损坏，时不时吐出一两个干瘪的空罐头。",
+      "visualPrompt": "Desolate living quarters hallway, walls covered in frantic scratch marks and blood. Broken vending machine, flickering warm light.",
+      "threatLevel": 2,
+      "childrenIds": [
+        "node_07_cafeteria",
+        "node_09_residential_corridor"
+      ]
+    },
+    "node_07_cafeteria": {
+      "name": "中央餐厅",
+      "desc": "数百张不锈钢桌椅被某种巨力堆叠在房间一角，形成了一座钢铁小山。地上的餐盘里生长着散发微光的真菌。偶尔能听到仿佛数百人同时咀嚼的幻听。",
+      "visualPrompt": "A large cafeteria with hundreds of stainless steel tables piled up into a chaotic mountain. Glowing fungus on the floor.",
+      "threatLevel": 3,
+      "childrenIds": [
+        "node_08_kitchen"
+      ],
+      "items": [
+        {
+          "id": "rations_old",
+          "name": "陈旧口粮",
+          "type": "consumable",
+          "rarity": "common",
+          "desc": "一包陈旧的军用口粮，包装完好。",
+          "discoveryThreshold": 2,
+          "quantity": 2,
+          "effects": [
+            [
+              "heal_hp",
+              15
+            ]
+          ]
+        }
+      ]
+    },
+    "node_08_kitchen": {
+      "name": "后厨",
+      "desc": "大型冷库的门敞开着，但里面流出的不是冷气，而是刺鼻的血腥味。案板上插着一把巨大的切肉刀，墙上的倒影里，有看不见的东西正在剁肉。",
+      "visualPrompt": "Industrial kitchen, open walk-in freezer emitting red mist, large bloody meat cleaver stuck in a chopping block.",
+      "threatLevel": 5
+    },
+    "node_09_residential_corridor": {
+      "name": "宿舍区过道",
+      "desc": "长长的过道两侧是一扇扇紧闭的铁门。地毯已经被某种黑色的腐蚀性液体烧得坑坑洼洼。前方传来极其微弱的抽泣声。",
+      "visualPrompt": "Long dark corridor with numbered iron doors. Melted holes in the carpet revealing concrete. Dim ambient lighting.",
+      "threatLevel": 3,
+      "childrenIds": [
+        "node_10_dormitory_a",
+        "node_11_dormitory_b",
+        "node_12_recreation_room",
+        "node_13_medical_bay"
+      ]
+    },
+    "node_10_dormitory_a": {
+      "name": "A区宿舍",
+      "desc": "狭窄的四人间里，上下铺的金属床架被一种怪异的巨力扭曲成了麻花状。一面本该挂着全身镜的墙上，只剩下一个深不见底的黑洞。",
+      "visualPrompt": "Cramped 4-bed dorm. Metal bunk beds violently twisted. Where a mirror should be on the wall, there is an impossibly deep void.",
+      "threatLevel": 4
+    },
+    "node_11_dormitory_b": {
+      "name": "B区宿舍 (幸存者)",
+      "desc": "这里的门被大量重物从内部堵死。房间里凌乱不堪，但在一个用被子搭成的‘安全堡垒’里，你发现了一个还活着的员工。",
+      "visualPrompt": "Messy dorm room barricaded from the inside. A makeshift tent made of blankets in the corner.",
+      "threatLevel": 1,
+      "nodeNpc": {
+        "id": "technician_li_ming",
+        "name": "技术员李明",
+        "gender": "male",
+        "desc": "双眼布满血丝，正神经质地啃咬着手指。紧紧抱着一个沉重的工具箱，看到你时发出了受伤野兽般的低呜。",
+        "visualPrompt": "Middle-aged man in a dirty yellow hazmat suit, heavily bloodshot eyes, nervously biting his nails. Clutching a heavy metal toolbox.",
+        "hide": true,
+        "style": "tactical",
+        "initialState": {
+          "attribute": {
+            "strength": 4,
+            "agility": 3,
+            "knowledge": 8,
+            "perception": 6
+          },
+          "equipState": {
+            "weapons": [
+              null,
+              null
+            ],
+            "armors": [],
+            "accessories": []
+          },
+          "vital": {
+            "maxHp": 100,
+            "maxSanity": 100,
+            "maxStamina": 100,
+            "maxVigor": 100
+          },
+          "trust": 10,
+          "level": 1,
+          "xp": 0,
+          "inventory": [],
+          "deck": [
+            {
+              "id": "card_repair_bash",
+              "name": "重击防卫",
+              "cost": 1,
+              "rarity": "common",
+              "desc": "在极度惊恐中挥舞沉重的金属工具箱试图逼退敌人。",
+              "theme": {
+                "borderColor": "#666",
+                "shadowColor": "#333",
+                "bgGradient": "linear-gradient(to bottom, #4a4a4a, #2a2a2a)",
+                "textColor": "#FFF",
+                "label": "生存战术"
+              },
+              "effects": [
+                {
+                  "type": "melee_attack",
+                  "value": 8,
+                  "target": "enemy",
+                  "scaling": {
+                    "attribute": "strength",
+                    "factor": 1.2
+                  }
+                }
+              ],
+              "feature": []
+            }
+          ],
+          "quest": {
+            "retrieve_data_core": {
+              "desc": "李明声称只要拿到服务器机房里的核心数据，他就能重启空间锚点，带你们逃离这里。",
+              "difficulty": 3,
+              "goals": [
+                {
+                  "id": "core_data_drive",
+                  "name": "核心数据存储盘",
+                  "desc": "记录了共振实验全过程的沉重硬盘。",
+                  "type": "material",
+                  "rarity": "rare"
+                }
+              ],
+              "rewards": [
+                {
+                  "id": "plasma_battery",
+                  "name": "高能等离子电池",
+                  "desc": "可提供巨大的设备充能。",
+                  "type": "consumable",
+                  "rarity": "epic",
+                  "effects": [
+                    [
+                      "restore_battery",
+                      100
+                    ]
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "node_12_recreation_room": {
+      "name": "员工休息区",
+      "desc": "破损的人造革沙发上长满了类似霉菌的发光真菌。墙上的全息电视不断闪烁着静态雪花，扬声器里偶尔传出倒放的求救声。一杯咖啡甚至还在冒着热气。",
+      "visualPrompt": "Ruined lounge, torn faux-leather sofas overgrown with glowing cyan fungus. Holographic TV showing static noise. Steaming cup of coffee on table.",
+      "threatLevel": 3,
+      "items": [
+        {
+          "id": "director_recorder",
+          "name": "主管的录音带",
+          "desc": "一盘磁带，外壳上写着‘不要听’。",
+          "type": "audio",
+          "rarity": "epic",
+          "quantity": 1,
+          "audioScript": "它们不是幻觉。当我们以为在观察高维空间时，实际上是我们在被‘捕食’。每一个反光面，都是它们的进食口..."
+        }
+      ]
+    },
+    "node_13_medical_bay": {
+      "name": "医疗站",
+      "desc": "无影灯疯狂地闪烁，几张病床被推倒在地。满地的玻璃碎渣中混合着大量的血迹。药柜被强行砸开，里面似乎还有一些残留的针剂。",
+      "visualPrompt": "Smashed medical bay, operating lights strobing. Overturned hospital beds, shattered medicine cabinets, blood splatters.",
+      "threatLevel": 4,
+      "childrenIds": [
+        "node_14_quarantine_ward"
+      ],
+      "items": [
+        {
+          "id": "medical_syringes",
+          "name": "高阶神经稳定剂",
+          "desc": "能强行阻断大脑对超自然现象的感知。",
+          "type": "consumable",
+          "rarity": "rare",
+          "quantity": 2,
+          "effects": [
+            [
+              "heal_sanity",
+              30
+            ]
+          ]
+        }
+      ]
+    },
+    "node_14_quarantine_ward": {
+      "name": "深度隔离病房",
+      "desc": "四面墙壁都是柔软的防撞垫，但现在上面布满了深达数寸的抓痕。这里是用来关押那些“声称在镜子里看到自己死期”的员工的地方。",
+      "visualPrompt": "Padded cell covered in deep, erratic claw marks. Very dim lighting, claustrophobic atmosphere.",
+      "threatLevel": 5,
+      "interactions": [
+        {
+          "desc": "检查满墙的抓痕",
+          "results": {
+            "timeCost": 1,
+            "soundEffect": "scream",
+            "narrative": "当你将手指放进抓痕中比对时，脑海里突然爆发出一声凄厉的尖叫，你意识到这些抓痕是为了阻止某种东西钻进墙里而留下的。",
+            "stateChange": {
+              "sanity": -12
+            }
+          }
+        }
+      ]
+    },
+    "node_15_research_hub": {
+      "name": "主科研中心 (大厅)",
+      "desc": "巨大的环形空间中心，矗立着一台被强行撕裂的维度共振仪，粗大的线缆如内脏般散落一地。环境温度低得不正常，隐约能听到从四周墙壁后传来的非人类窃窃私语。",
+      "visualPrompt": "Giant circular lab, destroyed massive dimensional resonator machine in center. Freezing mist in the air, glowing blue frost on surfaces.",
+      "threatLevel": 6,
+      "childrenIds": [
+        "node_16_chemistry_lab",
+        "node_17_biology_lab",
+        "node_19_data_center",
+        "node_20_director_office"
+      ]
+    },
+    "node_16_chemistry_lab": {
+      "name": "化学合成室",
+      "desc": "狭小幽闭的隔间内，倾倒的玻璃瓶流淌出荧光绿色的合成溶剂。刺鼻的氨水味几乎要灼伤你的呼吸道。角落里的应急灯发出红色的微光。",
+      "visualPrompt": "Claustrophobic lab, spilled glowing green solvents from broken glass bottles. Red emergency lighting, deep frantic scratch marks.",
+      "threatLevel": 4
+    },
+    "node_17_biology_lab": {
+      "name": "变异生物实验室",
+      "desc": "冰冷的金属实验台沾染着干涸的生物样本。某些角落长出了类似真菌的蠕动斑点。这里是肉体与金属结合实验的爆发原点。",
+      "visualPrompt": "A ruined biological laboratory, pulsating fungal growths on cold metal walls, claw marks, dried blood.",
+      "threatLevel": 8,
+      "childrenIds": [
+        "node_18_specimen_storage"
+      ],
+      "items": [
+        {
+          "id": "lab_notes_distorted",
+          "name": "扭曲的实验笔记",
+          "type": "document",
+          "rarity": "epic",
+          "desc": "不仅是肉体，空间本身也在排斥我们。",
+          "discoveryThreshold": 1,
+          "quantity": 1,
+          "documentContent": "样本活性异常。研究员A抱怨镜子里的自己比他慢了半拍。它在改变……别看镜子！"
+        }
+      ]
+    },
+    "node_18_specimen_storage": {
+      "name": "禁忌标本库",
+      "desc": "中央矗立着一个巨大的圆柱形培养舱，充满浑浊的福尔马林液体。培养舱内那个扭曲的多面体肉块猛地睁开了几十只眼睛。",
+      "visualPrompt": "Dark room with a huge cylindrical containment tank filled with murky yellow fluid. Inside, a grotesque multi-faceted mass of flesh with dozens of opening eyes.",
+      "threatLevel": 12,
+      "specificEnemy": {
+        "id": "aberrant_specimen",
+        "name": "畸变倒影融合体",
+        "gender": "both",
+        "desc": "几个研究员与其高维镜像错误融合的产物，肢体如同融化的蜡一般交错。",
+        "visualPrompt": "Grotesque biological abomination, fusion of human bodies and geometric shapes, melting wax-like skin, sharp bone spikes.",
+        "initialState": {
+          "attribute": {
+            "strength": 8,
+            "agility": 4,
+            "knowledge": 2,
+            "perception": 7
+          },
+          "equipState": {
+            "weapons": [
+              null,
+              null
+            ],
+            "armors": [],
+            "accessories": []
+          }
+        },
+        "intentDistribution": {
+          "attack": 60,
+          "buff": 20,
+          "debuff": 20,
+          "observe": 0
+        },
+        "nextIntent": {
+          "type": "debuff",
+          "desc": "无数眼睛释放出扰乱心智的光谱",
+          "value": 1
+        },
+        "lootTable": [
+          {
+            "id": "specimen_sample",
+            "name": "跳动的相变核心",
+            "desc": "触摸它会让人脑海中闪过不属于自己的记忆。",
+            "type": "material",
+            "rarity": "epic",
+            "dropProbability": 1
+          }
+        ]
+      },
+      "enemySpawnCondition": "on_enter"
+    },
+    "node_19_data_center": {
+      "name": "服务器机房",
+      "desc": "成排的黑色服务器机柜如同墓碑般矗立，发出震耳欲聋的低频噪音。机房中央的终端屏幕正幽幽地闪烁着提示符，验证需要极其复杂的序列。",
+      "visualPrompt": "Rows of monolithic black server racks like tombstones, glowing blue LEDs. A solitary terminal emitting pale light.",
+      "threatLevel": 5,
+      "interactions": [
+        {
+          "desc": "尝试在主机终端提取核心数据",
+          "requirements": {
+            "puzzleSolved": {
+              "type": "sequence",
+              "title": "镜像递归协议",
+              "desc": "解开镜像的倒影，观测者的起点即是终点。",
+              "solution": "13",
+              "data": {
+                "sequence": [
+                  1,
+                  4,
+                  null,
+                  40,
+                  13,
+                  4,
+                  1
+                ],
+                "missingIndex": 2,
+                "options": [
+                  9,
+                  13,
+                  27,
+                  39
+                ],
+                "correctOption": 13
+              },
+              "hints": [
+                "序列两边在互相映射。"
+              ],
+              "penalty": {
+                "sanity": -15
+              }
+            }
+          },
+          "results": {
+            "timeCost": 2,
+            "soundEffect": "puzzle_solve",
+            "narrative": "破解成功。终端机喷吐出一块沉甸甸的军用级硬盘。",
+            "stateChange": {
+              "gain": [
+                {
+                  "id": "core_data_drive",
+                  "name": "核心数据存储盘",
+                  "desc": "记录一切的核心驱动盘。",
+                  "type": "material",
+                  "rarity": "rare"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "node_20_director_office": {
+      "name": "折射的办公室",
+      "desc": "墙上镶嵌着一面巨大的镜子，镜面布满了裂纹。透过裂缝，你能窥见一个完全不同的维度，里面有不可名状的黑影在蠕动。",
+      "visualPrompt": "An abandoned director's office, a huge cracked mirror taking up an entire wall, a terrifying void and shadowy figures visible through the cracks.",
+      "threatLevel": 7,
+      "childrenIds": [
+        "node_21_observation_deck_alpha"
+      ],
+      "items": [
+        {
+          "id": "strange_artifact",
+          "name": "奇异反射物",
+          "type": "accessory",
+          "rarity": "epic",
+          "desc": "吸收了周围所有的光线的黑色晶体。",
+          "discoveryThreshold": 2,
+          "quantity": 1,
+          "effects": [
+            [
+              "knowledge",
+              3
+            ]
+          ]
+        }
+      ]
+    },
+    "node_21_observation_deck_alpha": {
+      "name": "观测平台 Alpha",
+      "desc": "宽阔的扇形平台上，阴冷的涡流风在脚下盘旋。这里俯瞰着下方深不见底的反应堆和某种正在闪烁异光的能量漩涡。巨大的结构钢梁发出不堪重负的呻吟声。",
+      "visualPrompt": "Wide fan-shaped observation deck, swirling cold mist. Industrial structural beams groaning under stress, overlooking a glowing abyss.",
+      "threatLevel": 8,
+      "childrenIds": [
+        "node_22_resonance_chamber"
+      ]
+    },
+    "node_22_resonance_chamber": {
+      "name": "相位共振室",
+      "desc": "这是一个声学结构极其怪异的球形房间。你的每一步都会引发多重回音，甚至在几秒钟后，你能听到‘未来’的自己发出的脚步声。",
+      "visualPrompt": "Spherical chamber lined with strange acoustic panels. Visually disorienting perspective lines.",
+      "threatLevel": 10,
+      "interactions": [
+        {
+          "desc": "尝试聆听回声",
+          "results": {
+            "timeCost": 1,
+            "soundEffect": "whisper",
+            "narrative": "你在回声中听到了尖叫，那是你自己的声音，充满了极度的痛苦。理智防线受到了严重冲击。",
+            "stateChange": {
+              "sanity": -10
+            }
+          }
+        }
+      ]
+    },
+    "node_23_maintenance_corridor": {
+      "name": "动力维护走廊",
+      "desc": "一条必须弯腰才能前行的幽暗检修道。管壁上挂满了黏稠的黑泥，腐败的恶臭如同实质般堵住了呼吸。手电筒的光束在这里似乎被某种力量吞噬。",
+      "visualPrompt": "Extremely cramped, dark maintenance tunnel. Walls coated in viscous black sludge. Flashlight beam struggles to penetrate.",
+      "threatLevel": 7,
+      "childrenIds": [
+        "node_24_ventilation_hub",
+        "node_25_water_treatment",
+        "node_26_generator_room",
+        "node_31_containment_zone_entry"
+      ]
+    },
+    "node_24_ventilation_hub": {
+      "name": "通风枢纽",
+      "desc": "巨大的金属管道交错缠绕，发出低沉的轰鸣。空气中弥漫着压抑的热度和奇怪的甜腻气息。管道表面附着着一层不自然的褐色黏液。",
+      "visualPrompt": "Massive interconnected metal ventilation ducts, dimly lit, coated in a strange brownish slime, oppressive atmosphere.",
+      "threatLevel": 11,
+      "enemySpawnCondition": "on_enter",
+      "specificEnemy": {
+        "id": "enemy_sludge_crawler",
+        "name": "黏液潜伏者",
+        "gender": "both",
+        "desc": "由通风管道中的污垢、毛发和被同化的生物组织融合成的恶心生物。",
+        "visualPrompt": "Grotesque monster made of dark sludge, hair, and pulsating flesh, squeezing out of a metal duct.",
+        "initialState": {
+          "attribute": {
+            "strength": 12,
+            "agility": 8,
+            "knowledge": 2,
+            "perception": 10
+          },
+          "equipState": {
+            "weapons": [
+              null,
+              null
+            ],
+            "armors": [],
+            "accessories": []
+          }
+        },
+        "intentDistribution": {
+          "attack": 60,
+          "debuff": 30,
+          "buff": 0,
+          "observe": 10
+        },
+        "nextIntent": {
+          "type": "attack",
+          "desc": "准备喷吐腐蚀性黏液",
+          "value": 15
+        },
+        "lootTable": []
+      }
+    },
+    "node_25_water_treatment": {
+      "name": "水处理核心",
+      "desc": "巨大的沉淀池中翻滚着墨绿色的液体。水面上漂浮着无法辨认的残骸。沉淀池的倒影中，水是清澈透明的，而在那清澈的水底，躺着无数具和你一样的尸体。",
+      "visualPrompt": "Industrial water treatment room with large pools of murky green liquid. Ominous reflections in the water showing a different, terrifying reality.",
+      "threatLevel": 8
+    },
+    "node_26_generator_room": {
+      "name": "发电机房",
+      "desc": "几台重型柴油发电机仍在顽强地运转，爆发出震耳欲聋的轰鸣声。强烈的震动感让你的脚底发麻。角落里的一个工具箱半掩着。",
+      "visualPrompt": "Loud, vibrating room with massive rusty diesel generators. Thick cables on the floor. Dim yellow lighting.",
+      "threatLevel": 6,
+      "childrenIds": [
+        "node_27_cooling_tower",
+        "node_28_reactor_control"
+      ],
+      "items": [
+        {
+          "id": "heavy_spanner",
+          "name": "重型扳手",
+          "type": "weapon",
+          "weaponType": "blunt",
+          "rarity": "common",
+          "desc": "末端沾染着干涸污渍的沉重钢制扳手。",
+          "discoveryThreshold": 1,
+          "quantity": 1,
+          "meleeDamage": 15,
+          "maxUses": 50
+        }
+      ]
+    },
+    "node_27_cooling_tower": {
+      "name": "冷却塔井底",
+      "desc": "抬起头，巨大的圆台形建筑直通黑暗的穹顶。冰冷的水滴像雨一样落下，打在生锈的格栅上。这里的空间感极大，让人产生严重的巨物恐惧。",
+      "visualPrompt": "Looking up from the bottom of a massive industrial cooling tower. Dark, misty, imposing concrete walls disappearing into darkness above.",
+      "threatLevel": 5
+    },
+    "node_28_reactor_control": {
+      "name": "反应堆主控室",
+      "desc": "主控面板上的按钮已被砸得粉碎，闪烁的红蓝警示灯将整个房间渲染得如同屠宰场。在巨大的全景防爆窗前，站着一具被自身外骨骼装甲绞杀的尸体。",
+      "visualPrompt": "Main control room lit by flashing red and blue alarms. Smashed control panels. A corpse in an exoskeleton suit crushed by its own armor.",
+      "threatLevel": 9,
+      "childrenIds": [
+        "node_29_reactor_core"
+      ],
+      "interactions": [
+        {
+          "desc": "搜查外骨骼尸体",
+          "results": {
+            "timeCost": 1,
+            "soundEffect": "scare",
+            "narrative": "当你触碰他的瞬间，你听到了一声清晰的耳语：‘轮到你了。’",
+            "stateChange": {
+              "sanity": -8,
+              "gain": [
+                {
+                  "id": "plasma_battery",
+                  "name": "高能等离子电池",
+                  "desc": "适用于重型工具或高阶充能。",
+                  "type": "consumable",
+                  "rarity": "epic",
+                  "effects": [
+                    [
+                      "restore_battery",
+                      100
+                    ]
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "node_29_reactor_core": {
+      "name": "异化反应堆",
+      "desc": "金属墙壁上的警示灯不规则闪烁，光线落在墙面上时发生了诡异的扭曲。巨大的切伦科夫辐射发出的幽蓝光芒中，隐约可见物质正在不断地自我解体与重组。",
+      "visualPrompt": "Highly radioactive reactor core, glowing eerie blue Cherenkov radiation. Warped metallic structures looking like twisted geometry.",
+      "threatLevel": 13,
+      "childrenIds": [
+        "node_30_waste_disposal"
+      ],
+      "items": [
+        {
+          "id": "geiger_counter",
+          "name": "盖革计数器",
+          "type": "accessory",
+          "rarity": "rare",
+          "desc": "似乎还能对空间异常产生共鸣。",
+          "discoveryThreshold": 2,
+          "quantity": 1,
+          "effects": [
+            [
+              "perception",
+              2
+            ]
+          ]
+        }
+      ]
+    },
+    "node_30_waste_disposal": {
+      "name": "废料深井",
+      "desc": "被废弃的高阶辐射物料堆积如山，强烈的辐射让你的视网膜上出现了大量的白色噪点，耳边充斥着如蜂群般的静电杂音。不可久留。",
+      "visualPrompt": "Pitch black room illuminated only by intensely glowing radioactive barrels. Visual snow and noise artifacts simulating extreme radiation.",
+      "threatLevel": 15
+    },
+    "node_31_containment_zone_entry": {
+      "name": "收容区大门",
+      "desc": "极其厚重的钛合金装甲门被某种无法理解的力量从内部向外熔出了一个完美的圆形大洞。洞口的边缘光滑如镜面，倒映出你扭曲的脸庞。",
+      "visualPrompt": "Massive titanium blast door with a perfectly circular, mirror-smooth hole melted through it from the inside out.",
+      "threatLevel": 11,
+      "childrenIds": [
+        "node_32_cell_block_alpha",
+        "node_33_cell_block_beta",
+        "node_35_classified_archives",
+        "node_36_armory"
+      ]
+    },
+    "node_32_cell_block_alpha": {
+      "name": "Alpha 收容囚室",
+      "desc": "一长排用于关押‘异化感染者’的单间。所有的玻璃门都从内部碎裂了。每个房间的墙上都用鲜血画满了复杂的几何学分形图案。",
+      "visualPrompt": "Row of high-security isolation cells. Shattered glass doors. Complex, blood-drawn fractal patterns covering the padded walls.",
+      "threatLevel": 12,
+      "childrenIds": [
+        "node_34_interrogation_room"
+      ]
+    },
+    "node_33_cell_block_beta": {
+      "name": "Beta 收容囚室 (真空)",
+      "desc": "这个区域完全处于真空状态，气闸门外可见内部漂浮着许多杂物。你可以透过强化玻璃看到里面有一具尸体，令人毛骨悚然的是，它的头还在缓慢转动，看着你。",
+      "visualPrompt": "View through thick glass into a zero-gravity, vacuum-sealed corridor. Floating debris and a terrifyingly aware corpse slowly turning its head.",
+      "threatLevel": 14,
+      "interactions": [
+        {
+          "desc": "靠近玻璃观察漂浮的尸体",
+          "results": {
+            "timeCost": 1,
+            "soundEffect": "breathing",
+            "narrative": "尸体转过头，隔着玻璃用空洞的双眼盯着你。你突然感觉不到肺里的空气了，就好像你也身处真空之中，窒息感让你疯狂挠抓自己的脖子。",
+            "stateChange": {
+              "hp": -5,
+              "sanity": -15
+            }
+          }
+        }
+      ]
+    },
+    "node_34_interrogation_room": {
+      "name": "镜像审讯室",
+      "desc": "房间中央有一张焊死的铁椅，而正对着铁椅的是一面巨大的单向镜。只是现在的单向镜变成了双向，你在镜子对面看到了一个完全相同的审讯室，只是铁椅上绑着一个被剥皮的人。",
+      "visualPrompt": "Interrogation room. Single metal chair facing a large two-way mirror. The reflection shows an identical room but with a flayed man strapped to the chair.",
+      "threatLevel": 16,
+      "events": [
+        "sanity_test_event"
+      ]
+    },
+    "node_35_classified_archives": {
+      "name": "机密档案室",
+      "desc": "这是一个连地图上都没有标注的幽闭空间。墙上密密麻麻地贴满了写有凌乱公式的便签，这里保存着关于‘维度捕食者’的最深层秘密。",
+      "visualPrompt": "Secret windowless room, claustrophobic. Walls completely covered in erratic sticky notes with complex equations. Dim light.",
+      "threatLevel": 8,
+      "childrenIds": [
+        "node_37_test_chamber_01"
+      ],
+      "interactions": [
+        {
+          "desc": "破解档案库门禁",
+          "requirements": {
+            "puzzleSolved": {
+              "type": "logic",
+              "title": "终端防火墙",
+              "desc": "根据残存日志推断主管的覆写密码。",
+              "solution": "1984",
+              "data": {
+                "premises": [
+                  "密码是一组四位数",
+                  "他似乎对著名的新语反乌托邦小说尤为着迷"
+                ],
+                "question": "输入覆写密码：",
+                "options": [
+                  "1984",
+                  "2077",
+                  "1999",
+                  "2001"
+                ],
+                "correctIndex": 0
+              },
+              "hints": [
+                "这在旧世界是一本极为有名的代表作"
+              ],
+              "penalty": {
+                "sanity": -5
+              }
+            }
+          },
+          "results": {
+            "timeCost": 2,
+            "soundEffect": "puzzle_solve",
+            "narrative": "档案柜弹开，你找到了通往最终测试区的高级权限卡。",
+            "stateChange": {
+              "gain": [
+                {
+                  "id": "security_keycard",
+                  "name": "安保最高权限卡",
+                  "desc": "能开启设施最深处的核心门禁。",
+                  "type": "material",
+                  "rarity": "epic"
+                }
+              ],
+              "unlock": [
+                [
+                  "node_37_test_chamber_01",
+                  "刷卡进入核心测试区"
+                ]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "node_36_armory": {
+      "name": "重型军械库",
+      "desc": "架子上堆积着早期实验阶段的报废机械和安保武器。最深处，一个被防尘布盖住的重型设备反射出一道致命的寒光。",
+      "visualPrompt": "Forgotten storage armory. Piles of scrap metal and guns resembling mechanical skeletons. Heavy device hidden under tarp.",
+      "threatLevel": 6,
+      "items": [
+        {
+          "id": "heavy_plasma_cutter",
+          "name": "工业级等离子切割器",
+          "desc": "沉重、致命，原本用于切割舰船装甲。",
+          "type": "weapon",
+          "rarity": "epic",
+          "quantity": 1,
+          "weaponType": "firearm",
+          "rangeDamage": 35,
+          "maxUses": 8,
+          "discoveryThreshold": 3
+        }
+      ]
+    },
+    "node_37_test_chamber_01": {
+      "name": "核心测试舱 01",
+      "desc": "巨大的空旷房间，周围布满了观测镜头。中央的地面如同玻璃般平整，但当你踩上去时，你发现下方深渊中倒悬着另一个一模一样的房间。",
+      "visualPrompt": "Vast empty testing chamber with an unnervingly pristine glass floor. Looking down reveals an infinite reflection of the room inverted.",
+      "threatLevel": 12,
+      "childrenIds": [
+        "node_38_fracture_threshold"
+      ]
+    },
+    "node_38_fracture_threshold": {
+      "name": "F区入口 (裂痕边界)",
+      "desc": "跨过一道无形的屏障后，物理法则完全崩坏。重力开始变得方向不定。走廊的地板开始像是液态水银一样波动。",
+      "visualPrompt": "Surreal transition point. Architecture bending defying gravity, floor turning into rippling liquid mercury.",
+      "threatLevel": 14,
+      "childrenIds": [
+        "node_39_shattered_gallery",
+        "node_40_reflection_hall"
+      ]
+    },
+    "node_39_shattered_gallery": {
+      "name": "碎裂画廊",
+      "desc": "空间中悬浮着无数破碎的巨型镜子碎片，每一个碎片都反射出不同的、扭曲的惨状。你感到仿佛被成百上千双眼睛同时凝视，倒影中的你正冲你露出诡异的微笑。",
+      "visualPrompt": "A massive void filled with floating, scattered mirror shards, each reflecting twisted realities. Paranoia inducing.",
+      "threatLevel": 18,
+      "interactions": [
+        {
+          "desc": "凝视深渊的镜面",
+          "results": {
+            "timeCost": 1,
+            "soundEffect": "distortion",
+            "narrative": "你忍不住注视着其中一面镜子，里面的你正缓缓拔出武器对准自己的喉咙……你猛地移开视线，感到一阵强烈的反胃。",
+            "stateChange": {
+              "sanity": -20
+            }
+          }
+        }
+      ]
+    },
+    "node_40_reflection_hall": {
+      "name": "无限反射大厅",
+      "desc": "六个维度的方向全是由无缝拼接的镜面构成。这里没有出口的视觉标识，只有你自己的无数个无限延伸的倒影。而其中几个倒影，并没有跟随你的动作。",
+      "visualPrompt": "A perfect cubic hall made entirely of seamless mirrors. Infinite regression of the viewer's reflection. Some reflections are standing still.",
+      "threatLevel": 17,
+      "childrenIds": [
+        "node_41_inverted_staircase"
+      ]
+    },
+    "node_41_inverted_staircase": {
+      "name": "倒悬螺旋阶梯",
+      "desc": "这是一条违反物理的楼梯，你需要头朝下地‘往上’走。阶梯的材质变成了某种柔软的、类似生物肌肉组织的物质。每踩一步，都能听到心跳声。",
+      "visualPrompt": "M.C. Escher-like impossible staircase made of dark, fleshy biological material. Gravity inversion. Visceral horror.",
+      "threatLevel": 16,
+      "childrenIds": [
+        "node_42_liquid_metal_sea"
+      ]
+    },
+    "node_42_liquid_metal_sea": {
+      "name": "回响之厅 (水银海)",
+      "desc": "一个广阔的无边界大厅，地面如同巨大的液态水银，平静却深不可测。倒影中出现了你的身影，但它正试图挣脱水银的束缚向你扑来。",
+      "visualPrompt": "A massive boundless chamber, floor is perfectly calm liquid mercury. Walls pulsating like living tissue oozing dark red fluid.",
+      "threatLevel": 19,
+      "childrenIds": [
+        "node_43_echoing_void"
+      ],
+      "items": [
+        {
+          "id": "bioweapon_prototype",
+          "name": "生物镜像原型武器",
+          "type": "weapon",
+          "weaponType": "magical",
+          "rarity": "epic",
+          "desc": "结合了被污染的生物组织与镜面特性的奇特武器。",
+          "discoveryThreshold": 3,
+          "quantity": 1,
+          "rangeDamage": 35,
+          "maxUses": 10
+        }
+      ]
+    },
+    "node_43_echoing_void": {
+      "name": "扭曲回声虚空",
+      "desc": "这里已经没有任何人造物体的痕迹。你漂浮在一个缓缓旋转的、由无数扭曲肢体与破碎镜面构成的深渊涡流中。震耳欲聋的寂静压迫着你的耳膜，你的心跳不由自主地与其频率同步。",
+      "visualPrompt": "Cosmic abyss—a slowly rotating vortex made of warped limbs and shattered mirrors. Profound, terrifying scale.",
+      "threatLevel": 20,
+      "childrenIds": [
+        "node_44_dimensional_rift_exit"
+      ],
+      "events": [
+        "massive_sanity_drain_event"
+      ]
+    },
+    "node_44_dimensional_rift_exit": {
+      "name": "维度奇点 (出口)",
+      "desc": "一个巨大的光芒拱门屹立在此，内部并非实体，而是流动的、漩涡状的反射。这是彻底逃离这片折射梦魇的唯一通道。这里有着超越肉体伤害的威胁，但也散发着微弱的、来自庇护所的呼唤。",
+      "visualPrompt": "A towering massive archway containing a swirling vortex of blinding cosmic energy and pure light, intense lighting, a portal escaping the nightmare.",
+      "threatLevel": 20,
+      "exits": [
+        {
+          "label": "穿越坍缩的漩涡，返回庇护所",
+          "type": "sanctuary_return"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,682 @@
+{
+    "id": "omega_biomech_complex",
+    "name": "欧米伽血肉复合体",
+    "background": "这里曾是一座高度机密的地下生物机械研究所，被称为‘欧米伽’。研究人员试图在此将有机生命与冰冷的钢铁机械完美融合，以创造出一种能够超越生死的新型生命体。然而，一次实验意外唤醒了某种深渊中的古老意识。那团不可名状的血肉吞噬了主脑核心，开始在设施内疯狂蔓延、异化。所有的工作人员要么被同化为怪物，要么在绝望中死去。现在，这里成了一个充斥着绝望、疯狂与死亡的血肉地狱。",
+    "topology": "复合体被分为上下两层。上层为曾经的办公与浅层研究区，包括接待、分诊、浅层手术室以及中央处理核心，通过主管道枢纽连接各个功能区。下层深渊包含各种畸形生物的处理与收容设施，其核心区盘踞着掌控整个复合体能量的融合畸体。两层之间由废料滑道或者深邃的竖井相连，底部由一个需要能源才能启动的紧急升降梯通向最终的地表逃生通道。",
+    "nodesCount": 26,
+    "visualStyle": "A terrifying factory where metal and flesh intertwine, emitting a pungent mixture of rotting flesh and machine oil. Dimly flickering emergency lights illuminate the nightmare manifestation of biomechanics.",
+    "initial": {
+        "dilationFactor": 1.1,
+        "entrance": "node_entrance"
+    },
+    "nodes": {
+        "node_entrance": {
+            "name": "设施入口",
+            "desc": "沉重的金属大门半开着，散发出腐肉与机油混合的刺鼻气味。门框上缠绕着泛着微光的生物组织，与生锈的钢铁形成了诡异的共生。远处传来微弱的嗡鸣声，像是某种巨大生物的心跳。",
+            "visualPrompt": "dark abandoned facility entrance, metallic structures, organic veins, dim light",
+            "threatLevel": 2,
+            "childrenIds": [
+                "node_reception"
+            ]
+        },
+        "node_reception": {
+            "name": "接待大厅",
+            "desc": "宽敞的大厅被一层粘稠的灰尘覆盖，曾经是接待台的地方现在堆满了残破的终端和扭曲的金属片。天花板上垂下一些发光的菌丝，微弱地照亮了地面上干涸的血迹与腐烂的肉块。空气中弥漫着压抑的寂静，只有你自己的呼吸声。",
+            "visualPrompt": "wide reception hall, corrupted bio-luminescent growths, rusted metal, debris",
+            "threatLevel": 3,
+            "childrenIds": [
+                "node_triage",
+                "node_conduit_junction"
+            ],
+            "items": [
+                {
+                    "id": "partial_map",
+                    "name": "设施部分地图",
+                    "desc": "一张沾满污渍的设施平面图，部分区域被烧毁，但仍能辨认出大致布局。",
+                    "type": "document",
+                    "rarity": "common",
+                    "discoveryThreshold": 2,
+                    "documentContent": "这张地图显示了医疗区和工业区的大致方位，但中央区域标记为'限制访问'。警告：深层复合体存在严重生物污染。"
+                }
+            ]
+        },
+        "node_triage": {
+            "name": "分诊台",
+            "desc": "狭小的分诊室里，废弃的生物扫描仪与金属桌椅被某种蠕动的有机质缠绕。无影灯下，曾经洁白的表面沾满了暗红色的污渍，空气中弥漫着福尔马林和铁锈的混合气味。一台破损的显示器还在发出微弱的滋滋声。",
+            "visualPrompt": "medical triage station, bloodstains, fused organic matter, flickering lights",
+            "threatLevel": 4,
+            "childrenIds": [
+                "node_surgery",
+                "node_observation"
+            ],
+            "items": [
+                {
+                    "id": "medical_stimulant",
+                    "name": "医疗兴奋剂",
+                    "desc": "一支密封完好的注射器，内含高效的止痛和恢复药剂。略微发光。",
+                    "type": "consumable",
+                    "rarity": "rare",
+                    "discoveryThreshold": 3,
+                    "effects": [
+                        [
+                            "heal_hp",
+                            25
+                        ],
+                        [
+                            "agility",
+                            2,
+                            3
+                        ]
+                    ],
+                    "quantity": 1
+                }
+            ]
+        },
+        "node_surgery": {
+            "name": "手术室A",
+            "desc": "手术室中央的金属操作台上，一具半人半机械的畸形躯体被粗大的皮带束缚着。它的皮肤下血管清晰可见，与暴露的电线和金属板融合。房间内弥漫着浓烈的血腥味和消毒剂的刺鼻气息，角落里堆满了染血的医疗器械和废弃的金属零件。",
+            "visualPrompt": "macabre operating room, flesh-metal amalgamation on table, surgical tools, dim red light",
+            "threatLevel": 6,
+            "childrenIds": [
+                "node_fusion_chamber"
+            ],
+            "specificEnemy": {
+                "id": "flesh_stitched_sentry",
+                "name": "血肉缝合哨兵",
+                "desc": "一个由人类躯体与废弃无人机残骸缝合而成的怪物，行动笨拙但攻击力惊人。",
+                "visualPrompt": "grotesque humanoid, metallic limbs, glowing red eyes",
+                "initialState": {
+                    "attribute": {
+                        "strength": 7,
+                        "agility": 3,
+                        "knowledge": 2,
+                        "perception": 4
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 70,
+                    "buff": 0,
+                    "debuff": 20,
+                    "observe": 10
+                },
+                "nextIntent": {
+                    "type": "attack",
+                    "desc": "沉重挥击",
+                    "value": 8
+                },
+                "lootTable": [
+                    {
+                        "id": "scrap_metal",
+                        "name": "废金属",
+                        "desc": "一些可用于制造或修理的废弃金属。",
+                        "type": "material",
+                        "rarity": "common",
+                        "dropProbability": 0.8
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_enter"
+        },
+        "node_observation": {
+            "name": "观察病房",
+            "desc": "一排排锈迹斑斑的隔离病房，透明的隔板上布满了裂痕和干涸的污渍。每个病房里都空无一人，但床铺和医疗设备都保持着有人刚离开的状态，仿佛病人只是短暂外出。空气中弥漫着一种令人不安的寂静，仿佛能听到过去的低语。",
+            "visualPrompt": "containment cells, distorted glass, eerie silence, data terminals",
+            "threatLevel": 3,
+            "items": [
+                {
+                    "id": "corrupted_data_log",
+                    "name": "损坏的数据日志",
+                    "desc": "一个部分损坏的平板电脑，屏幕上显示着零散的实验数据和患者记录。",
+                    "type": "document",
+                    "rarity": "common",
+                    "discoveryThreshold": 1,
+                    "documentContent": "“项目进展：融合体-07表现出极强的适应性，但精神稳定性极差。必须加大镇静剂量。底层的复合体似乎已经失控了……数据记录中断”"
+                }
+            ]
+        },
+        "node_fusion_chamber": {
+            "name": "生物融合室",
+            "desc": "这个房间的中心是一个巨大的生物发光培养罐，里面漂浮着一个模糊的、不断变形的巨大有机体，发出低沉的脉动声。周围的控制台被肉质的藤蔓缠绕，不时有电流穿梭其中，发出滋滋的声响。一股甜腻而腐烂的气味充斥着整个空间，令人作呕。",
+            "visualPrompt": "glowing central synthesis tank, pulsating organic matter, high-tech machinery, grotesque",
+            "threatLevel": 7,
+            "items": [
+                {
+                    "id": "unstable_bio_core",
+                    "name": "不稳定生物核心",
+                    "desc": "一个仍在微微颤动、散发着微弱光芒的有机核心，触感温热而黏滑。",
+                    "type": "material",
+                    "rarity": "epic",
+                    "discoveryThreshold": 5
+                }
+            ]
+        },
+        "node_conduit_junction": {
+            "name": "主管道枢纽",
+            "desc": "巨大的金属管道纵横交错，延伸至黑暗的深处，发出震耳欲聋的轰鸣声。空气中弥漫着蒸汽和金属的焦糊味，脚下的格栅地板在震动中发出吱呀声。几盏应急灯在远处闪烁，勉强照亮了这个庞大而复杂的工业空间。",
+            "visualPrompt": "massive industrial pipes, sparking electrical conduits, multi-level platforms, dim orange lights",
+            "threatLevel": 4,
+            "childrenIds": [
+                "node_maint_tunnel_upper",
+                "node_power_room",
+                "node_scrap_chute"
+            ],
+            "interactions": [
+                {
+                    "desc": "检查维护梯",
+                    "results": {
+                        "timeCost": 1,
+                        "soundEffect": "door_open",
+                        "narrative": "维护梯看起来很老旧，但似乎还能用。它通向更深层的区域。",
+                        "unlock": [
+                            [
+                                "node_processing_core",
+                                "前往中央处理核心（通过维护梯）"
+                            ]
+                        ]
+                    }
+                }
+            ]
+        },
+        "node_maint_tunnel_upper": {
+            "name": "西部维护隧道",
+            "desc": "狭窄的隧道内布满了裸露的电线和漏水的管道，潮湿而阴暗。每次呼吸都带着一股铁锈和霉味。墙壁上涂鸦着一些难以辨认的符号，似乎是维护人员留下的警示。头顶不时传来机械运转的低沉震动。",
+            "visualPrompt": "cramped maintenance tunnel, dripping water, exposed wires, dim light",
+            "threatLevel": 3,
+            "items": [
+                {
+                    "id": "toolkit",
+                    "name": "简易工具包",
+                    "desc": "一个沾满油污的工具包，里面有一些扳手和螺丝刀。",
+                    "type": "material",
+                    "rarity": "common",
+                    "discoveryThreshold": 2
+                },
+                {
+                    "id": "rusty_pipe_wrench",
+                    "name": "生锈的管钳",
+                    "desc": "一把沉重、沾满污渍的工业管钳。非常适合用来敲碎某些不够坚硬的东西。",
+                    "type": "weapon",
+                    "weaponType": "blunt",
+                    "rarity": "common",
+                    "meleeDamage": 4,
+                    "maxUses": 30,
+                    "discoveryThreshold": 2,
+                    "quantity": 1
+                }
+            ]
+        },
+        "node_power_room": {
+            "name": "电力调节室",
+            "desc": "巨大的电力调节器发出高频的嗡鸣声，几根粗大的电缆已经断裂，火花在空气中跳跃。控制面板上的指示灯大部分熄灭，只有少数还在闪烁着不祥的红光。地板上散落着烧焦的碎片和工具，显示这里曾发生过剧烈的事故。",
+            "visualPrompt": "large power generators, sparking control panels, broken gauges, damaged",
+            "threatLevel": 5,
+            "interactions": [
+                {
+                    "desc": "尝试修复电力系统",
+                    "requirements": {
+                        "items": [
+                            "toolkit"
+                        ],
+                        "puzzleSolved": {
+                            "type": "wire",
+                            "title": "电路重连",
+                            "desc": "电力系统的主回路断裂，需要重新连接正确的线路才能恢复供电。",
+                            "solution": "red-w1, blue-w2, green-w3",
+                            "data": {
+                                "wires": [
+                                    {
+                                        "id": "w1",
+                                        "color": "red",
+                                        "label": "A"
+                                    },
+                                    {
+                                        "id": "w2",
+                                        "color": "blue",
+                                        "label": "B"
+                                    },
+                                    {
+                                        "id": "w3",
+                                        "color": "green",
+                                        "label": "C"
+                                    },
+                                    {
+                                        "id": "w4",
+                                        "color": "yellow",
+                                        "label": "D"
+                                    }
+                                ],
+                                "ports": [
+                                    {
+                                        "id": "p1",
+                                        "label": "1",
+                                        "correctWireId": "w1"
+                                    },
+                                    {
+                                        "id": "p2",
+                                        "label": "2",
+                                        "correctWireId": "w2"
+                                    },
+                                    {
+                                        "id": "p3",
+                                        "label": "3",
+                                        "correctWireId": "w3"
+                                    }
+                                ]
+                            },
+                            "hints": [
+                                "检查断裂的颜色编码",
+                                "按照面板上的标记顺序连接"
+                            ],
+                            "penalty": {
+                                "sanity": -5,
+                                "hp": -2
+                            }
+                        }
+                    },
+                    "results": {
+                        "timeCost": 2,
+                        "soundEffect": "power_up",
+                        "narrative": "你成功修复了电力系统，一部分区域的灯光重新亮起，中央处理核心的大门也随之解锁。",
+                        "unlock": [
+                            [
+                                "node_processing_core",
+                                "中央处理核心大门已解锁"
+                            ]
+                        ]
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_processing_core",
+                    "label": "前往中央处理核心（需要电力）"
+                }
+            ]
+        },
+        "node_scrap_chute": {
+            "name": "废料处理滑道",
+            "desc": "一个巨大的金属滑道直通下方深不见底的黑暗，底部传来周期性的金属撞击声和令人不安的液体泼溅声。滑道边缘的金属已经变形，似乎曾有巨大物体被倾倒而下。这里似乎直通下方未知的‘生物机械复合体’。",
+            "visualPrompt": "dark, vertical disposal chute, grinding gears, refuse pile, dangerous",
+            "threatLevel": 6,
+            "interactions": [
+                {
+                    "desc": "跳入废料滑道",
+                    "results": {
+                        "timeCost": 1,
+                        "soundEffect": "distortion",
+                        "narrative": "你沿着滑道滑下，途中被尖锐的金属刮伤，重力拉扯着你坠入未知的深渊。你勉强着陆在底层的入口，浑身是伤。",
+                        "stateChange": {
+                            "hp": -15,
+                            "sanity": -10
+                        },
+                        "unlock": [
+                            [
+                                "node_deep_entrance",
+                                "跌入深渊：前往复合体底层入口"
+                            ]
+                        ]
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_deep_entrance",
+                    "label": "滑入深渊（单向坠落）"
+                }
+            ]
+        },
+        "node_processing_core": {
+            "name": "中央处理核心",
+            "desc": "巨大的圆形空间，中央是一个由无数服务器机架和活体组织纠缠而成的巨型结构，发出低沉的脉动。有机触手在金属框架间蠕动，连接着闪烁的数据流和培养罐。整个空间弥漫着一种令人心悸的生物电磁场。",
+            "visualPrompt": "vast server farm, organic tendrils consuming machinery, pulsating light, biomechanical horror",
+            "threatLevel": 7,
+            "childrenIds": [
+                "node_flesh_forge",
+                "node_overlook_upper"
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_power_room",
+                    "label": "返回电力调节室"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_evac_shaft",
+                    "label": "前往紧急撤离竖井"
+                }
+            ]
+        },
+        "node_flesh_forge": {
+            "name": "血肉熔炉室",
+            "desc": "房间中央是一个巨大的、活生生的熔炉，由跳动的血管和扭曲的金属构成，不断有粘稠的液体从中喷溅而出。这是上层设施最核心的恐怖。熔炉底部的排渣口塌陷了一个大洞，似乎通往更深层的复合体网络。",
+            "visualPrompt": "glowing, heart-like organic forge, grotesque machinery, writhing flesh, cacophony of screams",
+            "threatLevel": 8,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_deep_entrance",
+                    "label": "从塌陷口跃下，进入深层复合体（危险）"
+                }
+            ]
+        },
+        "node_overlook_upper": {
+            "name": "上层俯瞰台",
+            "desc": "一扇巨大的、布满裂痕的防弹玻璃俯瞰着下方的血肉熔炉室。控制台被破坏殆尽，屏幕上只剩下雪花和模糊的图像。空气中弥漫着绝望与腐朽的气味，仿佛这里曾是最后一道防线。",
+            "visualPrompt": "shattered glass control room, overlooking a monstrous chamber, damaged consoles",
+            "threatLevel": 5,
+            "nodeNpc": {
+                "id": "dying_researcher",
+                "name": "濒死的研究员",
+                "hide": true,
+                "gender": "male",
+                "desc": "他的一半身体已经与控制台的金属融合，暗红色的血液和黑色的机油在脚下汇聚。他的眼睛由于植入物的破坏而失去了视力，但仍然机械性地重复着警告。",
+                "visualPrompt": "A half-human researcher fused into the control console, leaking oil and blood, cybernetic eyes ruined, despairing.",
+                "initialState": {
+                    "level": 1,
+                    "xp": 0,
+                    "deck": [],
+                    "attribute": {
+                        "strength": 2,
+                        "agility": 1,
+                        "knowledge": 8,
+                        "perception": 5
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    },
+                    "vital": {
+                        "maxHp": 100,
+                        "hp": 5,
+                        "maxSanity": 100,
+                        "sanity": 10,
+                        "maxStamina": 100,
+                        "stamina": 10,
+                        "maxVigor": 100,
+                        "vigor": 10
+                    },
+                    "inventory": [],
+                    "trust": 0,
+                    "quest": {}
+                },
+                "style": "tactical"
+            },
+            "items": [
+                {
+                    "id": "project_genesis_notes",
+                    "name": "创世纪项目研究笔记",
+                    "desc": "一本沾满污渍的笔记本，记录了设施内进行的禁忌实验的细节。",
+                    "type": "document",
+                    "rarity": "rare",
+                    "discoveryThreshold": 2,
+                    "documentContent": "“……我们试图通过融合生物与机械来超越生命的极限。但我们唤醒的，远比我们想象的更古老。逃生竖井的动力电池已经被下层的主脑怪物夺走，我们没有退路了……”"
+                }
+            ]
+        },
+        "node_evac_shaft": {
+            "name": "紧急撤离竖井",
+            "desc": "一个巨大的金属竖井直冲天际，内部的紧急升降梯停在这一层。冷风从上方呼啸而下，带来一丝希望的气息。但升降梯的控制面板缺乏动力，需要【等离子能量电池】才能将其启动，送往地表。",
+            "visualPrompt": "rusted emergency elevator shaft, cables dangling, strong updraft, unstable",
+            "threatLevel": 6,
+            "childrenIds": [
+                "node_surface_hatch"
+            ],
+            "interactions": [
+                {
+                    "desc": "尝试启动紧急升降梯",
+                    "requirements": {
+                        "items": [
+                            "plasma_cell"
+                        ]
+                    },
+                    "results": {
+                        "timeCost": 2,
+                        "soundEffect": "power_up",
+                        "narrative": "你将历经千辛万苦夺回的等离子电池插入控制面板，升降梯的指示灯亮起刺眼的蓝光，发出沉重的轰鸣声，通往地表的路径终于打通了。",
+                        "stateChange": {
+                            "lose": [
+                                "plasma_cell"
+                            ]
+                        },
+                        "unlock": [
+                            [
+                                "node_surface_hatch",
+                                "升降梯已启动，乘坐通往地表"
+                            ]
+                        ]
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_processing_core",
+                    "label": "返回中央处理核心"
+                }
+            ]
+        },
+        "node_deep_entrance": {
+            "name": "底层复合体入口",
+            "desc": "从上层坠落至此，你面前是巨大的金属闸门，门缝中透出幽暗。生锈的钢板上覆盖着密集的菌丝与粘稠的生物残骸，空气中弥漫着冰冷的铁锈味与腐肉的甜腻气息。你已经来到了设施的最底层异化区。",
+            "visualPrompt": "thick rusted metal door in deep abyss, seeping dark fluids, biomechanical horror",
+            "threatLevel": 5,
+            "childrenIds": [
+                "node_deep_hall"
+            ]
+        },
+        "node_deep_hall": {
+            "name": "深渊大厅",
+            "desc": "巨大的钢门后是一个阴冷的大厅，空气中弥漫着强酸气味。废弃的设备堆积如山，生锈的金属与某种粘稠的生物残骸混杂。地板上留有巨大的拖拽痕迹，通向枢纽深处。",
+            "visualPrompt": "dim hall deep underground, rusted metal, walls covered in organic mycelium",
+            "threatLevel": 5,
+            "childrenIds": [
+                "node_deep_hub",
+                "node_deep_storage"
+            ]
+        },
+        "node_deep_storage": {
+            "name": "废弃储藏区",
+            "desc": "堆满了破损的容器和废弃的工业零件。角落里堆积着不知名的粘性物质，散发着微弱的腐败气息，如同腐烂的内脏。",
+            "visualPrompt": "dark cluttered storage room, broken equipment, sticky organic residue",
+            "threatLevel": 4,
+            "items": [
+                {
+                    "id": "lab_key",
+                    "name": "实验室钥匙卡",
+                    "desc": "一张旧式门禁卡，上面模糊地印着'E-LAB'字样，似乎被某种粘液包裹。",
+                    "type": "material",
+                    "rarity": "common",
+                    "discoveryThreshold": 3,
+                    "quantity": 1
+                },
+                {
+                    "id": "bio_hazard_suit",
+                    "name": "破损的防化服",
+                    "desc": "一套曾经能抵御生化污染的防护服，现在虽然破损，但仍能提供一些保护。",
+                    "type": "armor",
+                    "rarity": "rare",
+                    "defense": 3,
+                    "maxUses": 20,
+                    "discoveryThreshold": 3,
+                    "quantity": 1
+                }
+            ]
+        },
+        "node_deep_hub": {
+            "name": "底层中央枢纽",
+            "desc": "宽阔的圆形大厅，多条通道交汇于此。中心矗立着一根扭曲的、布满管道的柱子，表面隐约有肉质的纹理在缓慢搏动。仿佛是这片区域的心脏。",
+            "visualPrompt": "circular junction, central pillar mixed with metal and flesh, pulsating faintly",
+            "threatLevel": 6,
+            "childrenIds": [
+                "node_deep_processing",
+                "node_deep_east_lab",
+                "node_deep_maint_shaft"
+            ]
+        },
+        "node_deep_processing": {
+            "name": "生物处理线与控制站",
+            "desc": "一条延伸至黑暗深处的自动化生产线，巨大的机械臂浸泡在发出微光的生物溶液中。旁边的废弃控制台闪烁着微弱的警示灯，似乎曾监控着这场恶心的融合过程。空气中弥漫着血腥味。",
+            "visualPrompt": "giant mechanical arms in red bioliquid, adjacent dead control consoles, gruesome",
+            "threatLevel": 6,
+            "childrenIds": [
+                "node_deep_lab"
+            ]
+        },
+        "node_deep_lab": {
+            "name": "畸形生物实验室",
+            "desc": "散发着荧光灯白光的实验室，玻璃培养皿中漂浮着畸形的生物样本，它们的形态扭曲而诡异。操作台上散落着各种解剖工具。",
+            "visualPrompt": "bright clinical lab, distorted specimens in jars, cold metallic tables",
+            "threatLevel": 5,
+            "childrenIds": [
+                "node_deep_containment"
+            ],
+            "items": [
+                {
+                    "id": "lab_notes",
+                    "name": "实验日志碎片",
+                    "desc": "一份烧焦的实验日志，部分内容模糊不清。",
+                    "type": "document",
+                    "rarity": "rare",
+                    "discoveryThreshold": 2,
+                    "quantity": 1,
+                    "documentContent": "“……我们成功将活体组织与合金融合，但其心智活性异常高，它正在主控室生长，它偷走了我们的动力源……必须阻止它。”"
+                }
+            ]
+        },
+        "node_deep_containment": {
+            "name": "异常收容单元",
+            "desc": "一排排厚重的金属门，上面用未知符号和警告标记。空气寒冷而死寂，偶尔能听到金属内部传来微弱的刮擦声，令人不寒而栗。",
+            "visualPrompt": "heavy containment doors, flashing red warning lights, terrifying shadows",
+            "threatLevel": 6
+        },
+        "node_deep_east_lab": {
+            "name": "东部实验室",
+            "desc": "废弃的实验室，桌上散落着实验记录和破碎的器皿。地上有一摊干涸的液体，形状扭曲如挣扎的人影。这里的大门曾被上锁，是通往最终核心的必经之路。",
+            "visualPrompt": "broken petri dishes, bloody autopsy table, twisted forms on the floor",
+            "threatLevel": 6,
+            "childrenIds": [
+                "node_deep_core"
+            ],
+            "interactions": [
+                {
+                    "desc": "使用钥匙卡开启核心通道",
+                    "requirements": {
+                        "items": [
+                            "lab_key"
+                        ]
+                    },
+                    "results": {
+                        "timeCost": 1,
+                        "soundEffect": "door_open",
+                        "narrative": "你刷下钥匙卡，沉重的气密门伴随着气流声缓缓打开，一股令人窒息的恶臭扑面而来。通往深渊主控室的道路畅通了。",
+                        "unlock": [
+                            [
+                                "node_deep_core",
+                                "进入最终的主控室（极度危险）"
+                            ]
+                        ]
+                    }
+                }
+            ]
+        },
+        "node_deep_maint_shaft": {
+            "name": "底层维修竖井",
+            "desc": "狭窄而陡峭的金属竖井，管道与电缆杂乱无章地缠绕。头顶传来阵阵怪异的低语，空气潮湿而闷热。可以通向上方的观测平台。",
+            "visualPrompt": "dark vertical shaft, rusted ladder, tangled thick cables",
+            "threatLevel": 4,
+            "childrenIds": [
+                "node_deep_deck"
+            ]
+        },
+        "node_deep_deck": {
+            "name": "底层观测平台",
+            "desc": "一个摇摇欲坠的金属平台，通过巨大的玻璃窗俯瞰下方深渊般的主控室。你可以清楚地看到那团不可名状的庞大肉块正在吞噬着核心计算机系统。",
+            "visualPrompt": "fragile metal catwalk, overlooking a massive biomechanical monstrosity",
+            "threatLevel": 7
+        },
+        "node_deep_core": {
+            "name": "深渊主控室",
+            "desc": "废弃的控制台闪烁着微弱的警示灯。地面被粘稠的黑色物质覆盖，这片区域的核心盘踞着一只难以名状的憎恶怪物。它的体内闪烁着蓝光——正是上层电梯急需的等离子电池！",
+            "visualPrompt": "corrupted main control room, giant biomechanical boss entity, blue glowing core",
+            "threatLevel": 10,
+            "specificEnemy": {
+                "id": "fused_abomination",
+                "name": "融合畸体",
+                "desc": "一个由机械和血肉完美融合而成的可憎主脑，它的肢体在不自然地抽搐，保护着体内的能源核心。",
+                "visualPrompt": "massive biomech horror, multiple limbs, leaking black fluid, erratic eyes",
+                "initialState": {
+                    "attribute": {
+                        "strength": 12,
+                        "agility": 6,
+                        "knowledge": 4,
+                        "perception": 10
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 60,
+                    "buff": 10,
+                    "debuff": 20,
+                    "observe": 10
+                },
+                "nextIntent": {
+                    "type": "debuff",
+                    "desc": "释放心灵尖啸",
+                    "value": 15
+                },
+                "lootTable": [
+                    {
+                        "id": "plasma_cell",
+                        "name": "等离子能量电池",
+                        "desc": "一块高效能量电池，发出刺眼的蓝色光芒，是启动上层逃生电梯的唯一希望。",
+                        "type": "material",
+                        "rarity": "epic",
+                        "dropProbability": 1
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_enter",
+            "exits": [
+                {
+                    "targetId": "node_evac_shaft",
+                    "label": "乘坐主控室的高速货梯直达上层竖井",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_surface_hatch": {
+            "name": "地表通道舱门",
+            "desc": "历经无尽的血肉与机械的折磨，升降梯最终停在一个巨大的金属舱门前。舱门缝隙中透出耀眼的白光，你能听到来自地表世界的声音——风声，以及久违的宁静。地狱终于被你甩在了身后。",
+            "visualPrompt": "heavy metal hatch opening, blinding white light piercing through the dark, dust floating",
+            "threatLevel": 1,
+            "exits": [
+                {
+                    "type": "sanctuary_return",
+                    "label": "推开舱门，逃离这片血肉设施"
+                }
+            ]
+        }
+    }
+}

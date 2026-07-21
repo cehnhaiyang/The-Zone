@@ -1,0 +1,696 @@
+{
+  "id": "folk_horror_village",
+  "name": "霍洛赫斯特村",
+  "background": "在丰收庆典的表象下，隐藏着向古老大地之灵献祭的恐怖循环。村庄的时间流速与外界不同，每季丰收祭都需要外来者的血让土地保持肥沃。",
+  "topology": "从废弃的入口广场出发，呈放射状连接教堂、磨坊、村舍和领主宅邸，地表下通过隐秘的暗道互相连通，最终收束于田地深处的祭祀核心——圣林。",
+  "nodesCount": 20,
+  "visualStyle": "crumbling rural hamlet shrouded in perpetual autumn mist, twisted roots, dry cornfields, pagan symbols etched into weathered wood",
+  "initial": {
+    "dilationFactor": 1.2,
+    "entrance": "village_entrance"
+  },
+  "nodes": {
+    "village_entrance": {
+      "name": "村庄入口",
+      "desc": "浓雾缠绕着生锈的铁门，门上的木牌已看不清字迹。道路两旁堆积着腐烂的麦秆，空气中弥漫着潮湿泥土与陈年血腥味。远处传来微弱的铃铛声，却不见人影。",
+      "visualPrompt": "rusted iron gate engulfed in mist, fallen wooden sign, decayed wheat piles along muddy path",
+      "threatLevel": 3,
+      "exits": [
+        {
+          "type": "local",
+          "targetId": "village_square",
+          "label": "沿着泥路进入广场"
+        }
+      ],
+      "items": [
+        {
+          "id": "worn_note",
+          "name": "磨损的纸条",
+          "desc": "一张被水浸透的字条，上面勉强能辨认出“丰收……血……土地……”等字迹。",
+          "type": "document",
+          "rarity": "common",
+          "documentContent": "所有外乡人，请即刻离开。丰收祭需要活牲，而我们的存粮已耗尽。它醒了就来不及了。"
+        }
+      ]
+    },
+    "village_square": {
+      "name": "村庄广场",
+      "desc": "广场中央立着一个巨大的稻草人祭坛，头上戴着弯曲的鹿角，眼窝里插着枯萎的麦穗。周围的房屋门窗紧闭，只有风吹动百叶窗的嘎吱声。地面被拖曳出的深色痕迹指向各个方向。",
+      "visualPrompt": "large scarecrow altar with antlers at village center, deserted houses with shuttered windows, dark stains on cobblestone",
+      "threatLevel": 5,
+      "exits": [
+        {
+          "type": "local",
+          "targetId": "village_entrance",
+          "label": "退回村庄入口"
+        },
+        {
+          "type": "local",
+          "targetId": "old_church",
+          "label": "前往倾颓的教堂"
+        },
+        {
+          "type": "local",
+          "targetId": "grain_mill",
+          "label": "进入废弃磨坊"
+        },
+        {
+          "type": "local",
+          "targetId": "abandoned_cottage",
+          "label": "探查废弃村舍"
+        },
+        {
+          "type": "local",
+          "targetId": "village_well",
+          "label": "靠近古旧的石井"
+        },
+        {
+          "type": "local",
+          "targetId": "manor_house",
+          "label": "走向领主宅邸"
+        },
+        {
+          "type": "local",
+          "targetId": "graveyard",
+          "label": "穿过墓地小径"
+        }
+      ],
+      "events": [
+        "fog_thickens"
+      ]
+    },
+    "old_church": {
+      "name": "倾颓的教堂",
+      "desc": "教堂的木门半挂在铰链上，墙壁上的常春藤已侵入裂缝。内部的圣坛倾倒，十字架被倒置，墙上绘满了纠缠的根须与睁开的眼睛，颜料似乎未干。",
+      "visualPrompt": "crumbling church with ivy-covered stone walls, overturned altar, inverted cross, wet wall paintings of roots and eyes",
+      "threatLevel": 8,
+      "childrenIds": [
+        "church_nave",
+        "church_crypt"
+      ],
+      "exits": [
+        {
+          "type": "local",
+          "targetId": "village_square",
+          "label": "离开教堂回到广场"
+        }
+      ]
+    },
+    "church_nave": {
+      "name": "教堂正厅",
+      "desc": "长椅被堆叠在角落，中央腾出一个圆形空间，地板上刻着复杂的沟槽，汇聚到中心一个碗状凹陷。凹陷里残留着暗色粘稠液体。周围的空气冰冷，呼吸都化成白雾。",
+      "visualPrompt": "circular groove pattern on wooden floor leading to central bowl, pews stacked aside, icy breath visible",
+      "threatLevel": 10,
+      "items": [
+        {
+          "id": "priest_diary",
+          "name": "神父日记",
+          "desc": "一本布满霉斑的日记，最后几页似乎被用力撕掉，只剩潦草的警告。",
+          "type": "document",
+          "rarity": "rare",
+          "discoveryThreshold": 6,
+          "documentContent": "他们对土地的饥渴无法满足。我用血画下了封印，但每二十年就必须重新献祭。这一次，我做不到……原谅我。"
+        },
+        {
+          "id": "holy_water",
+          "name": "圣水",
+          "desc": "一瓶未经祝福的圣水，在靠近刻痕时会微微发光。",
+          "type": "consumable",
+          "rarity": "common",
+          "effects": [
+            [
+              "heal_sanity",
+              15
+            ]
+          ]
+        }
+      ],
+      "interactions": [
+        {
+          "desc": "擦拭地板上碗状凹陷周围的血迹",
+          "requirements": {
+            "items": [
+              "holy_water"
+            ]
+          },
+          "results": {
+            "timeCost": 2,
+            "soundEffect": "click",
+            "narrative": "圣水渗入沟槽，轨迹亮起淡淡的蓝光，最终汇聚到圣坛背后的暗门，门缓缓打开，涌出地窖的霉味。",
+            "stateChange": {
+              "unlock": [
+                [
+                  "church_crypt",
+                  "圣坛后的隐藏暗门"
+                ]
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "church_crypt": {
+      "name": "教堂地窖",
+      "desc": "狭窄的石阶向下延伸，墙壁上凿出的壁龛里堆放着古老的骨骸。尽头是一尊石棺，表面刻着一棵倒生的树，根系伸向人形轮廓。这里的空气稠密，时间似乎凝固。",
+      "visualPrompt": "narrow stone stairs descending, niches with bones, sarcophagus engraved with inverted tree and humanoid roots",
+      "threatLevel": 16,
+      "exits": [
+        {
+          "type": "local",
+          "targetId": "ritual_field",
+          "label": "从地窖后方的泥土隧道爬出"
+        }
+      ],
+      "specificEnemy": {
+        "id": "gravekeeper",
+        "name": "守墓枯骨",
+        "desc": "一堆由扭曲骨骸拼成的人形，颅骨裂开露出根系，每走一步都留下潮湿的泥土。",
+        "gender": "both",
+        "visualPrompt": "undead amalgamation of bones with roots forcing through skull cracks, covered in wet earth",
+        "initialState": {
+          "attribute": {
+            "strength": 12,
+            "agility": 6,
+            "knowledge": 3,
+            "perception": 8
+          },
+          "equipState": {
+            "weapons": [
+              null,
+              null
+            ],
+            "armors": [],
+            "accessories": []
+          }
+        },
+        "nextIntent": {
+          "type": "attack",
+          "desc": "挥舞带根骨臂",
+          "value": 15,
+          "targetId": "player"
+        },
+        "intentDistribution": {
+          "attack": 70,
+          "buff": 0,
+          "debuff": 20,
+          "observe": 10
+        },
+        "lootTable": [
+          {
+            "id": "root_amulet",
+            "name": "根须护符",
+            "desc": "一块缠绕根须的骨片，触碰时有脉搏般的律动。",
+            "type": "accessory",
+            "rarity": "epic",
+            "effects": [
+              [
+                "maxHp",
+                15
+              ],
+              [
+                "perception",
+                2
+              ]
+            ],
+            "dropProbability": 0.4
+          }
+        ],
+        "enemySpawnCondition": "on_enter"
+      }
+    },
+    "graveyard": {
+      "name": "村庄墓地",
+      "desc": "歪斜的墓碑半埋在蔓生的野草中，许多刻着相同的死亡年份。地面松软，踩下去有微微下陷的感觉。雾气在这里更浓，能见度极低。",
+      "visualPrompt": "overgrown graveyard with crooked tombstones, dense fog, soft sinking ground",
+      "threatLevel": 7,
+      "childrenIds": [
+        "graveyard_crypt"
+      ],
+      "items": [
+        {
+          "id": "silver_locket",
+          "name": "银质挂坠盒",
+          "desc": "一副小巧的银挂坠，内里刻着“勿忘我”，但照片已经模糊成一团。",
+          "type": "accessory",
+          "rarity": "rare",
+          "effects": [
+            [
+              "maxSanity",
+              10
+            ]
+          ]
+        }
+      ],
+      "exits": [
+        {
+          "type": "local",
+          "targetId": "village_square",
+          "label": "原路返回村庄广场"
+        }
+      ]
+    },
+    "graveyard_crypt": {
+      "name": "墓地地下墓穴",
+      "desc": "石阶通向一个低矮的墓室，四面墙上凿满了安放尸骨的凹槽。角落里堆着大量空麻袋，上面锈色的印记散发着铁锈与腐肉的甜腻气味。",
+      "visualPrompt": "low-ceilinged crypt with bone-filled niches, empty sacks with rust-colored stains",
+      "threatLevel": 10,
+      "enemySpawnCondition": "on_search",
+      "specificEnemy": {
+        "id": "corpse_eater",
+        "name": "食腐尸鬼",
+        "desc": "长期啃食受污染尸体而变异的地下生物，手脚退化成利爪。",
+        "gender": "both",
+        "visualPrompt": "hunched ghoul with elongated claws, feasting on contaminated remains in the dark",
+        "initialState": {
+          "attribute": {
+            "strength": 8,
+            "agility": 12,
+            "knowledge": 1,
+            "perception": 14
+          },
+          "equipState": {
+            "weapons": [
+              null,
+              null
+            ],
+            "armors": [],
+            "accessories": []
+          }
+        },
+        "nextIntent": {
+          "type": "attack",
+          "desc": "猛扑撕咬",
+          "value": 12,
+          "targetId": "player"
+        },
+        "intentDistribution": {
+          "attack": 80,
+          "buff": 10,
+          "debuff": 10,
+          "observe": 0
+        }
+      }
+    },
+    "grain_mill": {
+      "name": "废弃磨坊",
+      "desc": "巨大的水车轮已停止转动，木制齿轮上缠满了干枯的藤蔓。内部的扬尘让人窒息，地板上洒落着发黑的谷物。墙上挂着一件沾血的围裙。",
+      "visualPrompt": "defunct water wheel, wooden gears with dry vines, dust-filled air, bloodied apron hanging on wall",
+      "threatLevel": 8,
+      "childrenIds": [
+        "mill_basement"
+      ],
+      "items": [
+        {
+          "id": "rusty_sickle",
+          "name": "锈迹镰刀",
+          "desc": "一把农用的弯镰，刃口虽锈但握柄舒适。",
+          "type": "weapon",
+          "rarity": "common",
+          "weaponType": "dagger",
+          "meleeDamage": 12,
+          "maxUses": 40
+        }
+      ],
+      "exits": [
+        {
+          "type": "local",
+          "targetId": "village_square",
+          "label": "离开磨坊返回广场"
+        }
+      ]
+    },
+    "mill_basement": {
+      "name": "磨坊地窖",
+      "desc": "潮湿的储藏室堆满发霉的麦袋，墙角淌着暗色液体，聚成一个小水洼。天花板很低，蜘蛛网连着干尸状的虫壳。",
+      "visualPrompt": "damp storage with moldy grain sacks, dark puddle in corner, low cobweb-covered ceiling",
+      "threatLevel": 11,
+      "exits": [
+        {
+          "type": "local",
+          "targetId": "old_barn",
+          "label": "穿过墙上的破洞进入相邻的谷仓"
+        }
+      ],
+      "enemySpawnCondition": "on_interact"
+    },
+    "abandoned_cottage": {
+      "name": "废弃村舍",
+      "desc": "客厅的家具被粗暴地推翻，干涸的血手印从壁炉一直延伸到门口。厨房的瓦罐里装着变质的腌菜，散发着酸败味。通往阁楼的楼梯吱呀作响。",
+      "visualPrompt": "overturned furniture, dried handprints on floor, jars of spoiled preserves, creaky attic stairs",
+      "threatLevel": 6,
+      "childrenIds": [
+        "cottage_attic"
+      ],
+      "items": [
+        {
+          "id": "family_photo",
+          "name": "全家福照片",
+          "desc": "一张褪色的照片，上面的村民笑容空洞，眼睛似乎在注视不同的方向。",
+          "type": "document",
+          "rarity": "common",
+          "documentContent": "摄于丰收祭，愿土地继续赐福。——右下角用墨水写着“原谅我们”。",
+          "discoveryThreshold": 5
+        }
+      ],
+      "exits": [
+        {
+          "type": "local",
+          "targetId": "village_square",
+          "label": "退回村舍门外的广场"
+        }
+      ]
+    },
+    "cottage_attic": {
+      "name": "村舍阁楼",
+      "desc": "三角屋顶下的阴暗空间，堆满破旧行李箱和婴儿床。窗下放着一把摇椅，还在轻微晃动。空气中飘着樟脑和陈旧血渍混合的怪味。",
+      "visualPrompt": "dark attic with old suitcases and a crib, a rocking chair moving slightly, smell of mothballs and old blood",
+      "threatLevel": 7,
+      "items": [
+        {
+          "id": "lullaby_music_box",
+          "name": "摇篮曲八音盒",
+          "desc": "一个手工雕刻的八音盒，播放着走调的摇篮曲。底部刻着“给我们的孩子，愿土地免你饥饿”。",
+          "type": "audio",
+          "rarity": "rare",
+          "audioScript": "走调的八音盒旋律中夹杂着微弱的低语：“地下的根缠住了摇篮，宝宝别哭……”"
+        }
+      ]
+    },
+    "village_well": {
+      "name": "古旧石井",
+      "desc": "井口围着一圈覆满青苔的石头，闻起来有一股浓重的泥土腥味。绞盘上的绳索早已腐烂，但还能看到一只小铁桶悬挂在黑暗中。井底传来规律的水滴声。",
+      "visualPrompt": "moss-covered stone well, rotting rope with iron bucket dangling, rhythmic dripping from deep darkness",
+      "threatLevel": 5,
+      "childrenIds": [
+        "well_bottom"
+      ],
+      "interactions": [
+        {
+          "desc": "沿着井壁的凹槽慢慢攀爬下去",
+          "requirements": {
+            "items": [
+              "rusty_sickle"
+            ]
+          },
+          "results": {
+            "timeCost": 3,
+            "soundEffect": "click",
+            "narrative": "利用镰刀凿出的踏脚点，你缓缓降到井底。水面没膝，周围岩壁上有一道勉强可容身的裂缝。",
+            "stateChange": {
+              "unlock": [
+                [
+                  "well_bottom",
+                  "井底的岩壁裂缝"
+                ]
+              ]
+            }
+          }
+        }
+      ],
+      "exits": [
+        {
+          "type": "local",
+          "targetId": "village_square",
+          "label": "离开石井返回广场"
+        }
+      ]
+    },
+    "well_bottom": {
+      "name": "井底密室",
+      "desc": "裂隙内部是一间被凿出的密室，中央石台上放着一副用人骨拼成的祭坛。祭坛上的石碗里盛着油腻的黑色液体，表面反射出扭曲的倒影。",
+      "visualPrompt": "hidden chamber with bone altar, black oily liquid in stone bowl, distorted reflections",
+      "threatLevel": 13,
+      "exits": [
+        {
+          "type": "local",
+          "targetId": "ritual_field",
+          "label": "通过低矮的土道爬向地面"
+        }
+      ],
+      "items": [
+        {
+          "id": "bone_dagger",
+          "name": "骨制仪式匕首",
+          "desc": "用动物股骨打磨成的匕首，柄部缠绕着人的头发。触碰时会感到一丝不安的脉动。",
+          "type": "weapon",
+          "rarity": "epic",
+          "weaponType": "dagger",
+          "meleeDamage": 18,
+          "maxUses": 30,
+          "discoveryThreshold": 8
+        }
+      ]
+    },
+    "manor_house": {
+      "name": "领主宅邸",
+      "desc": "两层石砌宅邸，窗户被木板封死，正门上方刻着褪色的家族纹章：一只被藤蔓缠绕的手。大厅里，枝形吊灯摔碎在地，墙纸大片剥落。",
+      "visualPrompt": "stone manor sealed with planks, faded crest of hand wrapped in vines, shattered chandelier in foyer",
+      "threatLevel": 10,
+      "childrenIds": [
+        "manor_hall",
+        "manor_study"
+      ],
+      "items": [
+        {
+          "id": "old_rifle",
+          "name": "老式猎枪",
+          "desc": "一把保养尚可的杠杆式步枪，枪托上刻着“守卫家园”。弹药架上只剩三发子弹。",
+          "type": "weapon",
+          "rarity": "rare",
+          "weaponType": "firearm",
+          "rangeDamage": 25,
+          "maxUses": 3
+        }
+      ],
+      "exits": [
+        {
+          "type": "local",
+          "targetId": "village_square",
+          "label": "离开宅邸返回广场"
+        }
+      ]
+    },
+    "manor_hall": {
+      "name": "宅邸大厅",
+      "desc": "长条餐桌仍摆着腐烂的食物，高背椅后方挂着一幅巨大的家族肖像，画中人的眼睛被刺穿，从孔洞中长出细小的树根。地板发出不祥的吱呀声。",
+      "visualPrompt": "long dining table with rotten feast, defaced family portrait with roots growing from eye holes, creaky floorboards",
+      "threatLevel": 12,
+      "enemySpawnCondition": "on_enter"
+    },
+    "manor_study": {
+      "name": "领主书房",
+      "desc": "书桌抽屉被撬开，文件散落一地。壁炉里残留着灰烬和未烧完的账本。墙上挂着一幅羊皮纸地图，标注着村庄周围怪异的螺旋符号。",
+      "visualPrompt": "ransacked study with papers on floor, ashes in fireplace, parchment map with spiral symbols",
+      "threatLevel": 4,
+      "items": [
+        {
+          "id": "lord_journal",
+          "name": "领主日志",
+          "desc": "一本仓促书写的日志，记录着历代丰收祭的主祭者名单和……祭品的来源。",
+          "type": "document",
+          "rarity": "rare",
+          "documentContent": "1876, 用逃兵的血。1896, 用迷路的孩童。1916, 用迷路的士兵。1936, 用一位神父。1956, 用我们的长子……如此土地才能保持安静。我们别无选择。",
+          "discoveryThreshold": 7
+        }
+      ]
+    },
+    "ritual_field": {
+      "name": "祭祀田地",
+      "desc": "大片枯死的玉米地，秸秆在无风的空气中诡异摇摆。中央一块圆形空地上立着五根雕刻着面孔的木柱，组成一个石圈。地面画着被翻动过的粗大螺旋纹路。",
+      "visualPrompt": "barren cornfield with swaying dry stalks, formation of carved wooden pillars with faces, spiral patterns in soil",
+      "threatLevel": 14,
+      "childrenIds": [
+        "old_barn",
+        "hidden_grove"
+      ],
+      "exits": [
+        {
+          "type": "local",
+          "targetId": "church_crypt",
+          "label": "钻入连接地窖的泥土隧道"
+        },
+        {
+          "type": "local",
+          "targetId": "well_bottom",
+          "label": "爬进隐蔽的土道通往井底"
+        }
+      ],
+      "specificEnemy": {
+        "id": "wicker_husk",
+        "name": "枝编躯壳",
+        "desc": "一个由麦秆和柳条编织成的高大拟人，胸腔里填着乌黑的泥土，步行时地面都会微微震颤。",
+        "gender": "both",
+        "visualPrompt": "tall wicker and straw effigy with black soil spilling from chest, heavy footsteps shake ground",
+        "initialState": {
+          "attribute": {
+            "strength": 14,
+            "agility": 4,
+            "knowledge": 2,
+            "perception": 7
+          },
+          "equipState": {
+            "weapons": [
+              null,
+              null
+            ],
+            "armors": [],
+            "accessories": []
+          }
+        },
+        "nextIntent": {
+          "type": "attack",
+          "desc": "挥动手臂砸下",
+          "value": 20,
+          "targetId": "player"
+        },
+        "intentDistribution": {
+          "attack": 65,
+          "buff": 10,
+          "debuff": 15,
+          "observe": 10
+        },
+        "lootTable": [
+          {
+            "id": "black_earth",
+            "name": "黑沃土壤",
+            "desc": "一把从躯壳胸腔中取下的肥沃黑土，不断有细小的根须蠕动。",
+            "type": "material",
+            "rarity": "epic",
+            "dropProbability": 0.8
+          }
+        ],
+        "enemySpawnCondition": "on_enter"
+      }
+    },
+    "old_barn": {
+      "name": "废弃谷仓",
+      "desc": "谷仓大门被从内部撞坏，里面散落着断裂的缰绳和生锈的农具。角落里堆着几副空棺材，内壁满是爪痕。",
+      "visualPrompt": "broken barn doors, scattered reins and rusty tools, claw-scratched empty coffins",
+      "threatLevel": 11,
+      "exits": [
+        {
+          "type": "local",
+          "targetId": "mill_basement",
+          "label": "穿过破洞回到磨坊地窖"
+        }
+      ],
+      "items": [
+        {
+          "id": "coffin_nail",
+          "name": "棺材钉",
+          "desc": "一根锈迹斑斑的长铁钉，表面刻着驱邪的微缩铭文。",
+          "type": "material",
+          "rarity": "rare",
+          "discoveryThreshold": 6,
+          "quantity": 3
+        }
+      ]
+    },
+    "hidden_grove": {
+      "name": "隐藏圣林",
+      "desc": "穿过玉米地深处，一小片扭曲的枯树围成一个圆形空间。树皮上密布着睁开的眼睛浮雕，中央立着一座长满青苔的古老石坛。空气里弥漫着浓郁的泥土甜香，令人昏昏欲睡。",
+      "visualPrompt": "circle of twisted dead trees with eye carvings, ancient mossy altar, heavy sweet earthy scent",
+      "threatLevel": 18,
+      "exits": [
+        {
+          "type": "local",
+          "targetId": "woods_edge",
+          "label": "朝圣林后方的林间小径走去"
+        }
+      ],
+      "interactions": [
+        {
+          "desc": "将黑沃土壤撒在石坛上",
+          "requirements": {
+            "items": [
+              "black_earth",
+              "bone_dagger"
+            ]
+          },
+          "results": {
+            "timeCost": 2,
+            "soundEffect": "click",
+            "narrative": "土壤落在石坛上瞬间被吸收，石坛表面的苔藓迅速枯萎，露出下方的凹槽。你将匕首插入凹槽，大地一阵颤抖，林外传来道路开启的闷响。",
+            "stateChange": {
+              "sanity": -10,
+              "unlock": [
+                [
+                  "woods_edge",
+                  "圣林外新出现的林间小径"
+                ]
+              ]
+            }
+          }
+        }
+      ],
+      "specificEnemy": {
+        "id": "root_effigy",
+        "name": "根须塑像",
+        "desc": "由活体树根缠绕而成的女性形体，面部有多个空洞，里面闪烁着幽绿色的光芒。",
+        "gender": "female",
+        "visualPrompt": "living root sculpture of a woman with hollow face emitting green glow",
+        "initialState": {
+          "attribute": {
+            "strength": 16,
+            "agility": 8,
+            "knowledge": 10,
+            "perception": 12
+          },
+          "equipState": {
+            "weapons": [
+              null,
+              null
+            ],
+            "armors": [],
+            "accessories": []
+          }
+        },
+        "nextIntent": {
+          "type": "attack",
+          "desc": "根须蜿蜒抽击",
+          "value": 22,
+          "targetId": "player"
+        },
+        "intentDistribution": {
+          "attack": 50,
+          "buff": 15,
+          "debuff": 25,
+          "observe": 10
+        },
+        "lootTable": [
+          {
+            "id": "heart_root",
+            "name": "心脏之根",
+            "desc": "一枚仍在搏动的木质核心，滴落着金色的汁液。",
+            "type": "consumable",
+            "rarity": "cursed",
+            "effects": [
+              [
+                "heal_hp",
+                50
+              ],
+              [
+                "maxSanity",
+                -20
+              ]
+            ],
+            "dropProbability": 0.5
+          }
+        ],
+        "enemySpawnCondition": "on_enter"
+      }
+    },
+    "woods_edge": {
+      "name": "树林边缘",
+      "desc": "浓雾在这里终于略微散去，露出一条铺满落叶的小路。路面两侧堆满古老的界碑，刻着“离开此地，忘记一切”。身后的村庄隐没在雾气中，仿佛从未存在过。",
+      "visualPrompt": "clearing mist over leaf-strewn path, ancient boundary stones with fading warning, village fading into fog",
+      "threatLevel": 1,
+      "exits": [
+        {
+          "type": "sanctuary_return",
+          "label": "踏上离开霍洛赫斯特的小路"
+        }
+      ]
+    }
+  }
+}

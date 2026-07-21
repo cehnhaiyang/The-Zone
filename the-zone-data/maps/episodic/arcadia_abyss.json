@@ -1,0 +1,1011 @@
+{
+    "id": "arcadia_abyss",
+    "name": "阿卡迪亚深渊：共生起源",
+    "background": "曾经是人类对抗基因溃败的最后堡垒，‘阿卡迪亚生物工程中心’在数十年前秘密启动了极端的‘共生起源’计划。试图通过将脆弱的肉体与活体金属、寄生机械相融合来达成所谓的‘完美进化’。然而，随着深层‘血肉熔炉’的失控，整个设施化为了机械与血肉交织、永无宁日的地狱。",
+    "topology": "树状垂直分布结构，由表层的接待与办公区向下延伸，穿透中层的医疗枢纽与共生实验室，最终通向地底深处的高温禁忌工业区——血肉熔炉。部分区块被高强度隔离墙隔断，需要破解控制台方可深入。",
+    "nodesCount": 24,
+    "visualStyle": "Dark biomechanical sci-fi horror, transitioning from sterile ruined labs to rusted metal intertwined with pulsating organic matter, ending in a hellish flesh forge, 80s biopunk aesthetic meets HR Giger.",
+    "initial": {
+        "dilationFactor": 1.2,
+        "entrance": "node_gate"
+    },
+    "nodes": {
+        "node_gate": {
+            "name": "设施大门",
+            "desc": "生锈的金属大门上挂着褪色的标志：'阿卡迪亚生物工程中心 - 未经授权禁止入内'，半掩的门缝后是一片死寂的深渊。你看到门框上爬满了不自然的粗壮藤蔓，表面长着如眼睛般的肉质节瘤，正不安地颤动着。呜咽般的阴风从空荡的走廊深处吹出，伴随着远处的金属扭曲声。空气中弥漫着潮湿的霉味、以及某种令人作呕的福尔马林残留气味。",
+            "visualPrompt": "Rusted metal gates slightly ajar, unnatural pulsating vines with eye-like nodules growing on the frame, dark and oppressive atmosphere, warning signs.",
+            "threatLevel": 1,
+            "items": [
+                {
+                    "id": "facility_map",
+                    "name": "破损的设施平面图",
+                    "desc": "一张沾染了褐色污渍的地图，大部分区域被用红笔狂乱地圈起。",
+                    "type": "document",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "discoveryThreshold": 5,
+                    "documentContent": "平面图显示设施分为表层（基因工程）、中层（共生体测试）与深层（被涂黑的未知工业区）。边缘有潦草的字迹：'主管疯了，他在用活人喂那些齿轮。'"
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_reception",
+                    "label": "强行挤入接待大厅",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_reception": {
+            "name": "接待大厅",
+            "desc": "宽敞的大厅里一片狼藉，接待台后面的椅子翻倒在地，墙上'生物科技未来'的宣传海报被撕成了碎片。地面上有一条触目惊心的拖拽血迹，径直延伸向漆黑的走廊深处。天花板上的应急灯管在接触不良中疯狂闪烁，发出刺耳的滋滋声。",
+            "visualPrompt": "Ruined corporate reception area, overturned chairs, shredded posters, long trail of blood on the floor, flickering fluorescent lights.",
+            "threatLevel": 2,
+            "interactions": [
+                {
+                    "desc": "查看接待台的碎屏电脑",
+                    "results": {
+                        "timeCost": 1,
+                        "soundEffect": "glitch",
+                        "narrative": "屏幕上不断弹出血红色的警告邮件：'紧急通知：全员立即撤离！共生体X-23已突破收容！不要直视它的机械眼！'",
+                        "stateChange": {
+                            "sanity": -5
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_guard_post",
+                    "label": "进入警卫室",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_hallway_a",
+                    "label": "前往A区走廊 (基因工程)",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_atrium",
+                    "label": "前往设施中枢大厅",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_guard_post": {
+            "name": "警卫室",
+            "desc": "狭小的警卫室里布满了干涸的血手印，监控屏幕墙还在运作，显示着设施各处的雪花画面。屏幕发出的幽蓝光芒中，你能隐约看到画面里有些无实体的暗影在走廊游荡。整个房间充斥着陈旧的黑咖啡味和人类极度恐惧下分泌的汗水恶臭。",
+            "visualPrompt": "Cramped security room covered in bloody handprints, wall of glowing CRT monitors showing static and shadowy figures, abandoned equipment.",
+            "threatLevel": 3,
+            "items": [
+                {
+                    "id": "security_baton",
+                    "name": "重型电击警棍",
+                    "desc": "标准防暴装备，顶端的电极还在跳动着微弱的电火花。",
+                    "type": "weapon",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "weaponType": "blunt",
+                    "meleeDamage": 12,
+                    "maxUses": 50,
+                    "discoveryThreshold": 15
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_reception",
+                    "label": "退回接待大厅",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_hallway_a": {
+            "name": "A区主走廊",
+            "desc": "这条走廊两侧排列着办公室和小型实验室，大多数防爆门都被一种可怕的蛮力向外扭曲扯开。应急红灯的频闪让满墙深刻入骨的巨型爪痕显得诡异可怖。走廊里弥漫着纸张发霉的味道，以及某种类似熟透水果般甜腻的异样腐败味。",
+            "visualPrompt": "Long dimly lit corridor with emergency red lighting, blasted blast doors, deep claw marks gouged into the metal walls, scattered documents.",
+            "threatLevel": 3,
+            "exits": [
+                {
+                    "targetId": "node_office",
+                    "label": "进入主管办公室",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_lab_a1",
+                    "label": "进入A1基因实验室",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_reception",
+                    "label": "返回大厅",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_office": {
+            "name": "主管办公室",
+            "desc": "这间曾经豪华的办公室如今如同被飓风扫过，实木书桌从中间断裂，隐藏保险柜被暴力撕开。墙上挂着的荣誉证书碎了一地，映照着角落里一滩巨大的、半凝固的血迹。空气中名贵古龙水的香气早已被浓稠腥甜的血液气味彻底盖过。",
+            "visualPrompt": "Destroyed luxurious office, split wooden desk, violently torn open wall safe, shattered framed certificates, huge pool of dark blood.",
+            "threatLevel": 4,
+            "nodeNpc": {
+                "id": "npc_dr_arisa",
+                "name": "亚丽莎博士",
+                "desc": "她瘫靠在断裂的办公桌后，白大褂已被鲜血染红。令人毛骨悚然的是，她的左半边身体出现了严重的机械异变，皮肤下有粗大的线缆在发出微弱的荧光。",
+                "gender": "female",
+                "visualPrompt": "A dying female scientist in a bloody lab coat, leaning against a desk, half of her body is mutating with glowing blue wires under the skin.",
+                "hide": true,
+                "style": "tactical",
+                "initialState": {
+                    "attribute": {
+                        "strength": 3,
+                        "agility": 4,
+                        "knowledge": 18,
+                        "perception": 12
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    },
+                    "vital": {
+                        "maxHp": 100,
+                        "maxSanity": 100,
+                        "maxStamina": 100,
+                        "maxVigor": 100
+                    },
+                    "inventory": [],
+                    "level": 3,
+                    "xp": 0,
+                    "deck": [],
+                    "trust": 15,
+                    "quest": {
+                        "quest_mercy": {
+                            "desc": "亚丽莎痛苦地请求你前往中层的化学储藏室找来『神经稳定剂』，帮她压制脑部的机械寄生。",
+                            "difficulty": 3,
+                            "goals": [
+                                {
+                                    "id": "neural_stabilizer",
+                                    "name": "神经稳定剂",
+                                    "desc": "蓝黑色液体。",
+                                    "type": "consumable",
+                                    "rarity": "rare",
+                                    "effects": [
+                                        [
+                                            "heal_sanity",
+                                            30
+                                        ]
+                                    ]
+                                }
+                            ],
+                            "rewards": [
+                                {
+                                    "id": "director_keycard",
+                                    "name": "最高权限门禁卡",
+                                    "desc": "沾满血迹的黑色磁卡，可深入设施。",
+                                    "type": "material",
+                                    "rarity": "epic"
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "exits": [
+                {
+                    "targetId": "node_hallway_a",
+                    "label": "离开办公室",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_lab_a1": {
+            "name": "A1基因实验室",
+            "desc": "实验台上密密麻麻地摆满了培养皿和高精度显微镜，许多容器已经碎裂。溢出容器的粉红色肉质样本依然在犹如心脏般有节律地脉动。细胞分裂的黏腻声响被角落未关的音频放大器捕捉，听起来宛如一头巨兽在耳边呼吸。",
+            "visualPrompt": "Biotech lab filled with microscopes and petri dishes, pulsating pink fleshy masses overflowing from containers, wires and tubes hanging from the ceiling.",
+            "threatLevel": 5,
+            "items": [
+                {
+                    "id": "research_data",
+                    "name": "《第15代演化手记》",
+                    "desc": "沾着不明粘液的研究记录。",
+                    "type": "document",
+                    "rarity": "rare",
+                    "quantity": 1,
+                    "discoveryThreshold": 20,
+                    "documentContent": "“第10代：样本展现出解题能力。第13代：它开始模仿人类的声带结构并与机械接口融合。第15代：它刚才对我笑了……它逃脱了。”"
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_morgue",
+                    "label": "深入停尸房",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_hallway_a",
+                    "label": "退回走廊",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_morgue": {
+            "name": "停尸房",
+            "desc": "这里的温度低得有些不自然，冷藏抽屉被拉出了一半，数具被开膛破肚的惨白尸体暴露在空气中。阴影中，你看到尸体上有大片被野兽利齿和液压钳撕裂过的骇人缺口。冷风机沉闷的嗡鸣声中，夹杂着一种令人头皮发麻的湿滑咀嚼声。",
+            "visualPrompt": "Creepy morgue, partially pulled out autopsy drawers with mutilated corpses, low lighting, blood sprayed across the sterile white tiles.",
+            "threatLevel": 7,
+            "specificEnemy": {
+                "id": "enemy_corpse_eater",
+                "name": "畸变食尸者",
+                "desc": "四肢被非自然拉长，下颌骨被替换为生锈的机械咬合钳，正吞噬着冷冻柜里的残骸。",
+                "visualPrompt": "A terrifying mutated human with elongated limbs and a vertically split mechanical lower jaw, hunched over and eating corpses in a dark morgue.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 8,
+                        "agility": 10,
+                        "knowledge": 2,
+                        "perception": 12
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 70,
+                    "buff": 10,
+                    "debuff": 10,
+                    "observe": 10
+                },
+                "nextIntent": {
+                    "type": "attack",
+                    "desc": "机械撕咬",
+                    "value": 15
+                },
+                "lootTable": [
+                    {
+                        "id": "mutated_gland",
+                        "name": "生物机械腺体",
+                        "desc": "从怪物身上割下来的发光器官，仍有诡异的微温。",
+                        "type": "material",
+                        "rarity": "rare",
+                        "dropProbability": 1.0
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_enter",
+            "exits": [
+                {
+                    "targetId": "node_lab_a1",
+                    "label": "逃回实验室",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_atrium": {
+            "name": "中层：中枢大厅",
+            "desc": "你通过了向下的楼梯来到设施中层。昔日宏伟的大厅如今一片狼藉，天花板上垂下扭曲的金属藤蔓，与干枯的生物组织纠缠在一起。应急灯发出微弱的红光，空气中弥漫着一股难以名状的铁锈与腐肉混合的腥味。",
+            "visualPrompt": "Vast, decaying atrium, bio-mechanical tendrils, dim red emergency lights, rusted metal, organic decay.",
+            "threatLevel": 4,
+            "items": [
+                {
+                    "id": "scrap_metal_pile",
+                    "name": "废弃金属堆",
+                    "desc": "一堆被扭曲得不成形的金属零件。",
+                    "type": "material",
+                    "rarity": "common",
+                    "quantity": 3,
+                    "discoveryThreshold": 10
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_ward",
+                    "label": "通往急诊病房",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_utility",
+                    "label": "进入维修走廊",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_symbiosis_lab",
+                    "label": "前往共生体主实验室",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_reception",
+                    "label": "返回表层接待处",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_ward": {
+            "name": "急诊病房",
+            "desc": "病房内一片混乱，床铺倾倒，医疗设备散落一地。墙壁上留有触目惊心的抓痕和飞溅的血迹，仿佛这里曾发生过一场绝望的挣扎，耳边不时传来金属器械碰撞的微弱回响。",
+            "visualPrompt": "Chaotic emergency ward, overturned beds, scattered medical gear, bloodstains, metallic and sterile smells.",
+            "threatLevel": 3,
+            "items": [
+                {
+                    "id": "basic_medkit",
+                    "name": "简易医疗包",
+                    "desc": "一个沾染着污渍的急救包。",
+                    "type": "consumable",
+                    "rarity": "common",
+                    "discoveryThreshold": 10,
+                    "effects": [
+                        [
+                            "heal_hp",
+                            25
+                        ]
+                    ],
+                    "quantity": 1
+                }
+            ],
+            "nodeNpc": {
+                "id": "npc_injured_guard",
+                "name": "受伤的安保人员",
+                "desc": "一个身穿破烂安保服的男子倒在墙角，他的手臂与某种机械组织强行融合，发出痛苦的呻吟。",
+                "gender": "male",
+                "visualPrompt": "Severely injured male security guard, half-human half-machine, bleeding, tattered uniform.",
+                "hide": true,
+                "style": "defense",
+                "initialState": {
+                    "attribute": {
+                        "strength": 4,
+                        "agility": 3,
+                        "knowledge": 2,
+                        "perception": 4
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    },
+                    "vital": {
+                        "maxHp": 40,
+                        "maxSanity": 60,
+                        "maxStamina": 70,
+                        "maxVigor": 50
+                    },
+                    "inventory": [],
+                    "level": 1,
+                    "xp": 0,
+                    "deck": [],
+                    "trust": 5,
+                    "quest": {}
+                }
+            },
+            "interactions": [
+                {
+                    "desc": "询问安保人员发生了什么",
+                    "results": {
+                        "timeCost": 1,
+                        "soundEffect": "whisper",
+                        "narrative": "安保人员虚弱地低语着：“...不要相信...协议...它们会把你变成...怪物...控制台的密码...是...共生开始的日子...10月24日...”，随后便陷入了昏迷。",
+                        "stateChange": {
+                            "sanity": -5
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_atrium",
+                    "label": "退回中枢大厅",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_utility": {
+            "name": "维修走廊",
+            "desc": "狭窄的走廊两侧是密密麻麻的管道和电缆，发出低沉的嗡鸣声。空气中弥漫着一股机油和腐蚀性气体的混合味道，一些管道上渗出不明的粘稠液体。",
+            "visualPrompt": "Narrow utility corridor, dense pipes and cables, humming sounds, oil and corrosive gas smell, dripping unknown liquid.",
+            "threatLevel": 5,
+            "items": [
+                {
+                    "id": "rusted_pipe",
+                    "name": "生锈的铁管",
+                    "desc": "一根沉重的生锈铁管，勉强可以当作武器。",
+                    "type": "weapon",
+                    "rarity": "common",
+                    "weaponType": "blunt",
+                    "meleeDamage": 8,
+                    "maxUses": 50,
+                    "discoveryThreshold": 5
+                }
+            ],
+            "specificEnemy": {
+                "id": "skittering_construct",
+                "name": "疾行构造体",
+                "desc": "一个由废弃机械零件和扭曲骨骼拼凑而成的生物，六条纤细的肢体在地面上快速爬行。",
+                "visualPrompt": "Fast-moving construct, mechanical parts and twisted bones, six slender limbs, sharp scraping sound.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 4,
+                        "agility": 12,
+                        "knowledge": 2,
+                        "perception": 6
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 80,
+                    "buff": 0,
+                    "debuff": 10,
+                    "observe": 10
+                },
+                "nextIntent": {
+                    "type": "attack",
+                    "desc": "急速切割",
+                    "value": 10
+                },
+                "lootTable": []
+            },
+            "enemySpawnCondition": "on_search",
+            "exits": [
+                {
+                    "targetId": "node_atrium",
+                    "label": "返回大厅",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_symbiosis_lab": {
+            "name": "共生体主实验室",
+            "desc": "宽敞的实验室里摆满了复杂的生物反应器，整面墙壁被一块巨大的发光神经网络板占据，那些'神经元'实际上是某种活着的寄生机械虫正在爬行！高压电流的滋滋声与生物组织爆裂声交织。",
+            "visualPrompt": "Neurological lab, an entire wall dominated by a glowing neural network diagram made of living, crawling bioluminescent parasites, sparks flying from damaged consoles.",
+            "threatLevel": 6,
+            "exits": [
+                {
+                    "targetId": "node_chemical",
+                    "label": "进入化学品储藏室",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_test_chamber",
+                    "label": "前往协议测试舱",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_containment",
+                    "label": "向重度收容区前进",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_atrium",
+                    "label": "退回中枢大厅",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_chemical": {
+            "name": "化学品储藏室",
+            "desc": "狭小的储藏室里堆满了高大的金属货架，上面摆放着各种贴有警告标签的容器，晃动着不明液体。刺鼻的化学气味让人头晕目眩。",
+            "visualPrompt": "Small chemical storage, tall metal shelves, warning-labeled containers, pungent chemical smell.",
+            "threatLevel": 2,
+            "items": [
+                {
+                    "id": "neural_stabilizer",
+                    "name": "神经稳定剂",
+                    "desc": "蓝黑色液体，可以压制机械寄生的排异反应。",
+                    "type": "consumable",
+                    "rarity": "rare",
+                    "quantity": 1,
+                    "discoveryThreshold": 30,
+                    "effects": [
+                        [
+                            "heal_sanity",
+                            30
+                        ]
+                    ]
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_symbiosis_lab",
+                    "label": "离开储藏室",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_test_chamber": {
+            "name": "协议测试舱",
+            "desc": "这里是数个独立测试舱的区域，每个舱门都厚重而扭曲。中央有一个还能勉强运行的控制台，屏幕上闪烁着需要密码解锁的指令界面。",
+            "visualPrompt": "Test chambers area, heavy twisted doors with claw marks, central command console, metallic burning and biological decay smell.",
+            "threatLevel": 5,
+            "interactions": [
+                {
+                    "desc": "解锁共生协议核心日志",
+                    "requirements": {
+                        "puzzleSolved": {
+                            "type": "code",
+                            "title": "协议终端访问",
+                            "desc": "输入“共生协议”最后一次更新的日期（格式：MMDD）。",
+                            "solution": "1024",
+                            "data": {},
+                            "hints": [
+                                "守卫曾低语过一个日期..."
+                            ],
+                            "maxAttempts": 3,
+                            "loreText": "日志显示：共生协议于10月24日升级为“最终阶段”，目标实现生物与机械的完美融合。但融合过程变异，产生了无法预料的恐怖结果。",
+                            "penalty": {
+                                "sanity": 15
+                            }
+                        }
+                    },
+                    "results": {
+                        "timeCost": 2,
+                        "soundEffect": "success",
+                        "narrative": "控制台解锁，你阅读了绝密日志，明白了一切暴走的根源来自于最底层的'血肉熔炉'。",
+                        "stateChange": {
+                            "sanity": -10
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_symbiosis_lab",
+                    "label": "退回主实验室",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_containment": {
+            "name": "重度收容隔离带",
+            "desc": "眼前是一扇厚达半米的钛合金防爆大门，此刻却像纸板一样被某种恐怖的巨力从内部硬生生撕开，边缘的金属甚至因为受力过大而呈现出熔融状。门内深处传来极其压抑的低频共振。",
+            "visualPrompt": "Massive titanium blast door violently ripped open from the inside out, edges of the metal warped and melted, darkness looming beyond.",
+            "threatLevel": 6,
+            "exits": [
+                {
+                    "targetId": "node_cell_x23",
+                    "label": "探查X-23主收容室",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_observation",
+                    "label": "前往上方单向观察室",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_control_center",
+                    "label": "前往主控制中心",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_symbiosis_lab",
+                    "label": "返回主实验室",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_cell_x23": {
+            "name": "X-23主收容室",
+            "desc": "这个巨大的空旷穹顶房间中央，矗立着一个破碎的通天培养柱。四周的强化墙壁上不仅满是深不见底的机械爪痕，还用干涸的血液涂抹着一些歪歪扭扭的...人类文字：‘为什么’。",
+            "visualPrompt": "Giant empty containment dome, shattered massive cylindrical vat in the center, walls covered in deep gouges and crude words written in dried blood.",
+            "threatLevel": 7,
+            "items": [
+                {
+                    "id": "containment_log",
+                    "name": "收容观察录音",
+                    "desc": "外壳被踩碎的录音笔。",
+                    "type": "audio",
+                    "rarity": "rare",
+                    "quantity": 1,
+                    "discoveryThreshold": 25,
+                    "audioScript": "滋滋……第72天。它不再撞击玻璃了。它盘腿坐在里面，用那只机械眼直勾勾地盯着我。它具备了意识……"
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_containment",
+                    "label": "离开收容室",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_observation": {
+            "name": "单向观察室",
+            "desc": "隔着防爆单向玻璃，这里可以俯瞰整个收容室。所有的控制终端都已经过载烧毁，散发着难闻的绝缘漆焦味。地上的几把椅子被砸得粉碎，墙角有一滩人形的灰烬。",
+            "visualPrompt": "Observation deck overlooking the containment cell through reinforced one-way glass, burned out computer terminals, shattered chairs.",
+            "threatLevel": 4,
+            "interactions": [
+                {
+                    "desc": "抹去单向玻璃上的血迹向外看",
+                    "results": {
+                        "timeCost": 1,
+                        "soundEffect": "scare",
+                        "narrative": "你看到外侧的玻璃上也有一对血手印，完美地和你此刻的位置重合。它曾经站在这里注视着你们，就像你们注视着它。",
+                        "stateChange": {
+                            "sanity": -15
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_containment",
+                    "label": "下楼返回隔离带",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_control_center": {
+            "name": "设施主控制中心",
+            "desc": "这个八角形的大厅是设施的神经中枢，无数的显示屏闪烁着猩红的'致命故障'警告。中央主控台浸泡在一滩泛着荧光的培养液中。通往最底层“血肉熔炉”的重型物理锁阀门紧闭。",
+            "visualPrompt": "Octagonal control room, walls lined with monitors flashing red fatal error screens, central command console drenched in glowing fluid, heavy locked vault door.",
+            "threatLevel": 6,
+            "interactions": [
+                {
+                    "desc": "尝试破解通往底层的生物质泵压权限控制台",
+                    "requirements": {
+                        "puzzleSolved": {
+                            "type": "sequence",
+                            "title": "生物质压力序列解密",
+                            "desc": "控制台屏幕显示：‘警告：生物质注入压力不匹配。必须输入正确的斐波那契压力阈值。当前序列：[3, 5, 8, 13, ?]’",
+                            "solution": "21",
+                            "data": {
+                                "sequence": [
+                                    3,
+                                    5,
+                                    8,
+                                    13,
+                                    null
+                                ],
+                                "missingIndex": 4,
+                                "options": [
+                                    18,
+                                    20,
+                                    21,
+                                    26
+                                ],
+                                "correctOption": 21
+                            },
+                            "hints": [
+                                "仔细观察数字，后一个数字似乎是前两个数字相加的总和。"
+                            ],
+                            "maxAttempts": 3,
+                            "loreText": "系统解锁。深层的恶魔被释放了。",
+                            "penalty": {
+                                "hp": 15,
+                                "sanity": 10
+                            }
+                        }
+                    },
+                    "results": {
+                        "timeCost": 2,
+                        "soundEffect": "success",
+                        "narrative": "你按下了最后的确认键。屏幕由红转绿，伴随着一阵巨大的泄压声，厚重的防爆大门向两侧缓慢滑开，如同一只巨兽张开了深渊巨口。",
+                        "stateChange": {
+                            "unlock": [
+                                [
+                                    "node_forge_entrance",
+                                    "进入血肉熔炉区"
+                                ]
+                            ]
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_containment",
+                    "label": "退回收容隔离带",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_forge_entrance": {
+            "name": "深层：熔炉入口",
+            "desc": "巨大的金属门半开着，门框上缠绕着脉动的血管。门上的血管在规律地收缩，像是在呼吸一般。一阵阵热浪扑面而来，夹杂着高温金属、烧焦的肉和工业废气的刺鼻气味。深渊中传来震动骨膜的心跳声。",
+            "visualPrompt": "Massive half-open rusty metal door, pulsing organic red veins wrapped around the doorframe, dark industrial background, heat distortion in the air.",
+            "threatLevel": 7,
+            "exits": [
+                {
+                    "targetId": "node_workshop",
+                    "label": "进入改造车间",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_locker",
+                    "label": "前往工人更衣室",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_furnace_floor",
+                    "label": "深入熔炉底层",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_control_center",
+                    "label": "逃回控制中心",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_workshop": {
+            "name": "改造手术车间",
+            "desc": "工作台上散落着电锯、骨钻等令人毛骨悚然的“手术”工具，刀刃上挂着新鲜的碎肉。角落里有几个被掏空胸腔塞入反应炉的‘成功’实验体，机械关节发出细微的咔哒声。",
+            "visualPrompt": "A horrific makeshift operating room inside an industrial factory. Workbenches covered with bloody surgical tools and mechanical parts.",
+            "threatLevel": 8,
+            "items": [
+                {
+                    "id": "surgical_saw",
+                    "name": "电动手术锯",
+                    "desc": "便携式电动锯，马达声震耳欲聋。",
+                    "type": "weapon",
+                    "weaponType": "blunt",
+                    "rarity": "rare",
+                    "quantity": 1,
+                    "meleeDamage": 18,
+                    "maxUses": 15,
+                    "discoveryThreshold": 20
+                }
+            ],
+            "nodeNpc": {
+                "id": "npc_ida",
+                "name": "实验体 11 号 (艾达)",
+                "desc": "一个蜷缩在阴影中的少女。左臂和右腿被粗糙的液压义肢取代。她用仅存的一只充满恐惧的人类眼睛看着你。",
+                "gender": "female",
+                "visualPrompt": "A terrified young girl curled up in a dark corner. Her left arm and right leg are replaced by crude cybernetics.",
+                "hide": true,
+                "style": "burst",
+                "initialState": {
+                    "attribute": {
+                        "strength": 4,
+                        "agility": 8,
+                        "knowledge": 5,
+                        "perception": 7
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    },
+                    "vital": {
+                        "maxHp": 60,
+                        "maxSanity": 100,
+                        "maxStamina": 100,
+                        "maxVigor": 100
+                    },
+                    "inventory": [],
+                    "level": 1,
+                    "xp": 0,
+                    "deck": [],
+                    "trust": 15,
+                    "quest": {}
+                }
+            },
+            "exits": [
+                {
+                    "targetId": "node_forge_entrance",
+                    "label": "离开车间",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_locker": {
+            "name": "工人更衣室",
+            "desc": "锈蚀的储物柜歪歪斜斜地排列着，空气中弥漫着陈旧的汗水、铁锈和令人作呕的腐烂气味，地面上散落着几截发白的人类指骨与撕碎的工人服。",
+            "visualPrompt": "Rows of rusted, smashed metal lockers, broken mirrors on the wall reflecting distorted shapes, blood stains and scattered bones.",
+            "threatLevel": 7,
+            "specificEnemy": {
+                "id": "enemy_failed_worker",
+                "name": "异化装卸工",
+                "desc": "一个身体中嵌着齿轮的怪物，半个脑袋已经被金属面罩取代，发狂般地挥舞着变异的肢体。",
+                "visualPrompt": "A humanoid monster with rusty gears embedded in its flesh, half of its head covered by a crude metal mask, glowing red eye.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 10,
+                        "agility": 6,
+                        "knowledge": 2,
+                        "perception": 5
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 80,
+                    "buff": 10,
+                    "debuff": 10,
+                    "observe": 0
+                },
+                "nextIntent": {
+                    "type": "attack",
+                    "desc": "重锤挥击",
+                    "value": 18
+                },
+                "lootTable": []
+            },
+            "enemySpawnCondition": "on_search",
+            "exits": [
+                {
+                    "targetId": "node_forge_entrance",
+                    "label": "返回入口",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_furnace_floor": {
+            "name": "熔炉底层",
+            "desc": "这里的温度高得让人几近疯狂，巨大的熔炉投料口就在眼前，旁边堆积着一座由人类残骸和金属废料混合而成的‘原料山’。烧焦的脂肪味和刺鼻的硫磺味在这里凝结成了实质。",
+            "visualPrompt": "The hellish bottom floor of the furnace. A mountain of human body parts and scrap metal piled next to a massive, roaring furnace mouth. Extreme heat.",
+            "threatLevel": 8,
+            "interactions": [
+                {
+                    "desc": "靠近熔炉投料口",
+                    "results": {
+                        "timeCost": 1,
+                        "soundEffect": "scare",
+                        "narrative": "那里面翻滚的根本不是普通的铁水！无数张由液态金属构成的人脸在表面哀嚎、挣扎……熔炉，是活着的。",
+                        "stateChange": {
+                            "sanity": -20
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_conveyor",
+                    "label": "沿着绞肉传送带前进",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_forge_entrance",
+                    "label": "逃回较冷的入口",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_conveyor": {
+            "name": "绞肉传送带",
+            "desc": "巨大的履带式传送带轰隆作响，毫无怜悯地将‘原料’源源不断地送入火海。骨头被齿轮碾碎的爆裂声与微弱的求救声交织在一起，腐烂变质的气息被高温烘烤蒸发。",
+            "visualPrompt": "A massive, dirty industrial conveyor belt carrying mangled bodies and scrap metal towards a fiery abyss. Rusty gears, blood drippings.",
+            "threatLevel": 8,
+            "items": [
+                {
+                    "id": "worker_diary",
+                    "name": "血迹斑斑的日记",
+                    "desc": "从一具卡在齿轮里的尸体上扯下来的。",
+                    "type": "document",
+                    "rarity": "rare",
+                    "quantity": 1,
+                    "discoveryThreshold": 15,
+                    "documentContent": "他们说这是‘光荣的升华’...但我看到那根本不是升级...那是献祭！如果不逃...下一个被铲上履带的...就是我..."
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_assembly",
+                    "label": "前往自动化组装线",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_furnace_floor",
+                    "label": "退回熔炉底层",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_assembly": {
+            "name": "自动化组装线",
+            "desc": "无人值守的流水线正在高速运转。数条布满油污的机械臂挥舞着焊枪和骨钉枪，将冰冷的装甲板强行钉入还在抽搐的肉体之中。焊接产生的刺眼电弧光不断闪烁。",
+            "visualPrompt": "An automated assembly line. Giant mechanical arms with welding torches and rivet guns operating on fleshy masses. Blinding blue sparks.",
+            "threatLevel": 9,
+            "specificEnemy": {
+                "id": "enemy_assembly_butcher",
+                "name": "流水线屠夫",
+                "desc": "一个完全被改造的巨型怪物，右臂被替换成了工业级气动铆钉枪，身上挂满了废弃的肉块。",
+                "visualPrompt": "A hulking biomechanical monstrosity, its right arm replaced by a massive industrial pneumatic rivet gun.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 16,
+                        "agility": 5,
+                        "knowledge": 1,
+                        "perception": 8
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 85,
+                    "buff": 15,
+                    "debuff": 0,
+                    "observe": 0
+                },
+                "nextIntent": {
+                    "type": "attack",
+                    "desc": "高压铆钉射击",
+                    "value": 25
+                },
+                "lootTable": []
+            },
+            "enemySpawnCondition": "on_enter",
+            "exits": [
+                {
+                    "targetId": "node_final_chamber",
+                    "label": "前往熔炉核心 (终点)",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_conveyor",
+                    "label": "退回传送带",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_final_chamber": {
+            "name": "绝对终焉：完美融合体",
+            "desc": "这是一个洁白无瑕、与外界血污格格不入的球形无菌舱室。中央的零重力场中，悬浮着一个无法用语言形容的‘神明’。它在天使般光洁的肉体与极致复杂的流体金属之间不断变幻形态。千万个声带同时发声在你的脑海中直接炸响：‘进化...完美...永恒...’。",
+            "visualPrompt": "A stark white, pristine spherical zero-gravity chamber. In the center floats a beautiful yet terrifying entity shifting between perfect human flesh and liquid chrome metal.",
+            "threatLevel": 10,
+            "interactions": [
+                {
+                    "desc": "直视神明",
+                    "results": {
+                        "timeCost": 1,
+                        "soundEffect": "distortion",
+                        "narrative": "极端的痛苦瞬间涌入大脑。你感受到了数万个被融化在这个核心里的灵魂。这根本不是升华，这是永生炼狱！在它沉睡的间隙，你抓起了一块剥落的碎片准备逃离。",
+                        "stateChange": {
+                            "sanity": -30
+                        }
+                    }
+                }
+            ],
+            "items": [
+                {
+                    "id": "perfect_core_fragment",
+                    "name": "神之碎片",
+                    "desc": "从融合体身上剥离的一小块液态金属，握在手中如同有生命般律动。",
+                    "type": "material",
+                    "rarity": "epic",
+                    "quantity": 1,
+                    "discoveryThreshold": 0
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_assembly",
+                    "label": "拒绝进化，向后逃亡",
+                    "type": "local"
+                },
+                {
+                    "label": "带着神之碎片逃回庇护所",
+                    "type": "sanctuary_return"
+                }
+            ]
+        }
+    }
+}

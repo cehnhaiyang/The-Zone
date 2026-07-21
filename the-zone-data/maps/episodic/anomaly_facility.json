@@ -1,0 +1,571 @@
+{
+    "id": "anomaly_facility",
+    "name": "被遗忘的第13号观测综合体",
+    "background": "这里曾是核爆前最后建立的顶尖物理与认知科学观测设施，但在某次针对高维裂隙的观测中触发了灾变，被废弃深埋。内部的物理法则与时间流速已因'虚空'实体的侵蚀而彻底崩溃。",
+    "topology": "呈现线性递进但空间扭曲的地下设施结构。从地表荒原外缘逐渐深入，途经洗消区、安保站、研究区，最终直达深渊所在的收容核心区。",
+    "nodesCount": 16,
+    "visualStyle": "一座深埋于核爆荒原之下的高科技观测与收容设施。整体色调呈幽暗的蓝绿色与腐蚀的铁锈红交织。大面积的防爆玻璃碎裂，墙壁上蔓延着如生物脉络般的虚空裂痕。空气中漂浮着发光的辐射尘埃，闪烁的应急红灯在深沉的黑暗中勾勒出破碎的金属结构，一种强烈的认知扰动正从地下深处溢出。",
+    "initial": {
+        "dilationFactor": 1.5,
+        "entrance": "node_decay_path"
+    },
+    "nodes": {
+        "node_decay_path": {
+            "name": "衰变荒原外缘",
+            "desc": "废弃的崎岖土路通向一个被遗忘的地表废墟。风蚀的岩石间散布着生锈的金属残骸，表明这里曾是一道严密的防线。空气中弥漫着压抑的寂静，只剩下风的呜咽。低沉的风声夹杂着刺鼻的金属氧化物气味。",
+            "visualPrompt": "破败的土路蜿蜒而上，两旁是风化的岩石和腐蚀的铁皮。远处，一片黯淡的工业建筑隐没在尘埃中，天际线被某种引力场异常扭曲。昏黄的光线透过浓厚的辐射尘投射下斑驳的阴影。",
+            "threatLevel": 3,
+            "items": [
+                {
+                    "id": "rusty_pipe",
+                    "name": "生锈的铁管",
+                    "type": "weapon",
+                    "weaponType": "blunt",
+                    "rarity": "common",
+                    "desc": "一根沉重的金属管道。虽然长满了铁锈，但敲碎某种东西的头盖骨还是绰绰有余的。",
+                    "meleeDamage": 8,
+                    "maxUses": 15,
+                    "discoveryThreshold": 1,
+                    "quantity": 1
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_shelter_ruins",
+                    "label": "偏离主路，搜查废弃避难所",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_collapsed_tunnel",
+                    "label": "沿着主路前往塌陷隧道",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_shelter_ruins": {
+            "name": "避难所残骸",
+            "desc": "一个曾经用于临时避难的简陋建筑，现在只剩下一堆摇摇欲坠的金属板和碎布。内部遍布灰尘，似乎在很久以前就被匆忙遗弃了。地面上有一块褪色的防辐射符号。",
+            "visualPrompt": "破烂的防水布和锈蚀的金属片构成了这个临时避难所的框架。内部散落着一些私人物品的残骸：一个撕裂的睡袋、一个翻倒的水壶。光线穿过金属板的破洞，在地上投下苍白的光斑。",
+            "threatLevel": 4,
+            "items": [
+                {
+                    "id": "scrap_metal",
+                    "name": "可用废料",
+                    "type": "material",
+                    "rarity": "common",
+                    "desc": "几块尚未完全锈蚀的金属零件，或许能在庇护所派上用场。",
+                    "discoveryThreshold": 2,
+                    "quantity": 3
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_decay_path",
+                    "label": "返回荒原主路",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_irradiated_crater",
+                    "label": "靠近后方散发幽光的陨石坑",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_irradiated_crater": {
+            "name": "辐射陨石坑",
+            "desc": "一个巨大的碗状凹陷，地面呈现出一种怪异的灰绿色，并散发出持续的微弱光芒。中央有一个不明物体，被扭曲的金属残骸所环绕。空气中弥漫着高浓度的辐射，令人窒息。",
+            "visualPrompt": "灰绿色的地面如同病态的皮肤，坑底的发光物体发出幽幽的光，扭曲着周围的一切。高耸的、破损的金属结构在边缘摇摇欲坠，仿佛怪异的骨架。",
+            "threatLevel": 13,
+            "exits": [
+                {
+                    "targetId": "node_shelter_ruins",
+                    "label": "逃离高辐射区，返回避难所",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_comm_outpost",
+                    "label": "冲过陨石坑，前往对面的前哨站",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_comm_outpost": {
+            "name": "通讯前哨废墟",
+            "desc": "一座孤零零的加固混凝土建筑，顶部巨大的抛物面天线已断裂。内部一片漆黑，设备显示屏布满裂纹。老旧设备的微弱电流声和持续的沙沙无线电静电声在回荡。这里记录着灾难发生前最后的绝望呼叫。",
+            "visualPrompt": "前哨站内部一片混乱，破碎的控制面板和倒塌的椅子散落在地。天花板上有明显的渗漏痕迹，一台闪烁着微弱指示灯的旧终端机仍在运作。",
+            "threatLevel": 7,
+            "items": [
+                {
+                    "id": "scrambled_memo",
+                    "name": "加密备忘录",
+                    "type": "document",
+                    "rarity": "rare",
+                    "desc": "一份严重损坏的加密备忘录，部分内容可读。似乎与一次紧急撤离和失控的观测样本有关。",
+                    "documentContent": "紧急命令：所有地表人员立即撤离区域α。地下核心的‘样本C’控制失效，维度波动已击穿第三级隔离层。我们自以为在观测深渊，实际上是深渊从内部吞噬了我们。放弃所有非必要设备，不要回头...",
+                    "discoveryThreshold": 3,
+                    "quantity": 1
+                },
+                {
+                    "id": "last_transmission",
+                    "name": "破损的录音带",
+                    "type": "audio",
+                    "rarity": "epic",
+                    "desc": "一盘满是划痕的磁带，似乎记录了被强制切断前的前哨站最后通讯。",
+                    "audioScript": "[震耳欲聋的电磁杂音]...不要打开隔离门！它在侵入我们的认知网络！[肉体撕裂与尖叫声]...物理屏障无效，重复，物理屏障无效！我们成了它的养料...",
+                    "discoveryThreshold": 4,
+                    "quantity": 1
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_decay_path",
+                    "label": "顺着外墙回到荒原主路",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_collapsed_tunnel": {
+            "name": "塌陷沉降隧道",
+            "desc": "这条原本用于向下层设施输送物资的隧道大半被落石和泥土堵塞。内部黑暗潮湿，结构岌岌可危。水滴声在寂静中被放大，空气中弥漫着令人作呕的霉味和逐渐增强的电离辐射感。",
+            "visualPrompt": "手电筒的光束在潮湿的岩壁上跳动，揭示出粗糙的支撑结构和缝隙中渗出的不明发光液体。远处深邃的黑暗中，隐隐有橘红色的警示灯在闪烁。",
+            "threatLevel": 9,
+            "items": [
+                {
+                    "id": "medical_kit",
+                    "name": "标准急救包",
+                    "type": "consumable",
+                    "rarity": "common",
+                    "desc": "一套封装在铅制容器中的急救医疗包，未受辐射污染。",
+                    "effects": [
+                        [
+                            "heal_hp",
+                            30
+                        ]
+                    ],
+                    "discoveryThreshold": 5,
+                    "quantity": 1
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_decay_path",
+                    "label": "返回地表",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_dimensional_entrance",
+                    "label": "穿过废墟进入地下闸门",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_dimensional_entrance": {
+            "name": "地下观测站入口",
+            "desc": "穿过塌陷带后，进入一个冰冷且充满金属气息的封闭舱室。应急照明灯发出微弱的橙色光芒，揭示出墙壁上整齐排列的粗大管线。空气中弥漫着高浓度的臭氧味，物理法则在这里似乎开始变得模糊。",
+            "visualPrompt": "厚重的钛合金防爆门半开着，周围的金属结构显示出不自然的扭曲与融化痕迹，如同暴露在极高温度下后迅速冷却的形态。",
+            "threatLevel": 3,
+            "exits": [
+                {
+                    "targetId": "node_collapsed_tunnel",
+                    "label": "返回塌陷隧道",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_decontamination_chamber",
+                    "label": "进入洗消舱",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_decontamination_chamber": {
+            "name": "协议洗消舱",
+            "desc": "一段狭长的缓冲区域，天花板上的喷头早已干涸。墙上的紫外线消毒灯以一种令人不安的频率闪烁着。地面的排水栅栏被某种从下水道涌出的黑色黏液堵塞。",
+            "visualPrompt": "蓝色的紫外线光在积水中反射，空气中弥漫着刺鼻的化学清洗剂和腐肉的混合气味。前方的主门紧闭，但旁边的维护通道似乎半掩着。",
+            "threatLevel": 4,
+            "exits": [
+                {
+                    "targetId": "node_dimensional_entrance",
+                    "label": "退回入口舱室",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_utility_closet",
+                    "label": "钻入一旁的杂物间",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_observation_deck",
+                    "label": "强行推开主门进入观测甲板",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_utility_closet": {
+            "name": "杂物间",
+            "desc": "狭小的空间里堆满了生锈的工具箱、备用部件和几桶清洁剂。角落里有一个坏掉的扫地机器人，其外壳上有被利器撕裂的痕迹。",
+            "visualPrompt": "手电筒扫过满是灰尘的货架，阴影在墙壁上拉长，仿佛有什么东西正躲藏在杂物堆后。",
+            "threatLevel": 2,
+            "items": [
+                {
+                    "id": "power_cell",
+                    "name": "备用能量电池",
+                    "type": "consumable",
+                    "rarity": "common",
+                    "desc": "一块标准尺寸的工业用能量电池。",
+                    "effects": [
+                        [
+                            "restore_battery",
+                            25
+                        ]
+                    ],
+                    "discoveryThreshold": 4,
+                    "quantity": 1
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_decontamination_chamber",
+                    "label": "返回洗消舱",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_observation_deck": {
+            "name": "深渊观测甲板",
+            "desc": "宽敞的扇形房间内，一面倾斜的多层防爆玻璃窗主宰了视野。然而窗外没有任何实质物体，只有翻滚的黑暗与撕裂空间的微弱蓝光。站在操作台前，莫名的精神重压与耳边的低语声笼罩着你，这里是凝视深渊的边缘。",
+            "visualPrompt": "操作台的屏幕群显示着瀑布般毫无逻辑的乱码，微光照亮了地上早已干涸的暗红色拖痕，拖痕一直延伸向防爆窗下方的通往中枢的闸门。",
+            "threatLevel": 10,
+            "interactions": [
+                {
+                    "desc": "贴近防爆玻璃，直视外部的虚空裂隙",
+                    "results": {
+                        "timeCost": 1,
+                        "soundEffect": "whisper",
+                        "narrative": "你凝视着深渊，那翻滚的黑暗瞬间反向倒灌入你的意识。庞大的、不属于人类的知识碎片强行塞入你的脑海。你痛苦地捂住流下鼻血的脸颊，但似乎掌握了某种可怕的真相。",
+                        "stateChange": {
+                            "sanity": -25,
+                            "hp": -5,
+                            "gain": [
+                                {
+                                    "id": "abyssal_insight",
+                                    "name": "深渊启示录",
+                                    "type": "document",
+                                    "rarity": "epic",
+                                    "desc": "直视虚空后，在脑海中强制烧录的疯狂知识。由于无法用正常语言表述，你只能用血把它画在布料上。",
+                                    "documentContent": "时间不是线性的...它像一个溃烂的伤口在三维空间中向四面八方扩散。不要相信光，那是它用来吸引猎物的诱饵。"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ],
+            "items": [
+                {
+                    "id": "void_data_log",
+                    "name": "受损的虚空数据日志",
+                    "type": "document",
+                    "rarity": "epic",
+                    "desc": "一枚插在报废主控台上的数据存储芯片，外壳已经部分碳化。",
+                    "documentContent": "记录日期：[数据剥离]...通过对能量波动的反复分析，我们确认这不是一个裂隙，而是一个伪装成空洞的器官。这个'未知'表现出了不可名状的智力。所谓的收容失效根本不存在，是它故意让我们抓住的。系统日志显示，下层屏障正被内部指令主动瓦解...",
+                    "discoveryThreshold": 4,
+                    "quantity": 1
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_decontamination_chamber",
+                    "label": "返回洗消舱",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_central_hub",
+                    "label": "顺着血迹前往中央枢纽",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_central_hub": {
+            "name": "中央枢纽大厅",
+            "desc": "一个巨大的圆形大厅，头顶的照明系统大多已经失效，只剩下几盏闪烁的备用灯。墙壁上布满了控制面板，但显示屏一片空白。大厅中央有一座曾经是引路标志的雕塑，现在被扭曲成了一团无法名状的金属刺球。",
+            "visualPrompt": "空旷的大厅中回荡着你自己的脚步声。深处的一条走廊闪烁着红光，那是通往下层安保站的方向。",
+            "threatLevel": 7,
+            "exits": [
+                {
+                    "targetId": "node_observation_deck",
+                    "label": "返回观测甲板",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_security_checkpoint",
+                    "label": "前往安保检查站",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_security_checkpoint": {
+            "name": "核心安保检查站",
+            "desc": "连接观测区与深层收容核心的最后防线。控制台彻底锁死了通向深渊的金属重门。浓重的消毒剂味混合着生物组织烧焦的气味。只有通过最高权限钥匙卡，才能强行覆盖本地主机的隔离指令，打开通往绝对隔离区的闸门。",
+            "visualPrompt": "巨大的三重复合防爆门紧闭，墙壁上的警示红灯静默地转动。检票闸机上沾染着大量已经结晶的不明黑色污渍，控制台的读卡器发出微弱的红光。",
+            "threatLevel": 9,
+            "interactions": [
+                {
+                    "desc": "刷卡强行覆盖隔离闸门",
+                    "requirements": {
+                        "items": [
+                            "core_access_card"
+                        ]
+                    },
+                    "results": {
+                        "timeCost": 2,
+                        "soundEffect": "door_open",
+                        "narrative": "验证模块发出一声尖锐的蜂鸣。沉重的机械锁扣层层解脱，伴随着令人牙酸的液压声，通往极深处隔离区的黑暗向你敞开。实质化的精神压力如同海啸般从裂缝中喷涌而出。",
+                        "stateChange": {
+                            "unlock": [
+                                [
+                                    "node_quarantine_zone",
+                                    "跨过闸门进入绝对隔离区"
+                                ]
+                            ]
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_central_hub",
+                    "label": "撤回中央枢纽",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_research_lab",
+                    "label": "探索右侧的畸变实验室",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_research_lab": {
+            "name": "畸变研究实验室",
+            "desc": "一个用于分析从裂隙中获取的物质的实验室。实验桌上散落着变异的生物样本组织和大量凌乱的演算手稿。空气中充斥着福尔马林与臭氧交织的刺鼻气味。",
+            "visualPrompt": "显微镜台被暴力砸碎，多台离心机内残存的暗紫色液体仍在沸腾。角落里的生物培养舱玻璃上布满了从内部疯狂抓挠出的血迹。",
+            "threatLevel": 12,
+            "interactions": [
+                {
+                    "desc": "尝试破解冻结的生物样本保险柜",
+                    "requirements": {
+                        "puzzleSolved": {
+                            "type": "sequence",
+                            "title": "基因序列物理锁",
+                            "desc": "控制台上闪烁着一段不完整的重组基因序列匹配错误。必须纠正缺失的碱基对才能解除柜体的物理锁定。",
+                            "solution": "C-G",
+                            "hints": [
+                                "DNA的奥秘在于成双成对。注意碱基互补配对原则：A与T配对，C与G配对。"
+                            ],
+                            "data": {
+                                "sequence": [
+                                    "A-T",
+                                    "C-G",
+                                    "T-A",
+                                    null
+                                ],
+                                "missingIndex": 3,
+                                "options": [
+                                    "A-T",
+                                    "T-A",
+                                    "C-G",
+                                    "G-C"
+                                ],
+                                "correctOption": "C-G"
+                            },
+                            "penalty": {
+                                "sanity": 10
+                            }
+                        }
+                    },
+                    "results": {
+                        "timeCost": 5,
+                        "soundEffect": "success",
+                        "narrative": "随着一声轻响，气压锁解除。冰冷的雾气散去，露出了原本被封存的战术补给物资。",
+                        "stateChange": {
+                            "gain": [
+                                {
+                                    "id": "sanity_vial",
+                                    "name": "高浓度镇定剂",
+                                    "type": "consumable",
+                                    "rarity": "rare",
+                                    "desc": "一小瓶呈现荧光蓝色的特制镇定剂，能强效抑制海马体的过度活跃。",
+                                    "effects": [
+                                        [
+                                            "heal_sanity",
+                                            40
+                                        ]
+                                    ]
+                                },
+                                {
+                                    "id": "void_resonance_ring",
+                                    "name": "虚空共鸣指环",
+                                    "type": "accessory",
+                                    "rarity": "cursed",
+                                    "desc": "一枚从变异实验体骨骼中提取打造的指环。戴上它能让你思维更敏锐，但耳边的低语却从未停止。",
+                                    "effects": [
+                                        [
+                                            "knowledge",
+                                            3
+                                        ],
+                                        [
+                                            "perception",
+                                            2
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_security_checkpoint",
+                    "label": "返回安保检查站",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_storage_annex",
+                    "label": "进入实验室后方的储藏附室",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_storage_annex": {
+            "name": "实验室储藏附室",
+            "desc": "存放危险化学品和重要资产的密闭房间。这里的恒温系统已经崩溃，空气冷得刺骨。几具穿着白色防护服的干尸倒在被撬开的保险柜旁，他们的面部表情因极度恐惧而扭曲。",
+            "visualPrompt": "结霜的墙壁在手电光下闪烁，地上散落着凝结的化学药剂残渣。那具死死抱住公文包的干尸怀中，隐约露出了红色的金属反光。",
+            "threatLevel": 11,
+            "items": [
+                {
+                    "id": "core_access_card",
+                    "name": "收容核心最高权限卡",
+                    "type": "material",
+                    "rarity": "epic",
+                    "desc": "一张带有基金会高级权限标识的红色钥匙卡，表面沾染着洗不掉的血迹。这是深入核心的唯一凭证。",
+                    "discoveryThreshold": 7,
+                    "quantity": 1
+                },
+                {
+                    "id": "hazmat_suit",
+                    "name": "重型防化服",
+                    "type": "armor",
+                    "rarity": "rare",
+                    "desc": "一件沾满干涸液体的铅层防化服，可以提供坚实的物理和环境防护。",
+                    "defense": 12,
+                    "maxUses": 10,
+                    "discoveryThreshold": 5,
+                    "quantity": 1
+                }
+            ],
+            "exits": [
+                {
+                    "targetId": "node_research_lab",
+                    "label": "返回研究实验室",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_quarantine_zone": {
+            "name": "绝对隔离区",
+            "desc": "一条被厚重铅板完全包裹的长廊，原本是为了防止辐射与精神污染泄漏而建。然而现在，铅板表面布满了深不见底的抓痕，某种超越维度的力量正在逐渐侵蚀这里的物理结构。",
+            "visualPrompt": "长廊中弥漫着实质化的黑雾，每向前走一步，心跳声都在耳边放大一倍。走廊尽头，那扇通往最终核心的巨门正因为内部的狂暴能量而剧烈震颤。",
+            "threatLevel": 16,
+            "exits": [
+                {
+                    "targetId": "node_security_checkpoint",
+                    "label": "逃回安保检查站",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_containment_core",
+                    "label": "直面深渊，步入收容核心",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_containment_core": {
+            "name": "核心收容单元",
+            "desc": "这是整个地下综合体的心脏。巨大的球形空间中央，磁束缚能量场已经被撕裂成了碎片。现实的物理法则在这里完全失效，空间的几何结构疯狂地折叠交错。一个超脱人类理解的畸变实体盘踞在坍塌的裂隙中，死死地盯住了你。",
+            "visualPrompt": "墙壁上的六边形抑制面板已被高能辐射烧熔成了灰绿色的玻璃状物质。中央爆裂的反应堆核心上方，悬浮着一团由纠缠的肢体与纯粹暗物质混合而成的庞然大物。",
+            "threatLevel": 20,
+            "enemySpawnCondition": "on_enter",
+            "specificEnemy": {
+                "id": "enemy_void_observer",
+                "name": "虚空吞噬者·畸变聚合体",
+                "gender": "both",
+                "desc": "一个由被侵蚀的基金会安保人员血肉与纯粹的暗物质能量强制粘合而成的扭曲怪物。它没有固定的形态，持续不断地向外辐射致命的精神污染。",
+                "visualPrompt": "在微蓝的能量场残骸中，一团由破碎防弹衣、融化的骨骼和虚空暗流混合而成的怪物正缓慢蠕动，其表面每分每秒都在睁开与闭合着无数只浑浊的眼球。",
+                "initialState": {
+                    "attribute": {
+                        "strength": 15,
+                        "agility": 8,
+                        "knowledge": 25,
+                        "perception": 12
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    }
+                },
+                "lootTable": [
+                    {
+                        "id": "void_core_shard",
+                        "name": "虚空核心碎片",
+                        "type": "material",
+                        "rarity": "epic",
+                        "desc": "散发着不祥紫光的晶体，摸上去冰冷刺骨，似乎蕴含着高维能量。",
+                        "dropProbability": 1.0
+                    }
+                ],
+                "intentDistribution": {
+                    "attack": 50,
+                    "debuff": 30,
+                    "buff": 10,
+                    "observe": 10
+                },
+                "nextIntent": {
+                    "type": "debuff",
+                    "desc": "正在聚集令人疯狂的神经毒素脉冲"
+                }
+            },
+            "exits": [
+                {
+                    "targetId": "node_quarantine_zone",
+                    "label": "撤回隔离区",
+                    "type": "local"
+                },
+                {
+                    "targetId": "node_escape_route",
+                    "label": "冲向核心后方的备用撤离电梯",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_escape_route": {
+            "name": "紧急撤离电梯井",
+            "desc": "一条隐蔽而狭窄的竖井通道，尽头停靠着一部用重型贫铀钢板加固的高速脱轨电梯。这是切断与虚空联系、重返现实维度的唯一逃生舱。",
+            "visualPrompt": "电梯轿厢内的应急灯发出急促的黄色频闪。墙壁上布满了无数科研人员在绝望中留下的血色手印。电梯上行轨道的指示灯依然显示为绿色的通电状态。",
+            "threatLevel": 1,
+            "exits": [
+                {
+                    "targetId": "node_containment_core",
+                    "label": "返回核心收容单元",
+                    "type": "local"
+                },
+                {
+                    "label": "启动撤离程序，彻底脱离深渊",
+                    "type": "sanctuary_return"
+                }
+            ]
+        }
+    }
+}

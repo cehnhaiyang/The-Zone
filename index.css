@@ -1,0 +1,1103 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Serif+SC:wght@400;600;700;900&display=swap');
+
+:root {
+  --crt-scanline: rgba(18, 16, 16, 0.15);
+  /* Reduced opacity for clarity */
+  --terminal-green: #34d399;
+  --terminal-amber: #fbbf24;
+  --terminal-red: #f87171;
+  --bg-dark: #27272a;
+  /* Zinc-800 - Brighter base to avoid complete black depth */
+  --bg-panel: rgba(63, 63, 70, 0.85);
+  /* Zinc-700 equivalent lighter panel */
+}
+
+body {
+  font-family: "KaiTi", "STKaiti", "楷体", "Noto Serif SC", serif;
+  background-color: var(--bg-dark);
+  color: #e4e4e7;
+  /* Zinc-200 */
+  transition: filter 2s ease;
+  overflow: hidden;
+}
+
+/* 强制覆盖 Tailwind 的字体工具类 */
+.font-sans,
+.font-serif,
+.font-mono {
+  font-family: "KaiTi", "STKaiti", "楷体", "Noto Serif SC", serif !important;
+}
+
+/* 噪点背景纹理 */
+.noise-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.015;
+  /* Substantially reduced opacity to reduce muddy look */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* 自定义滚动条 - 更细 */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #52525b;
+  /* Zinc-600 */
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #71717a;
+  /* Zinc-500 */
+}
+
+/* CRT 扫描线 - 降低浓度 */
+.scanlines {
+  background: linear-gradient(to bottom,
+      rgba(255, 255, 255, 0),
+      rgba(255, 255, 255, 0) 50%,
+      rgba(0, 0, 0, 0.01) 50%,
+      rgba(0, 0, 0, 0.01));
+  background-size: 100% 4px;
+  position: fixed;
+  pointer-events: none;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  opacity: 0.04;
+  /* Highly reduced for minimal interference */
+}
+
+/* 屏幕发光 - 降低暗角 */
+.screen-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(circle, rgba(40, 50, 60, 0) 70%, rgba(0, 0, 0, 0.1) 100%);
+  /* Much Lighter vignette, less dark edges */
+  pointer-events: none;
+  z-index: 49;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.05);
+}
+
+/* 增强的文字发光效果 */
+.text-glow {
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.2), 0 0 8px rgba(255, 255, 255, 0.4);
+}
+
+.text-glow-green {
+  text-shadow: 0 0 5px rgba(52, 211, 153, 0.6), 0 0 10px rgba(52, 211, 153, 0.4);
+}
+
+.text-glow-red {
+  text-shadow: 0 0 5px rgba(248, 113, 113, 0.6), 0 0 10px rgba(248, 113, 113, 0.4);
+}
+
+/* 动画 */
+@keyframes shake {
+  0% {
+    transform: translate(1px, 1px) rotate(0deg);
+  }
+
+  10% {
+    transform: translate(-1px, -2px) rotate(-1deg);
+  }
+
+  20% {
+    transform: translate(-3px, 0px) rotate(1deg);
+  }
+
+  30% {
+    transform: translate(3px, 2px) rotate(0deg);
+  }
+
+  40% {
+    transform: translate(1px, -1px) rotate(1deg);
+  }
+
+  50% {
+    transform: translate(-1px, 2px) rotate(-1deg);
+  }
+
+  60% {
+    transform: translate(-3px, 1px) rotate(0deg);
+  }
+
+  70% {
+    transform: translate(3px, 1px) rotate(-1deg);
+  }
+
+  80% {
+    transform: translate(-1px, -1px) rotate(1deg);
+  }
+
+  90% {
+    transform: translate(1px, 2px) rotate(0deg);
+  }
+
+  100% {
+    transform: translate(1px, -2px) rotate(-1deg);
+  }
+}
+
+.shake-anim {
+  animation: shake 0.5s infinite;
+}
+
+/* 受击震动 */
+@keyframes damage-shake {
+  0% {
+    transform: translate(0, 0);
+    filter: drop-shadow(0 0 0 red);
+  }
+
+  25% {
+    transform: translate(-5px, 5px);
+    filter: drop-shadow(2px 2px 10px red);
+  }
+
+  50% {
+    transform: translate(5px, -5px);
+    filter: drop-shadow(-2px -2px 10px red);
+  }
+
+  75% {
+    transform: translate(-5px, -5px);
+  }
+
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+.damage-shake {
+  animation: damage-shake 0.3s ease-in-out;
+}
+
+@keyframes breathe {
+  0% {
+    opacity: 0.9;
+    filter: brightness(0.95) contrast(1.1);
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    filter: brightness(1.05) contrast(1.2);
+    transform: scale(1.02);
+  }
+
+  100% {
+    opacity: 0.9;
+    filter: brightness(0.95) contrast(1.1);
+    transform: scale(1);
+  }
+}
+
+.animate-breathe {
+  animation: breathe 6s infinite ease-in-out;
+  will-change: transform, opacity;
+}
+
+@keyframes blink-animation {
+
+  0%,
+  96%,
+  98% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+
+  97% {
+    opacity: 0;
+    transform: scaleY(0.1);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+.animate-blink {
+  animation: blink-animation 8s infinite;
+  transform-origin: center;
+}
+
+@keyframes snow {
+  0% {
+    transform: translate(0, 0);
+  }
+
+  10% {
+    transform: translate(-5%, -5%);
+  }
+
+  20% {
+    transform: translate(-10%, 5%);
+  }
+
+  30% {
+    transform: translate(5%, -10%);
+  }
+
+  40% {
+    transform: translate(-5%, 15%);
+  }
+
+  50% {
+    transform: translate(-10%, 5%);
+  }
+
+  60% {
+    transform: translate(15%, 0);
+  }
+
+  70% {
+    transform: translate(0, 10%);
+  }
+
+  80% {
+    transform: translate(-15%, 0);
+  }
+
+  90% {
+    transform: translate(10%, 5%);
+  }
+
+  100% {
+    transform: translate(5%, 0);
+  }
+}
+
+@keyframes noise-shift {
+  0% {
+    transform: translate(1%, 1%);
+  }
+
+  20% {
+    transform: translate(-2%, 1%);
+  }
+
+  40% {
+    transform: translate(-2%, -1%);
+  }
+
+  60% {
+    transform: translate(2%, 1%);
+  }
+
+  80% {
+    transform: translate(1%, -2%);
+  }
+
+  100% {
+    transform: translate(-1%, 2%);
+  }
+}
+
+.animate-snow {
+  animation: snow 0.2s steps(4) infinite;
+}
+
+/* 故障效果 */
+.glitch-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.glitch-container::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'JetBrains Mono', monospace;
+  color: rgba(255, 255, 255, 0.05);
+  font-size: 24px;
+  letter-spacing: 0.2em;
+  z-index: 0;
+}
+
+.glitch-image {
+  position: relative;
+  filter: sepia(0.2) contrast(1.1) brightness(1.1);
+  z-index: 1;
+}
+
+.chromatic-aberration {
+  text-shadow: 1px 0 rgba(255, 0, 0, 0.4), -1px 0 rgba(0, 255, 255, 0.4);
+}
+
+.sanity-low {
+  filter: sepia(0.3) contrast(1.2) hue-rotate(-10deg);
+  animation: pulse-visual 4s infinite;
+}
+
+.sanity-critical {
+  filter: sepia(0.6) contrast(1.4) hue-rotate(-20deg) blur(0.3px);
+  animation: glitch-skew 3s infinite steps(10);
+}
+
+@keyframes pulse-visual {
+  0% {
+    filter: sepia(0.3) contrast(1.2) hue-rotate(-10deg);
+  }
+
+  50% {
+    filter: sepia(0.4) contrast(1.3) hue-rotate(-15deg);
+  }
+
+  100% {
+    filter: sepia(0.3) contrast(1.2) hue-rotate(-10deg);
+  }
+}
+
+@keyframes glitch-skew {
+  0% {
+    transform: skew(0deg);
+  }
+
+  20% {
+    transform: skew(-0.5deg);
+  }
+
+  40% {
+    transform: skew(0.5deg);
+  }
+
+  60% {
+    transform: skew(-0.2deg);
+  }
+
+  80% {
+    transform: skew(0.2deg);
+  }
+
+  100% {
+    transform: skew(0deg);
+  }
+}
+
+.typing-cursor::after {
+  content: '▋';
+  animation: blink 1s step-start infinite;
+  margin-left: 2px;
+  color: var(--terminal-green);
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* 按钮扫描效果 */
+.btn-scan {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.btn-scan::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+  transition: 0.5s;
+}
+
+.btn-scan:hover::after {
+  left: 100%;
+}
+
+.glass-panel {
+  background: rgba(39, 39, 46, 0.75);
+  /* Brighter glass base */
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  /* Brighter border */
+}
+
+/* === 新增系统 UI 样式 === */
+
+/* 分段条容器 */
+.segmented-bar-container {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  height: 8px;
+}
+
+.segment {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1px;
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.segment.filled-hp {
+  background: #10b981;
+  box-shadow: 0 0 5px #10b981;
+}
+
+.segment.filled-hp.critical {
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+  animation: blink 1s infinite;
+}
+
+.segment.filled-san {
+  background: #3b82f6;
+  box-shadow: 0 0 5px #3b82f6;
+}
+
+.segment.filled-san.critical {
+  background: #a855f7;
+  box-shadow: 0 0 8px #a855f7;
+}
+
+/* 科技感边框 */
+.tech-border {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.tech-border::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 6px;
+  height: 6px;
+  border-top: 2px solid rgba(255, 255, 255, 0.4);
+  border-left: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+.tech-border::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 6px;
+  height: 6px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.4);
+  border-right: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+/* ================================================================
+ * 视觉引擎与 HUD 系统 (Consolidated Visual System)
+ * ================================================================ */
+
+:root {
+  --neon-cyan: #06b6d4;
+  --neon-emerald: #10b981;
+  --neon-red: #ef4444;
+  --neon-purple: #a855f7;
+  --neon-amber: #f59e0b;
+}
+
+/* --- 核心动画关键帧 --- */
+
+@keyframes scan-line {
+  0% {
+    transform: translateY(-2vh);
+    opacity: 0;
+  }
+
+  5% {
+    opacity: 0.8;
+  }
+
+  95% {
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translateY(102vh);
+    opacity: 0;
+  }
+}
+
+@keyframes scan-flicker {
+
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+
+  10%,
+  14%,
+  54% {
+    opacity: 0.9;
+  }
+
+  12%,
+  52% {
+    opacity: 0.2;
+  }
+
+  30%,
+  70% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes pan-zoom-deep {
+  0% {
+    transform: scale(1.1) translate(0, 0);
+  }
+
+  25% {
+    transform: scale(1.18) translate(-1.5%, 1%);
+  }
+
+  50% {
+    transform: scale(1.14) translate(1.5%, -1%);
+  }
+
+  75% {
+    transform: scale(1.18) translate(1%, 2%);
+  }
+
+  100% {
+    transform: scale(1.1) translate(0, 0);
+  }
+}
+
+@keyframes handheld-drift {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+
+  20% {
+    transform: translate(2px, -2px) rotate(0.08deg);
+  }
+
+  40% {
+    transform: translate(-1px, 1.5px) rotate(-0.05deg);
+  }
+
+  60% {
+    transform: translate(-2.5px, -1px) rotate(0.06deg);
+  }
+
+  80% {
+    transform: translate(1px, 2px) rotate(-0.03deg);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+@keyframes enemy-breathe {
+
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  30%,
+  50%,
+  70% {
+    transform: scale(1.03);
+  }
+}
+
+@keyframes tension-shake {
+
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  20% {
+    transform: translate(1px, 1px);
+  }
+
+  40% {
+    transform: translate(-1px, -1px);
+  }
+
+  60% {
+    transform: translate(-1.5px, 0.5px);
+  }
+
+  80% {
+    transform: translate(1px, -1.5px);
+  }
+}
+
+@keyframes panic-shake {
+
+  0%,
+  100% {
+    transform: translate(2px, -4px) rotate(-0.4deg);
+  }
+
+  10% {
+    transform: translate(-4px, -4px) rotate(-0.8deg);
+  }
+
+  20%,
+  70% {
+    transform: translate(5px, 2px) rotate(0.8deg);
+  }
+
+  30%,
+  90% {
+    transform: translate(-2px, 4px) rotate(0deg);
+  }
+}
+
+@keyframes heartbeat {
+
+  0%,
+  30%,
+  100% {
+    transform: scaleY(1);
+    opacity: 0.4;
+  }
+
+  15% {
+    transform: scaleY(1.8);
+    opacity: 1;
+  }
+}
+
+@keyframes digital-flicker {
+
+  0%,
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+
+  5% {
+    opacity: 0.9;
+    transform: scaleX(1.1);
+  }
+
+  15% {
+    opacity: 0.6;
+    transform: scaleX(0.9);
+  }
+}
+
+@keyframes tear {
+
+  0%,
+  4%,
+  8%,
+  100% {
+    clip-path: inset(0 0 0 0);
+    transform: translateX(0);
+  }
+
+  2% {
+    clip-path: inset(20% 0 70% 0);
+    transform: translateX(-15px);
+    filter: hue-rotate(90deg);
+  }
+
+  6% {
+    clip-path: inset(65% 0 15% 0);
+    transform: translateX(15px);
+    filter: hue-rotate(-90deg);
+  }
+}
+
+@keyframes chromatic-pulse {
+
+  0%,
+  20%,
+  55%,
+  100% {
+    text-shadow: 0 0 transparent;
+  }
+
+  15% {
+    text-shadow: 2px 0 var(--neon-red), -2px 0 var(--neon-cyan);
+  }
+
+  50% {
+    text-shadow: -1px 1px var(--neon-red), 1px -1px var(--neon-cyan);
+  }
+}
+
+@keyframes vignette-breathe {
+
+  0%,
+  100% {
+    box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.7);
+  }
+
+  50% {
+    box-shadow: inset 0 0 180px rgba(0, 0, 0, 0.85);
+  }
+}
+
+@keyframes glitch-slice {
+
+  0%,
+  6%,
+  18%,
+  43%,
+  100% {
+    clip-path: none;
+    transform: translateX(0) skewX(0deg);
+  }
+
+  3% {
+    clip-path: inset(10% 0 80% 0);
+    transform: translateX(-8px) skewX(-2deg);
+  }
+
+  15% {
+    clip-path: inset(60% 0 20% 0);
+    transform: translateX(12px) skewX(1deg);
+  }
+}
+
+@keyframes wave-oscillate {
+
+  0%,
+  100% {
+    height: 30%;
+  }
+
+  25% {
+    height: 80%;
+  }
+
+  50% {
+    height: 45%;
+  }
+
+  75% {
+    height: 90%;
+  }
+}
+
+@keyframes visor-glitch-anim {
+
+  0%,
+  100% {
+    clip-path: inset(0 0 0 0);
+    transform: translateX(0);
+  }
+
+  20% {
+    clip-path: inset(10% 0 80% 0);
+    transform: translateX(-3px);
+  }
+
+  80% {
+    clip-path: inset(80% 0 5% 0);
+    transform: translateX(2px);
+  }
+}
+
+@keyframes visor-boot {
+  0% {
+    opacity: 0;
+    filter: brightness(2) blur(10px);
+  }
+
+  100% {
+    opacity: 1;
+    filter: brightness(1) blur(0);
+  }
+}
+
+@keyframes visor-panel-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes visor-data-flow {
+  0% {
+    background-position: 0 0;
+  }
+
+  100% {
+    background-position: 0 100%;
+  }
+}
+
+/* --- 视觉组件类 --- */
+
+.scan-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--neon-emerald);
+  box-shadow: 0 0 20px var(--neon-emerald), 0 0 60px rgba(16, 185, 129, 0.3);
+  animation: scan-line 4.5s linear infinite, scan-flicker 3s steps(1) infinite;
+  pointer-events: none;
+  z-index: 25;
+  opacity: 0.6;
+  will-change: transform, opacity;
+}
+
+.scan-bar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -30px;
+  width: 100%;
+  height: 60px;
+  background: linear-gradient(to bottom, transparent, rgba(16, 185, 129, 0.05), transparent);
+}
+
+.glass-panel-glow {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(14px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel-glow:hover {
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), 0 0 20px rgba(6, 182, 212, 0.12);
+}
+
+.cyber-grid {
+  background-image:
+    linear-gradient(rgba(6, 182, 212, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(6, 182, 212, 0.06) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.visor-scanlines {
+  background: repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0, 0, 0, 0.15) 1px, rgba(0, 0, 0, 0.15) 2px);
+}
+
+.visor-data-flow {
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 255, 255, 0.03) 50%, transparent 100%);
+  background-size: 100% 200%;
+  animation: visor-data-flow 3s linear infinite;
+}
+
+.visor-grid {
+  background-image:
+    linear-gradient(rgba(6, 182, 212, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(6, 182, 212, 0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* --- 状态切换动画类 --- */
+
+.animate-pan-zoom-deep {
+  animation: pan-zoom-deep 40s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.animate-handheld {
+  animation: handheld-drift 10s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-enemy-breathe {
+  animation: enemy-breathe 5s ease-in-out infinite;
+}
+
+.animate-tension-shake {
+  animation: tension-shake 0.15s linear infinite;
+}
+
+.animate-panic {
+  animation: panic-shake 0.4s linear infinite;
+}
+
+.animate-noise {
+  animation: noise-shift 0.3s steps(4) infinite;
+  will-change: transform;
+}
+
+.animate-tear {
+  animation: tear 4s infinite steps(1);
+}
+
+.animate-chromatic-pulse {
+  animation: chromatic-pulse 4s ease-in-out infinite;
+}
+
+.animate-vignette-breathe {
+  animation: vignette-breathe 8s ease-in-out infinite;
+  will-change: box-shadow;
+}
+
+.animate-glitch-slice {
+  animation: glitch-slice 6s steps(1) infinite;
+}
+
+.visor-glitch {
+  animation: visor-glitch-anim 0.2s steps(10) infinite;
+}
+
+.visor-boot {
+  animation: visor-boot 0.5s ease-out forwards;
+}
+
+.visor-panel-in {
+  animation: visor-panel-in 0.3s ease-out forwards;
+}
+
+.filter-neural-outline {
+  filter: contrast(1.2) brightness(1.1) drop-shadow(0 0 2px rgba(255, 255, 255, 0.1));
+}
+
+.filter-naked-eye {
+  filter: contrast(1.1) brightness(0.9) sepia(0.05) saturate(0.85);
+}
+
+.filter-nightmare {
+  filter: contrast(1.8) brightness(0.6) hue-rotate(-30deg) saturate(1.8);
+}
+
+/* =============================================================================
+   OverlayPanel & Effects (全屏覆盖层与视觉特效)
+   ============================================================================= */
+
+/* 基础特效：扫描线 */
+.overlay-scanlines {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(0, 0, 0, 0.1) 1px,
+    rgba(0, 0, 0, 0.1) 2px
+  );
+}
+
+/* 动效：背景粒子浮动 (用于增强氛围感) */
+@keyframes float-particle {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
+  25% { transform: translateY(-20px) translateX(10px); opacity: 0.6; }
+  50% { transform: translateY(-10px) translateX(-5px); opacity: 0.4; }
+  75% { transform: translateY(-30px) translateX(5px); opacity: 0.5; }
+}
+.animate-float-particle { animation: float-particle linear infinite; }
+
+/* 动效：网格漂移 (科幻感背景底纹) */
+@keyframes grid-drift {
+  0% { background-position: 0 0; }
+  100% { background-position: 50px 50px; }
+}
+.animate-grid-drift { animation: grid-drift 30s linear infinite; }
+
+/* 动效：文字呼吸发光 (多色调支持) */
+@keyframes text-glow {
+  0%, 100% { text-shadow: 0 0 20px rgba(34, 211, 238, 0.3); }
+  50% { text-shadow: 0 0 40px rgba(34, 211, 238, 0.5), 0 0 60px rgba(34, 211, 238, 0.3); }
+}
+.animate-text-glow { animation: text-glow 3s ease-in-out infinite; }
+
+@keyframes text-glow-green {
+  0%, 100% { text-shadow: 0 0 20px rgba(16, 185, 129, 0.3); }
+  50% { text-shadow: 0 0 40px rgba(16, 185, 129, 0.5), 0 0 60px rgba(16, 185, 129, 0.3); }
+}
+.animate-text-glow-green { animation: text-glow-green 3s ease-in-out infinite; }
+
+@keyframes text-glow-red {
+  0%, 100% { text-shadow: 0 0 30px rgba(220, 38, 38, 0.4); }
+  50% { text-shadow: 0 0 60px rgba(220, 38, 38, 0.6), 0 0 80px rgba(220, 38, 38, 0.4); }
+}
+.animate-text-glow-red { animation: text-glow-red 2s ease-in-out infinite; }
+
+/* 动效：系统故障/抖动效果 (用于过场切换或错误提示) */
+@keyframes glitch-shake {
+  0%, 100% { transform: translate(0); }
+  10% { transform: translate(-2px, 1px); }
+  20% { transform: translate(2px, -1px); }
+  30% { transform: translate(-1px, 2px); }
+  40% { transform: translate(1px, -2px); }
+  50% { transform: translate(-2px, -1px); }
+}
+.animate-glitch-shake { animation: glitch-shake 0.3s ease-out; }
+
+@keyframes glitch-text {
+  0%, 100% { opacity: 0.1; transform: translateX(0); }
+  25% { opacity: 0.15; transform: translateX(-5px); }
+  50% { opacity: 0.1; transform: translateX(5px); }
+  75% { opacity: 0.12; transform: translateX(-3px); }
+}
+.animate-glitch-text { animation: glitch-text 2s ease-in-out infinite; }
+
+/* 动效：加载进度条横扫 */
+@keyframes loading-bar {
+  0% { transform: translateX(-100%); width: 30%; }
+  50% { width: 50%; }
+  100% { transform: translateX(400%); width: 30%; }
+}
+.animate-loading-bar { animation: loading-bar 1.5s ease-in-out infinite; }
+
+/* =============================================================================
+   Puzzle (谜题系统专属动画)
+   ============================================================================= */
+
+/* 矩阵数字滚动背景 */
+@keyframes matrix-scroll {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+.animate-matrix-scroll { animation: matrix-scroll 20s linear infinite; }
+
+/* 快速扫描线 (输入框动效) */
+@keyframes scan-down-fast {
+  0% { top: -10%; opacity: 0; }
+  50% { opacity: 1; }
+  100% { top: 110%; opacity: 0; }
+}
+.animate-scan-down-fast { animation: scan-down-fast 2s linear infinite; }
+
+/* 谜题面板整体抖动 (输入错误反馈) */
+@keyframes shake-puzzle {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+.animate-shake-puzzle { animation: shake-puzzle 0.4s ease-in-out; }
+
+.text-chromatic {
+  text-shadow: 1px 0 rgba(255, 0, 80, 0.3), -1px 0 rgba(0, 200, 255, 0.3);
+}
+
+.text-data {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 8px currentColor;
+}
+
+/* 实用工具：青色发光阴影 */
+.text-shadow-cyan { text-shadow: 0 0 10px rgba(34, 211, 238, 0.5); }

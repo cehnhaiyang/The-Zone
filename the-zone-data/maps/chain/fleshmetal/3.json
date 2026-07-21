@@ -1,0 +1,521 @@
+{
+    "id": "fleshmetal_3",
+    "name": "血肉与机械",
+    "visualStyle": "Hyper-advanced rusted biomechanics, pulsating organic cables integrating with server racks, dimly lit with toxic green and warning red lights, claustrophobic yet vast.",
+    "generatedPlotPoints": [
+        {
+            "id": "pp_god_gestation",
+            "type": "main",
+            "content": "整个设施是一个巨大的子宫，核心深处正在孕育一个由血肉与机械融合而成的虚空神明。所有实验、所有牺牲，都是为了给这个即将诞生的‘神’提供养料。",
+            "hint": "在废弃的医务室中寻找记录了项目真正目的的实验日志，或揭开孵化池的秘密。"
+        },
+        {
+            "id": "pp_ark_devoured",
+            "type": "side",
+            "content": "本以为逃出生天的‘方舟’，在天际被深渊中涌出的血肉卫星吞噬并同化。所谓的救赎，不过是送入了另一个更大的培养皿。",
+            "hint": "在活体样本冷库中，找到记录了方舟最终命运的绝密数据板。"
+        },
+        {
+            "id": "pp_original_host",
+            "type": "main",
+            "content": "设施的核心并非人类建造，而是依托于一个远古文明遗留的“骨架”扩建而成。这些远古机械本身仍然存活，它们一直在引导实验走向自己的目的：为自己制造一个完美的容器。",
+            "hint": "在收容单元中，检查破损的拘束装置并感知其残留的记忆。"
+        }
+    ],
+    "initial": {
+        "entrance": "pod_crash_site",
+        "dilationFactor": 1.0
+    },
+    "nodes": {
+        "pod_crash_site": {
+            "name": "逃生舱坠毁点",
+            "desc": "剧烈的撞击让你的五脏六腑都在翻腾。基金会高层的逃生舱被某种粗壮的金属触须强行拽回并撕裂，外部是一片黑暗的工业空间。空气中弥漫着刺鼻的臭氧味、冷却液的泄漏味以及一种难以名状的生物腥气。头顶的警报灯闪烁着令人不安的红光，照亮了那些像血管一样缠绕在墙壁上的生锈电缆。",
+            "visualPrompt": "Crashed metal escape pod with Foundation logos, torn open by mechanical tentacles, dark industrial space, leaking coolant, flashing red alarm lights.",
+            "threatLevel": 1,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "quarantine_corridor",
+                    "label": "深入幽暗的设施"
+                }
+            ]
+        },
+        "quarantine_corridor": {
+            "name": "极危隔离走廊",
+            "desc": "这条狭长的混凝土走廊本应是无菌的隔离区，但现在两侧的净化喷头却在向外喷洒着浑浊的暗红色雾气。墙面上装有厚重的密封面板，其中几块已经被内部膨胀的肉质组织顶得凸起变形。脚下的金属格栅湿滑无比，踩上去会发出令人牙酸的摩擦声。",
+            "visualPrompt": "Narrow concrete corridor, decontamination sprinklers spraying dark red mist, bulging heavy steel wall panels, wet metal grated floor.",
+            "threatLevel": 3,
+            "childrenIds": [
+                "ruined_med_bay",
+                "ventilation_maze",
+                "abyssal_incubation_pool"
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "pod_crash_site",
+                    "label": "退回坠毁点"
+                },
+                {
+                    "type": "local",
+                    "targetId": "apex_processing_chamber",
+                    "label": "前往巨型处理室"
+                }
+            ]
+        },
+        "abyssal_incubation_pool": {
+            "name": "深渊孵化池",
+            "desc": "这是一个被遗忘的底层废液池，如今已变成了血肉机械的温床。巨大的机械子宫悬挂在天花板上，不断向下方翻滚的黑色羊水中滴落着发光的生物质。水面上漂浮着无数未能成型的残次品，空气中充斥着极度高浓度的深渊辐射，神经链接仪不断发出刺耳的警告。",
+            "visualPrompt": "Dark underground pool of boiling black amniotic fluid, giant mechanical wombs hanging from ceiling, floating biomechanical failures.",
+            "threatLevel": 5,
+            "items": [
+                {
+                    "id": "synthetic_amniotic_fluid",
+                    "name": "合成羊水",
+                    "desc": "极高纯度的融合催化剂，能强行修补严重的肉体损伤，但会造成精神上的深层污染。",
+                    "type": "consumable",
+                    "rarity": "epic",
+                    "quantity": 2,
+                    "effects": [
+                        [
+                            "heal_hp",
+                            45
+                        ],
+                        [
+                            "heal_sanity",
+                            -15
+                        ]
+                    ]
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "quarantine_corridor",
+                    "label": "逃离这片温床"
+                }
+            ]
+        },
+        "ruined_med_bay": {
+            "name": "废弃医务室",
+            "desc": "这里曾是实验人员的医务室，现在只剩下被彻底砸碎的病床和干涸的发黑血迹。浓烈的福尔马林气味混合着腐肉的甜腻，令人作呕。角落里的一台受损监护仪屏幕上，心电图早已变成了一条刺眼的直线，但机器内部却发出了诡异的咀嚼声。",
+            "visualPrompt": "Destroyed medical bay, smashed hospital beds, dried black blood, broken heart monitor with static screen.",
+            "threatLevel": 2,
+            "items": [
+                {
+                    "id": "medical_injector",
+                    "name": "高纯度医疗注射器",
+                    "desc": "内含未知绿色溶液的军用注射器，针头仍保持着无菌状态。",
+                    "type": "consumable",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "effects": [
+                        [
+                            "heal_hp",
+                            30
+                        ]
+                    ]
+                },
+                {
+                    "id": "diary_page_awakening",
+                    "name": "染血的日记残页",
+                    "desc": "手写的记录，字迹潦草且充满绝望。",
+                    "type": "document",
+                    "rarity": "rare",
+                    "quantity": 1,
+                    "toSolvePP": "pp_god_gestation",
+                    "documentContent": "它们有意识……血肉和金属的网络在互相窃窃私语。我们以为在制造统治世界的工具，但实际上，我们只是在为某个在虚空中沉睡的神明搭建肉身。它快醒了。"
+                }
+            ]
+        },
+        "ventilation_maze": {
+            "name": "排气管网",
+            "desc": "漆黑狭窄的金属管道内部，只能靠手电筒微弱的光芒前行。管道壁上挂满了令人毛骨悚然的黏液和未知的蛛网状纤维。每向前爬行一步，管道深处都会传来低沉的呼啸声，仿佛是这艘巨大机械生物正在呼吸。",
+            "visualPrompt": "Pitch black narrow metal air duct, glowing slime, web-like organic fibers, dense dust.",
+            "threatLevel": 1,
+            "items": [
+                {
+                    "id": "emergency_rations",
+                    "name": "真空应急口粮",
+                    "desc": "一包被遗弃在通风管道里的压缩饼干。",
+                    "type": "consumable",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "effects": [
+                        [
+                            "heal_hp",
+                            10
+                        ]
+                    ]
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "quarantine_corridor",
+                    "label": "爬出通风管道"
+                }
+            ]
+        },
+        "apex_processing_chamber": {
+            "name": "中枢处理大厅",
+            "desc": "你踏入一个巨大得令人眩晕的圆形处理室。高耸的金属支架和扭曲的机械臂直插天花板，无数透明的培养管如同树根般垂落，里面输送着发光的绿色流体。房间中央是一台巨大的处理器残骸，表面已经完全被一层缓慢蠕动、长满眼球的暗红色生物质所覆盖。甜腥与臭氧的气味在这里达到了顶峰。",
+            "visualPrompt": "Massive circular chamber, towering twisted metal arms, transparent tubes pumping glowing green fluid, central processor covered in pulsing dark red flesh with eyes.",
+            "threatLevel": 5,
+            "childrenIds": [
+                "bio_storage_vault",
+                "mech_assembly_line"
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "quarantine_corridor",
+                    "label": "退回隔离区"
+                },
+                {
+                    "type": "local",
+                    "targetId": "nexus_observation_deck",
+                    "label": "登上观察平台"
+                }
+            ]
+        },
+        "bio_storage_vault": {
+            "name": "活体样本冷库",
+            "desc": "推开沉重的防爆门，极低的温度瞬间剥夺了你体表的温度。一排排金属货架上摆放着冷冻箱，但几乎所有的箱体都已经被一种诡异的、会呼吸的肉质增生物覆盖。它们在金属表面缓慢蠕动，发出令人头皮发麻的湿润摩擦声。",
+            "visualPrompt": "Freezing cold storage vault, metal shelves, cryo-boxes completely overgrown with breathing, pulsating fleshy growths, frosty air.",
+            "threatLevel": 4,
+            "interactions": [
+                {
+                    "desc": "破解覆盖着血肉组织的冷冻箱操作面板",
+                    "requirements": {
+                        "time": 15,
+                        "puzzleSolved": {
+                            "type": "memory",
+                            "title": "突触记忆回溯",
+                            "desc": "面板上的生物电路要求你通过神经链接仪，短暂连接系统并复现一段远古的记忆脉冲序列。",
+                            "solution": "Alpha, Gamma, Beta, Omega",
+                            "data": {
+                                "sequence": [
+                                    "Alpha",
+                                    "Gamma",
+                                    "Beta",
+                                    "Omega"
+                                ],
+                                "displayTime": 3000,
+                                "inputLength": 4
+                            },
+                            "hints": [
+                                "序列的顺序很重要，请集中注意力。"
+                            ],
+                            "penalty": {
+                                "sanity": -10
+                            }
+                        }
+                    },
+                    "results": {
+                        "soundEffect": "success",
+                        "narrative": "冷冻箱发出嘶嘶的泄压声，那些附着的肉块痛苦地退缩了。你在里面找到了一块保存完好的深渊绝密数据板。",
+                        "stateChange": {
+                            "gain": [
+                                {
+                                    "id": "data_log_genesis",
+                                    "name": "机密日志：起源",
+                                    "desc": "一份破损的数字数据板，记录了基金会的核心机密。",
+                                    "type": "document",
+                                    "rarity": "epic",
+                                    "toSolvePP": "pp_ark_devoured",
+                                    "documentContent": "项目Delta-7汇报：我们曾以为方舟逃入了绝对安全的轨道，直到我们在望远镜里看到了它……那不只是融合，而是捕食。那些轨道上的肉体对外部金属不仅没有排异，反而主动将其吞噬并重构。方舟已经变成了一个悬挂在天际的血肉卫星。根本没有退路，这是一种来自远古的降临。"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "mech_assembly_line": {
+            "name": "残骸装配线",
+            "desc": "废弃的装配线旁堆放着大量半成品的重型外骨骼，火花不时从断裂的焊点喷射而出。空气中弥漫着浓烈的机油味和烧焦的蛋白质气味。一些原本应该死去的金属残肢，似乎在受到某种生物电信号的牵引，正在地面上无意识地抽搐。",
+            "visualPrompt": "Stagnant assembly line, half-finished heavy exoskeletons, flying sparks from broken welders, twitching mechanical limbs on the floor.",
+            "threatLevel": 6,
+            "specificEnemy": {
+                "id": "flesh_mech_hybrid",
+                "name": "肉钢狂化体",
+                "desc": "一个扭曲的生物，肢体由金属骨骼和增生的血肉构成，行动缓慢却充满破坏力，每一寸表皮都镶嵌着锋利的金属锯片。",
+                "visualPrompt": "A slow but highly destructive biomechanical monster, covered in fleshy growths and rusty metal saw blades, aggressive posture.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 12,
+                        "agility": 4,
+                        "knowledge": 1,
+                        "perception": 6
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 75,
+                    "buff": 25,
+                    "debuff": 0,
+                    "observe": 0
+                },
+                "lootTable": [
+                    {
+                        "id": "serrated_blade",
+                        "name": "沾血的锯片",
+                        "desc": "从狂化体身上拆下来的金属锯片，极具杀伤力。",
+                        "type": "weapon",
+                        "rarity": "rare",
+                        "weaponType": "sword",
+                        "meleeDamage": 15,
+                        "maxUses": 15,
+                        "dropProbability": 0.5
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_search"
+        },
+        "nexus_observation_deck": {
+            "name": "环形观察平台",
+            "desc": "这是一个位于高处的透明玻璃平台，向下可以俯瞰整个恶心的中枢处理大厅。透明地板下方，粗大的电缆和跳动的肉块交织在一起，如同地狱的画卷。站在这里，你能清晰地听到一阵阵如同巨大心脏跳动般的低沉轰鸣，震动从脚底一直传达到大脑深处。",
+            "visualPrompt": "High altitude observation deck, transparent glass floor overlooking horrifying biomechanical factory below, dim green ambient light.",
+            "threatLevel": 2,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "apex_processing_chamber",
+                    "label": "返回处理大厅"
+                },
+                {
+                    "type": "local",
+                    "targetId": "nexus_control_center",
+                    "label": "前往主控中心"
+                }
+            ]
+        },
+        "nexus_control_center": {
+            "name": "节点主控中心",
+            "desc": "房间中央的主控制台布满了错综复杂的管线，屏幕上闪烁着毫无逻辑的乱码与红色警告。几台报废的安保机器人被生生撕成了碎片，散落一地。浓重的臭氧味和血腥味让人窒息。控制台的正中央，一个刻着古老符文的终端孔洞正散发着幽蓝的光芒，似乎在等待着被激活。",
+            "visualPrompt": "Main control room, terminal covered in tangled cables, screen showing red static and corrupted data, destroyed security robots on the floor.",
+            "threatLevel": 4,
+            "childrenIds": [
+                "security_office",
+                "data_archive"
+            ],
+            "interactions": [
+                {
+                    "desc": "将带有最高权限的蓝色磁条卡插入主终端，解除核心区域的物理封锁。",
+                    "requirements": {
+                        "time": 20,
+                        "items": [
+                            "blue_access_card"
+                        ]
+                    },
+                    "results": {
+                        "soundEffect": "door_open",
+                        "narrative": "终端发出一声尖锐的电子嘶鸣，随后，通往核心的重型闸门伴随着地动山摇的轰鸣声缓缓开启，一股令人绝望的热浪扑面而来。",
+                        "unlock": [
+                            [
+                                "awakening_core",
+                                "直面苏醒的动力核心"
+                            ]
+                        ]
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "nexus_observation_deck",
+                    "label": "退回观察平台"
+                },
+                {
+                    "type": "local",
+                    "targetId": "awakening_core",
+                    "label": "直面苏醒的动力核心"
+                }
+            ]
+        },
+        "security_office": {
+            "name": "安保监控室",
+            "desc": "墙面上挂满了几十个监控屏幕，但现在所有的画面都只剩下令人烦躁的黑白雪花噪点。地面上有一具穿着高级安保制服的无头尸体，其颈部切口异常平滑。空气中弥漫着火药和肠液混合的恶臭。",
+            "visualPrompt": "Security office, wall of monitors showing only black and white static snow, headless corpse in uniform on the floor.",
+            "threatLevel": 3,
+            "items": [
+                {
+                    "id": "blue_access_card",
+                    "name": "蓝色权限卡",
+                    "desc": "带有蓝色磁条的最高级别通行卡，卡面上沾满了已经干涸的血手印。",
+                    "type": "material",
+                    "rarity": "rare",
+                    "quantity": 1
+                }
+            ]
+        },
+        "data_archive": {
+            "name": "残骸档案室",
+            "desc": "一排排倾倒的服务器机架在黑暗中苟延残喘，少数仍在发出微弱的绿光。这里极其干燥，充斥着一股焦糊的电子元件气味。在最深处的阴影中，全息投影仪偶尔会闪现出一个扭曲的人形轮廓，低语着无法理解的破碎代码。",
+            "visualPrompt": "Archive room, fallen server racks, faint green lights, flickering holographic projection of a distorted human figure in the dark corner.",
+            "threatLevel": 4,
+            "specificEnemy": {
+                "id": "data_ghost",
+                "name": "数据幽灵",
+                "desc": "一个由故障全息投影和静电构成的扭曲人形，它是死去的科研人员意识被强行上传到网络后的悲惨残骸。",
+                "visualPrompt": "A distorted humanoid figure made of flickering holographic static and blue electrical discharges, floating in a dark server room.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 2,
+                        "agility": 10,
+                        "knowledge": 8,
+                        "perception": 8
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 40,
+                    "buff": 0,
+                    "debuff": 60,
+                    "observe": 0
+                },
+                "lootTable": [
+                    {
+                        "id": "corrupted_drive",
+                        "name": "污染的记忆体",
+                        "desc": "包含着死者破碎意识的储存盘，里面可能还残留着一些有用的科技碎片。",
+                        "type": "material",
+                        "rarity": "rare",
+                        "dropProbability": 0.8
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_enter"
+        },
+        "awakening_core": {
+            "name": "苏醒的动力核心",
+            "desc": "这是一个极其宽阔的地下深渊，中央矗立着一颗宛如恒星般巨大的融合核心。但它不仅是机械的，无数粗壮的、如同巨蟒般的血肉脉络死死地缠绕着核心，随着能量的涌动而发出震耳欲聋的心跳声。极其恐怖的热浪和威压几乎要将你的理智碾碎，每一次呼吸都像是在吞咽燃烧的铁水。",
+            "visualPrompt": "Abyssal underground space, massive glowing fusion core wrapped tightly by gigantic snake-like organic veins, intense heat distortion.",
+            "threatLevel": 10,
+            "childrenIds": [
+                "containment_cell"
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "nexus_control_center",
+                    "label": "撤回主控中心"
+                }
+            ],
+            "specificEnemy": {
+                "id": "sentinel_avatar",
+                "name": "虚空神之降临体",
+                "desc": "一个极其庞大的机甲与肉体混合物，它是整个设施意志的具象化。其表面镶嵌着锐利的刀刃、人类的骨骼残骸与不断发射能量矩阵的幽蓝眼瞳。",
+                "visualPrompt": "A colossal, terrifying biomechanical god-avatar, covered in sharp blades, human skeletons, and glowing blue eyes, dominating a massive underground chamber.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 20,
+                        "agility": 8,
+                        "knowledge": 15,
+                        "perception": 12
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 50,
+                    "buff": 20,
+                    "debuff": 30,
+                    "observe": 0
+                },
+                "lootTable": [
+                    {
+                        "id": "core_singularity",
+                        "name": "核心奇点残片",
+                        "desc": "击败降临体后剥落的物质，违背了所有的物理法则，握在手中极其冰冷。吞噬它可以获得极致的肉体进化，但理智将彻底破碎。",
+                        "type": "consumable",
+                        "rarity": "cursed",
+                        "effects": [
+                            [
+                                "maxHp",
+                                50
+                            ],
+                            [
+                                "strength",
+                                5
+                            ],
+                            [
+                                "agility",
+                                5
+                            ],
+                            [
+                                "maxSanity",
+                                -30
+                            ],
+                            [
+                                "heal_sanity",
+                                -100
+                            ]
+                        ],
+                        "dropProbability": 1.0
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_enter",
+            "interactions": [
+                {
+                    "desc": "将核心奇点残片插入核心控制台，引导失控的能量将出路上的血肉组织烧尽。",
+                    "requirements": {
+                        "time": 15,
+                        "items": [
+                            "core_singularity"
+                        ]
+                    },
+                    "results": {
+                        "soundEffect": "power_down",
+                        "narrative": "奇点在插入的瞬间爆发出恐怖的引力波，死死缠绕着通道的巨大血肉脉络在凄厉的尖啸中迅速焦黑、枯萎，化为飞灰。通往飞升之门的道路，终于敞开了。",
+                        "unlock": [
+                            [
+                                "ascension_gate",
+                                "步入虚空深渊"
+                            ]
+                        ]
+                    }
+                }
+            ]
+        },
+        "containment_cell": {
+            "name": "初始收容单元",
+            "desc": "隐藏在核心后方的一个狭小舱室。这里的墙壁由极厚的碳钢构成，表面布满了令人胆寒的疯狂抓挠痕迹。房间中央，数根粗壮的超合金支架被硬生生地扯断，地上残留着一滩黑紫色的粘稠液体。很显然，那个被称为“神”的东西，就是从这里破壳而出的。",
+            "visualPrompt": "Small carbon steel cell, deep frantic scratch marks on the walls, torn super-alloy restraints in the center, pool of blackish-purple sludge.",
+            "threatLevel": 0,
+            "interactions": [
+                {
+                    "desc": "将手放在断裂的拘束装置上，让残留的神经脉冲涌入你的思维。",
+                    "requirements": {
+                        "time": 10
+                    },
+                    "results": {
+                        "soundEffect": "whisper",
+                        "narrative": "一股狂暴而冰冷的远古记忆如潮水般淹没了你。你看到了星空中游荡的金属巨兽，看到了它们沉睡于此，看到了人类的自大如何将这远古的“骨架”重新唤醒。所谓的“血肉机械融合”，不过是这沉睡神明无意识的梦游。而现在，它已经醒了。",
+                        "stateChange": {
+                            "sanity": -15,
+                            "gain": []
+                        }
+                    }
+                }
+            ]
+        },
+        "ascension_gate": {
+            "name": "飞升之门",
+            "lock": "巨量粗壮的血肉脉管死死缠绕并封死了通道，需要极其强大的能量冲击才能将其清除。",
+            "desc": "在击败了那个恐怖的实体后，前方的金属墙壁如同莲花般绽放，露出了一条通往未知的通道。通道的尽头没有任何人造的光源，只有一片纯粹的、似乎连声音都能吞噬的虚空黑暗。空气在这里变得异常冰冷且宁静，与身后的修罗场形成了鲜明的对比。",
+            "visualPrompt": "Metal wall blooming open like a lotus, leading to an extremely dark corridor with no light, stark contrast to the red hot core.",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "awakening_core",
+                    "label": "回头看最后一眼"
+                },
+                {
+                    "type": "zone_transfer",
+                    "targetId": "NEXT_ZONE",
+                    "label": "步入虚空深渊"
+                }
+            ]
+        }
+    }
+}

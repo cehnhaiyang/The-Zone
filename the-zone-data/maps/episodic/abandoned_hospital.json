@@ -1,0 +1,1922 @@
+{
+    "id": "abandoned_hospital",
+    "name": "阈限医院",
+    "visualStyle": "derelict medical facility, flickering fluorescent lights, peeling green paint, blood-stained linoleum floors, organic growths intertwining with rusted metal, oppressive atmosphere, dim emergency lighting",
+    "initial": {
+        "dilationFactor": 1.0,
+        "entrance": "node_emergency_entrance"
+    },
+    "nodes": {
+        "node_emergency_entrance": {
+            "name": "急诊入口",
+            "desc": "沉重的双开门半开着，门轴发出刺耳的悲鸣。门后的世界被一层厚重的灰尘笼罩，空气中弥漫着消毒水与腐朽混合的怪异气味。远处传来微弱的滴水声，打破了这片死寂。墙壁上残留着模糊的警示标语，字迹已被时间侵蚀。",
+            "visualPrompt": "Abandoned hospital emergency entrance, rusty heavy double doors half-open, dust motes dancing in stale air, broken signage, flickering overhead light, debris scattered on floor, eerie silence",
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_triage_station",
+                    "label": "进入分诊大厅"
+                }
+            ]
+        },
+        "node_triage_station": {
+            "name": "分诊大厅",
+            "desc": "大厅中央的咨询台空无一人，几张带血的挂号单在穿堂风中微微颤动。天花板上的日光灯发出阵阵令人不安的嗡鸣声，节奏如同垂死者的呼吸。空气中弥漫着刺鼻的漂白粉味和一种挥之不去的腐败气息，地面散落着文件和碎玻璃。",
+            "visualPrompt": "Desolate hospital triage area, shattered glass on floor, scattered medical papers, abandoned wheelchairs, flickering fluorescent lights, oppressive atmosphere, blood-stained registration slips",
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_waiting_room",
+                    "label": "前往候诊室"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_main_lobby",
+                    "label": "前往医院大厅"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_main_corridor",
+                    "label": "进入主走廊"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_triage_log",
+                    "name": "分诊日志",
+                    "desc": "一本沾血的日志，记录了灾难发生前的一些急诊病人信息，以及最后一页潦草的求救字迹。",
+                    "type": "document",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "documentContent": "20XX年X月X日，23:15，病人XXX，体温40.1，伴剧烈咳嗽。23:30，病人XXX，精神亢奋，胡言乱语，自称被'低语'所困。23:45，大量不明症状患者涌入，我们无法处理。皮肤出现不明斑点...他们正在变...救命..."
+                }
+            ]
+        },
+        "node_waiting_room": {
+            "name": "候诊室",
+            "desc": "候诊室里，一排排椅子东倒西歪，有些被撕裂，露出内部泛黄的海绵。空气中弥漫着一股陈旧的霉味，混合着某种难以名状的甜腻腐败气息。角落里，一个旧式电视机还在播放着雪花点，偶尔闪过模糊的画面，让人不寒而栗。",
+            "visualPrompt": "Chaotic hospital waiting room, overturned chairs with torn upholstery, static-playing old TV, moldy smell, faint light through dirty windows, scattered magazines, sense of abandonment",
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_triage_station",
+                    "label": "返回分诊大厅"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_pain_killers",
+                    "name": "止痛药",
+                    "desc": "一板已经过期但似乎仍可用的止痛药，上面沾着干涸的污渍。",
+                    "type": "consumable",
+                    "rarity": "common",
+                    "quantity": 3,
+                    "effects": [
+                        [
+                            "heal_hp",
+                            5
+                        ]
+                    ]
+                },
+                {
+                    "id": "item_medical_report_fragment",
+                    "name": "医疗报告碎片",
+                    "desc": "一份被撕毁的医疗报告，上面勉强能辨认出'组织再生'、'异常增殖'等字样。",
+                    "type": "document",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "documentContent": "报告编号：77-B-Gamma。患者ID：[模糊不清]。诊断：在'超生物整合'初期表现出异常的组织再生速度。植入的机械结构正在被宿主细胞快速吞噬并改造，而非排斥。这与预期结果不符，但…潜力巨大。建议提升实验体监控等级。",
+                    "discoveryThreshold": 5
+                }
+            ]
+        },
+        "node_main_lobby": {
+            "name": "医院大厅",
+            "desc": "高挑的大厅穹顶破损，几束月光穿透裂缝，照亮了中央的接待台。大理石地面上散落着文件和碎玻璃，回荡着空旷的寂静。空气中除了尘埃，还有一种淡淡的、令人作呕的铁锈味，似乎在诉说着曾经的混乱。",
+            "visualPrompt": "Grand hospital lobby, broken ceiling with moonlight streaming through cracks, scattered documents, shattered glass, rusty smell, echoing silence, peeling paint on walls",
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_triage_station",
+                    "label": "返回分诊大厅"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_records_office",
+                    "label": "进入档案室"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_east_corridor",
+                    "label": "前往东侧走廊"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_west_corridor",
+                    "label": "前往西侧走廊"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_stairwell",
+                    "label": "进入楼梯间"
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "调查接待台",
+                    "requirements": {
+                        "time": 2
+                    },
+                    "results": {
+                        "soundEffect": "click",
+                        "narrative": "你发现了一个损坏的员工ID卡，上面模糊的头像和姓名难以辨认。它可能对某些锁有作用。",
+                        "stateChange": {
+                            "gain": [
+                                {
+                                    "id": "item_staff_id_card",
+                                    "name": "损坏的员工ID卡",
+                                    "desc": "一张破损的员工ID卡，表面有抓痕，芯片似乎还能勉强识别。",
+                                    "type": "accessory",
+                                    "rarity": "common",
+                                    "effects": [
+                                        [
+                                            "perception",
+                                            1
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "node_records_office": {
+            "name": "档案室",
+            "desc": "堆满发霉档案的房间，文件柜倾倒。光线昏暗，只有窗外透进微弱的光。地板上散落着一些旧照片。空气中弥漫着潮湿的纸张腐烂味和尘螨的气息。",
+            "visualPrompt": "Moldy records office, overturned filing cabinets, scattered patient files and old photographs, dim light through dusty window, smell of decaying paper, cobwebs in corners",
+            "threatLevel": 1,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_main_lobby",
+                    "label": "返回医院大厅"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_patient_file",
+                    "name": "旧病历",
+                    "desc": "一份泛黄的旧病历，记录了一个病人奇怪的症状和最终的失踪。",
+                    "type": "document",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "discoveryThreshold": 5,
+                    "documentContent": "患者编号：89号。症状：夜间幻听，自称被'低语'所困，皮肤出现不明斑点。诊断：重度精神分裂。治疗无效。于XXXX年X月X日，患者离奇失踪，病房内无打斗痕迹，窗户紧闭。"
+                },
+                {
+                    "id": "item_flashlight",
+                    "name": "手电筒",
+                    "desc": "一个旧式手电筒，电池可能还有些电。",
+                    "type": "accessory",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "discoveryThreshold": 8,
+                    "effects": [
+                        [
+                            "perception",
+                            1
+                        ]
+                    ]
+                }
+            ]
+        },
+        "node_west_corridor": {
+            "name": "西侧走廊",
+            "desc": "西侧走廊相对干净一些，但依然弥漫着一股消毒水和铁锈的混合气味。一些宣传海报从墙上剥落，露出下方发霉的墙体。远处的黑暗中，似乎有什么东西在低声嘶吼，声音微不可闻却令人毛骨悚然。",
+            "visualPrompt": "Cleaner west hospital corridor, disinfectant and rust smell, peeling health posters revealing moldy walls, shattered window at far end, faint growls from darkness, unsettling quiet",
+            "threatLevel": 1,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_main_lobby",
+                    "label": "返回医院大厅"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_security_post",
+                    "label": "进入安保岗亭"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_staff_lounge",
+                    "label": "进入员工休息室"
+                }
+            ]
+        },
+        "node_security_post": {
+            "name": "安保岗亭",
+            "desc": "狭小的安保岗亭内一片狼藉，监控屏幕碎裂，椅子翻倒在地。空气中弥漫着浓烈的烟草味和汗臭，墙上挂着一张被撕毁的家庭合影。这里曾是防线，如今只剩下破碎的记忆。",
+            "visualPrompt": "Small security post, broken monitors, overturned chair, strong tobacco and sweat smell, torn family photo on wall, scattered ammunition casings, dim emergency light",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_west_corridor",
+                    "label": "返回西侧走廊"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_blunt_weapon",
+                    "name": "警棍",
+                    "desc": "一根沾有干涸血迹的金属警棍，握在手中沉甸甸的，给人一丝安全感。",
+                    "type": "weapon",
+                    "rarity": "common",
+                    "weaponType": "blunt",
+                    "meleeDamage": 8,
+                    "maxUses": 50
+                }
+            ]
+        },
+        "node_staff_lounge": {
+            "name": "员工休息室",
+            "desc": "员工休息室的桌椅散乱，咖啡杯和零食包装随处可见。空气中弥漫着一股过期食物的酸腐味，与医院的死寂格格不入。墙上的白板上写满了激励人心的标语，如今看来只觉讽刺。",
+            "visualPrompt": "Disordered staff lounge, scattered furniture and coffee cups, expired food smell, ironic motivational posters on wall, broken vending machine, personal belongings left behind, eerie contrast to hospital silence",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_west_corridor",
+                    "label": "返回西侧走廊"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_energy_bar",
+                    "name": "能量棒",
+                    "desc": "一根被遗忘在角落的能量棒，包装虽然有些破损，但看起来还能食用。",
+                    "type": "consumable",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "effects": [
+                        [
+                            "restore_battery",
+                            15
+                        ]
+                    ]
+                }
+            ]
+        },
+        "node_main_corridor": {
+            "name": "主走廊",
+            "desc": "这条走廊被腐蚀的金属板和湿滑的生物黏液覆盖，空气中弥漫着一股浓烈的铁锈味和福尔马林的气味。紧急照明灯忽明忽暗，投下跳动的影子，让人感到不安。一些废弃的医疗推车被掀翻在地，上面散落着手术器械和被污染的绷带。",
+            "visualPrompt": "Long corroded hospital corridor, bio-slime on walls, flickering emergency lights, overturned medical carts, scattered surgical tools, blood-stained bandages, oppressive shadows",
+            "threatLevel": 1,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_triage_station",
+                    "label": "返回分诊大厅"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_doctors_office",
+                    "label": "进入医生办公室"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_supply_closet",
+                    "label": "进入补给柜"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_janitors_closet",
+                    "label": "进入清洁工储物间"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_emergency_room",
+                    "label": "进入急诊室"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_bio_scanner",
+                    "name": "生物扫描仪",
+                    "desc": "一个手持式生物扫描仪，屏幕已经裂开，但似乎仍能工作。可以用来探测附近的生命信号。",
+                    "type": "accessory",
+                    "rarity": "rare",
+                    "effects": [
+                        [
+                            "perception",
+                            2
+                        ]
+                    ],
+                    "discoveryThreshold": 10
+                }
+            ]
+        },
+        "node_doctors_office": {
+            "name": "医生办公室",
+            "desc": "办公室一片狼藉，桌子被推翻，文件散落一地。一个老旧的地球仪倒在角落里，地图已经模糊不清。破碎的窗户缝隙中，冷风吹过，带动着散落的纸张轻微抖动。空气中有一股混杂着旧血腥味和福尔马林的气味。",
+            "visualPrompt": "Wrecked doctor's office, overturned desk, scattered medical files, broken globe in corner, shattered window letting in cold wind, torn medical certificates on wall, blood-stained papers",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_main_corridor",
+                    "label": "返回主走廊"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_operating_prep",
+                    "label": "进入手术准备间"
+                }
+            ]
+        },
+        "node_operating_prep": {
+            "name": "手术准备间",
+            "desc": "这里是通往手术室的过渡区域，墙壁上挂着几个生锈的柜子。空气中弥漫着一股挥之不去的消毒水味，与腐烂的气息混杂在一起。金属器械托盘凌乱地散落在地上，上面覆盖着一层厚厚的灰尘。",
+            "visualPrompt": "Surgical prep room, rusted cabinets on walls, scattered metal instrument trays covered in dust, exposed wiring from ceiling, faded handprints on walls, strong disinfectant and decay smell",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_doctors_office",
+                    "label": "返回医生办公室"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_operating_theater",
+                    "label": "进入手术室"
+                }
+            ]
+        },
+        "node_operating_theater": {
+            "name": "手术室",
+            "desc": "手术室的核心区域，一张硕大的手术台占据了房间的中央。所有窗户都被厚重的铁板封死。手术台冰冷而斑驳，上面残留着暗红色的污渍。天花板上的手术灯已经完全损坏，垂下几根断裂的电线。空气中弥漫着浓烈的血腥味和腐肉味。",
+            "visualPrompt": "Large operating room, central surgical table with dark red stains, broken surgical lights hanging from ceiling, sealed windows with iron plates, scattered surgical instruments on floor, walls appearing to breathe slowly, oppressive and horrifying",
+            "threatLevel": 5,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_operating_prep",
+                    "label": "返回手术准备间"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_observation_gallery",
+                    "label": "通往观察廊"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_surgical_scalpel",
+                    "name": "手术解剖刀",
+                    "desc": "一把锋利的手术刀，虽然沾染了污渍，但依然能派上用场。",
+                    "type": "weapon",
+                    "rarity": "common",
+                    "weaponType": "dagger",
+                    "meleeDamage": 10,
+                    "maxUses": 40
+                }
+            ],
+            "specificEnemy": {
+                "id": "enemy_twisted_surgeon",
+                "name": "畸变的缝合者",
+                "desc": "他曾是一名医生，但现在他的手臂被多余的手术刀片取代，口罩下的面孔早已融化。",
+                "visualPrompt": "A monstrous surgeon with blade-like limbs, wearing a tattered surgical gown, melted face beneath mask, twitching movements",
+                "initialState": {
+                    "attribute": {
+                        "strength": 8,
+                        "agility": 12,
+                        "knowledge": 4,
+                        "perception": 6
+                    },
+                    "equipState": {
+                        "weapons": [null, null],
+                        "armors": [null, null, null],
+                        "accessories": [null, null, null, null, null]
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 70,
+                    "buff": 0,
+                    "debuff": 20,
+                    "observe": 10
+                },
+                "nextIntent": {
+                    "type": "attack",
+                    "desc": "高举手术刀片，准备执行可怕的切割"
+                },
+                "lootTable": [
+                    {
+                        "id": "item_rusty_scalpel",
+                        "name": "生锈手术刀",
+                        "desc": "一把生锈的旧手术刀，刀刃已经钝化。",
+                        "type": "weapon",
+                        "rarity": "common",
+                        "weaponType": "dagger",
+                        "meleeDamage": 6,
+                        "maxUses": 30,
+                        "dropProbability": 0.6
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_enter"
+        },
+        "node_observation_gallery": {
+            "name": "观察廊",
+            "desc": "从手术室上方俯瞰的观察廊，厚重的防弹玻璃上布满了裂痕，玻璃后的手术室景象模糊不清。这里光线昏暗，只有一些废弃的监视器屏幕发出微弱的绿光。空气冰冷而沉重，仿佛有无数双眼睛曾在此注视着下方发生的恐怖。",
+            "visualPrompt": "Overlooking observation gallery, cracked bulletproof glass, dim green glow from defunct monitors, cold heavy air, sense of unseen eyes watching, dust-covered seats",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_operating_theater",
+                    "label": "返回手术室"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_security_badge",
+                    "name": "安全主管徽章",
+                    "desc": "一枚印有'安全主管：卡拉·雷诺兹'字样的安全徽章，或许能解锁某些权限。",
+                    "type": "material",
+                    "rarity": "epic",
+                    "quantity": 1,
+                    "discoveryThreshold": 15
+                }
+            ]
+        },
+        "node_supply_closet": {
+            "name": "补给柜",
+            "desc": "这是一个狭小的储物间，货架已经空空荡荡，只剩下一些破损的包装袋和废弃的注射器。地面上堆积着一层厚厚的灰尘，踩上去会留下清晰的脚印。黑暗中，只有手电的光照亮了架子上的空隙，那些空隙像无数饥饿的眼睛。",
+            "visualPrompt": "Narrow supply closet, empty metal shelves, discarded syringe packages on floor, thick dust layer, claustrophobic darkness, torn medical supply wrappers",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_main_corridor",
+                    "label": "返回主走廊"
+                }
+            ]
+        },
+        "node_janitors_closet": {
+            "name": "清洁工储物间",
+            "desc": "这个狭小的储物间堆满了清洁用品，水桶、拖把和一瓶瓶不明液体。一个老旧的铁皮柜子半开着，内部的黑暗显得异常深邃。油腻的拖把靠在墙角，水桶里残余的污水泛着诡异的微光。空气中弥漫着漂白水和腐烂抹布的混合气味。",
+            "visualPrompt": "Cramped janitor's closet, cleaning supplies scattered, half-open rusty locker with deep darkness inside, greasy mops leaning against wall, bucket with eerie glowing dirty water, strong bleach and rot smell",
+            "threatLevel": 1,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_main_corridor",
+                    "label": "返回主走廊"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_janitors_log_page",
+                    "name": "清洁工的日记残页",
+                    "desc": "一张被撕下的日记页，字迹潦草，像是匆忙写下的。",
+                    "type": "document",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "documentContent": "最近工作变得异常。二楼手术区尽头的那个房间，每次我清理完，墙上总会出现新的、无法辨认的污渍。它们不是血，也不是任何我见过的东西，有种黏腻的、深紫色的光泽。用再强的清洁剂也擦不掉，过几天又会变淡，然后再次出现。我甚至开始听到那片区域有低语声，像是有什么东西在墙壁里蠕动。病人们都说这里不太对劲，但我不敢向上级汇报这些，他们只会认为我疯了。今晚，我在主走廊看到一个医生，他只是站在那里，一动不动，背对着我。我叫他，他也没有回应...这地方不对劲。我得想办法离开。"
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "检查铁皮柜子后面",
+                    "requirements": {
+                        "time": 2,
+                        "puzzleSolved": {
+                            "type": "logic",
+                            "title": "柜子背后的秘密",
+                            "desc": "你注意到铁皮柜后面似乎有一道不明显的缝隙，用力推开它也许能发现什么。",
+                            "solution": "向里推",
+                            "data": {
+                                "premises": [
+                                    "柜子似乎被什么东西卡住了，而且铰链的方向有些奇怪。"
+                                ],
+                                "question": "你要如何操作柜子？",
+                                "options": [
+                                    "向里推",
+                                    "向外拉"
+                                ],
+                                "correctIndex": 0
+                            },
+                            "hints": [
+                                "试试向里推"
+                            ],
+                            "maxAttempts": 2,
+                            "penalty": {
+                                "sanity": 3,
+                                "lock": "你用力过猛，柜子发出刺耳的刮擦声，让你的神经紧绷。"
+                            }
+                        }
+                    },
+                    "results": {
+                        "soundEffect": "door_open",
+                        "narrative": "你费力推开柜子，发现了一个隐藏的通风口。",
+                        "unlock": [
+                            [
+                                "node_vent_system_entry",
+                                "进入隐藏的通风系统入口"
+                            ]
+                        ]
+                    }
+                }
+            ]
+        },
+        "node_emergency_room": {
+            "name": "急诊室",
+            "desc": "急诊室的景象令人毛骨悚然。手术灯从天花板上垂下，发出刺眼的白光，照亮了一张被血肉和金属残骸覆盖的手术台。空气中弥漫着浓烈的血腥味和烧焦的肉味，地上散落着沾血的绷带和废弃的注射器。角落里，一台心电监护仪发出微弱的滴答声。",
+            "visualPrompt": "Grisly emergency room, surgical light casting harsh white light, blood-soaked operating table covered in flesh and metal debris, burnt meat smell, discarded syringes on floor, faint heartbeat monitor beeping",
+            "threatLevel": 3,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_main_corridor",
+                    "label": "返回主走廊"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_drug_storage",
+                    "label": "进入药品储藏室"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_adrenaline_shot",
+                    "name": "肾上腺素注射剂",
+                    "desc": "一管强效肾上腺素，能在短时间内提升身体机能。",
+                    "type": "consumable",
+                    "rarity": "rare",
+                    "quantity": 1,
+                    "effects": [
+                        [
+                            "heal_hp",
+                            30
+                        ],
+                        [
+                            "strength",
+                            3,
+                            2
+                        ],
+                        [
+                            "agility",
+                            3,
+                            2
+                        ]
+                    ]
+                }
+            ],
+            "specificEnemy": {
+                "id": "enemy_flesh_golem",
+                "name": "血肉魔像",
+                "desc": "由多具尸体和机械残骸缝合而成的巨大生物，皮肤下可见跳动的血管和裸露的金属骨架。它行动迟缓，但每一次挥击都带着恐怖的力量。",
+                "visualPrompt": "Large grotesque creature, stitched from multiple corpses and mechanical parts, pulsating veins under skin, exposed metal skeleton, slow but immensely powerful, bloody and horrifying",
+                "initialState": {
+                    "attribute": {
+                        "strength": 9,
+                        "agility": 4,
+                        "knowledge": 2,
+                        "perception": 3
+                    },
+                    "equipState": {
+                        "weapons": [null, null],
+                        "armors": [null, null, null],
+                        "accessories": [null, null, null, null, null]
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 80,
+                    "buff": 10,
+                    "debuff": 10,
+                    "observe": 0
+                },
+                "nextIntent": {
+                    "type": "attack",
+                    "desc": "蓄积力量准备发起重击"
+                },
+                "lootTable": [
+                    {
+                        "id": "item_heavy_metal_plate",
+                        "name": "重型金属板",
+                        "desc": "从血肉魔像身上剥落的厚重金属板，可以作为简易护甲。",
+                        "type": "armor",
+                        "rarity": "rare",
+                        "defense": 10,
+                        "maxUses": 50,
+                        "dropProbability": 0.4
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_enter"
+        },
+        "node_drug_storage": {
+            "name": "药品储藏室",
+            "desc": "这里的空气异常寒冷，密闭的药柜里整齐地排列着各种化学试剂。一个老旧的保险柜嵌在墙壁内，上面有一个复杂的电子锁。地板上有一具穿着白大褂的骸骨，手里紧紧攥着一个药瓶。",
+            "visualPrompt": "Cold drug storage room, medicine cabinets with chemical reagents, electronic safe embedded in wall, skeletal remains in lab coat clutching a vial, frost on surfaces, dim blue emergency light",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_emergency_room",
+                    "label": "返回急诊室"
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "尝试破解保险柜的电子锁",
+                    "requirements": {
+                        "time": 2,
+                        "puzzleSolved": {
+                            "type": "logic",
+                            "title": "化学配比谜题",
+                            "desc": "屏幕上显示着：H(1), He(2), Li(3)... 下一个元素是？",
+                            "solution": "Be",
+                            "data": {
+                                "premises": [
+                                    "屏幕上显示着化学元素的排列：H(1), He(2), Li(3)..."
+                                ],
+                                "question": "排列在下一个的元素代号是什么？",
+                                "options": [
+                                    "Be",
+                                    "B",
+                                    "C",
+                                    "N"
+                                ],
+                                "correctIndex": 0
+                            },
+                            "hints": [
+                                "按照原子序数排列",
+                                "氢氦锂铍硼..."
+                            ],
+                            "maxAttempts": 3,
+                            "penalty": {
+                                "hp": 10,
+                                "sanity": 5
+                            }
+                        }
+                    },
+                    "results": {
+                        "soundEffect": "click",
+                        "narrative": "保险柜咔哒一声打开了，里面存放着高效的恢复药物。",
+                        "stateChange": {
+                            "gain": [
+                                {
+                                    "id": "item_medical_kit",
+                                    "name": "急救包",
+                                    "desc": "一个标准急救包，包含止血剂、绷带和少量止痛药。",
+                                    "type": "consumable",
+                                    "rarity": "rare",
+                                    "quantity": 1,
+                                    "effects": [
+                                        [
+                                            "heal_hp",
+                                            30
+                                        ],
+                                        [
+                                            "heal_sanity",
+                                            5
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "node_east_corridor": {
+            "name": "东侧走廊",
+            "desc": "走廊两侧的病房房门紧闭，偶尔能听到从门后传来的低沉呻吟或指甲抓挠木板的声音。墙壁上的应急灯发出惨淡的红光，将影子拉得极长。脚下的瓷砖因不明液体的浸泡而变得湿滑。",
+            "visualPrompt": "Dimly lit hospital east corridor, red emergency lights casting long shadows, closed ward doors, wet slippery floor tiles, faint groans from behind doors, peeling paint, ominous atmosphere",
+            "threatLevel": 2,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_main_lobby",
+                    "label": "返回医院大厅"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_nurse_station",
+                    "label": "前往中央护士站"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_ward_302",
+                    "label": "进入302号病房"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_ward_305",
+                    "label": "进入305号隔离病房"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_abandoned_ward",
+                    "label": "进入废弃病房区"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_intensive_care_unit",
+                    "label": "进入重症监护室"
+                }
+            ]
+        },
+        "node_nurse_station": {
+            "name": "中央护士站",
+            "desc": "半圆形的柜台后方堆满了杂乱的档案夹。一台老旧的显示器闪烁着雪花点，偶尔跳出几段模糊的监控画面。柜台上放着一个半凉的咖啡杯，杯沿上印着一个鲜红的唇印。空气中弥漫着淡淡的消毒水味。",
+            "visualPrompt": "Circular nurse station, messy files piled behind counter, flickering CRT monitor with static, cold coffee cup with red lipstick mark, scattered patient charts, dim fluorescent light above",
+            "threatLevel": 1,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_east_corridor",
+                    "label": "返回东侧走廊"
+                }
+            ],
+            "nodeNpc": {
+                "id": "npc_ghost_nurse",
+                "name": "护士残影",
+                "desc": "一个半透明的女性身影，正机械地翻阅着手中的记录本，似乎并没意识到自己已经死去。",
+                "gender": "female",
+                "visualPrompt": "Translucent female nurse figure, mechanically flipping through records, unaware of her death, flickering in and out of visibility",
+                "style": "healer",
+                "hide": true,
+                "initialState": {
+                    "attribute": {
+                        "strength": 3,
+                        "agility": 5,
+                        "knowledge": 15,
+                        "perception": 10
+                    },
+                    "vital": {
+                        "maxHp": 50,
+                        "maxSanity": 200,
+                        "maxStamina": 100,
+                        "maxVigor": 100
+                    },
+                    "trust": 0,
+                    "level": 5,
+                    "xp": 0,
+                    "deck": [],
+                    "equipState": {
+                        "weapons": [null, null],
+                        "armors": [null, null, null],
+                        "accessories": [null, null, null, null, null]
+                    },
+                    "inventory": [],
+                    "quest": {
+                        "find_elena": {
+                            "desc": "帮她找到失踪的护士长埃琳娜的下落。",
+                            "difficulty": 3,
+                            "goals": [],
+                            "rewards": []
+                        }
+                    }
+                }
+            },
+            "interactions": [
+                {
+                    "desc": "搜索护士站的抽屉",
+                    "requirements": {
+                        "time": 1
+                    },
+                    "results": {
+                        "soundEffect": "click",
+                        "narrative": "你发现了一把带有金色标签的钥匙，上面写着'院长办公室'。",
+                        "stateChange": {
+                            "gain": [
+                                {
+                                    "id": "item_directors_key",
+                                    "name": "院长办公室钥匙",
+                                    "desc": "一把沉重的黄铜钥匙，上面刻着'院长办公室'的字样。",
+                                    "type": "material",
+                                    "rarity": "rare"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "node_ward_302": {
+            "name": "302号病房",
+            "desc": "病床上的床单被撕成了条状，墙上涂满了用黑色颜料绘成的扭曲符号。窗户被厚重的木板封死，只有几缕月光通过缝隙漏进来。空气中弥漫着一种陈旧的墨水味和干涸的汗液味。",
+            "visualPrompt": "Derelict hospital room 302, shredded bed sheets, occult symbols drawn in black on walls, boarded-up windows with moonlight seeping through, old ink and dried sweat smell, overturned furniture",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_east_corridor",
+                    "label": "返回东侧走廊"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_diary_fragment_01",
+                    "name": "日记残页（一）",
+                    "desc": "上面记录了零号病人对'虚空低语'的恐惧描述。",
+                    "type": "document",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "documentContent": "它们在墙壁里走动……它们没有影子，只有声音……我听到它们在叫我的名字，一遍又一遍。医生说我疯了，但我没有疯。墙壁在呼吸，地板在脉动。这个地方是活的。"
+                }
+            ]
+        },
+        "node_ward_305": {
+            "name": "305号隔离病房",
+            "desc": "这间病房的门被加固过，门上有一个小小的观察窗。内部一片狼藉，医疗设备被彻底砸碎。地板中央坐着一个背对着门的身影，正不断低头重复着撞击地板的动作。空气中弥漫着浓重的血腥味。",
+            "visualPrompt": "Reinforced isolation room 305, reinforced door with small observation window, smashed medical equipment inside, hunched figure sitting on floor repeatedly hitting head, strong blood smell, padded walls torn apart",
+            "threatLevel": 4,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_east_corridor",
+                    "label": "返回东侧走廊"
+                }
+            ],
+            "specificEnemy": {
+                "id": "enemy_mad_patient",
+                "name": "发狂的受试者",
+                "desc": "他的双眼被缝死，但听觉极其灵敏。",
+                "visualPrompt": "A patient in a torn straitjacket, eyes sewn shut with black thread, twitching violently, head covered in self-inflicted wounds, unnaturally sensitive hearing",
+                "initialState": {
+                    "attribute": {
+                        "strength": 10,
+                        "agility": 6,
+                        "knowledge": 1,
+                        "perception": 15
+                    },
+                    "equipState": {
+                        "weapons": [null, null],
+                        "armors": [null, null, null],
+                        "accessories": [null, null, null, null, null]
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 80,
+                    "buff": 0,
+                    "debuff": 0,
+                    "observe": 20
+                },
+                "nextIntent": {
+                    "type": "attack",
+                    "desc": "通过敏锐的听觉锁定你并发起疯狂扑击"
+                },
+                "lootTable": [
+                    {
+                        "id": "item_mutated_tissue",
+                        "name": "变异组织",
+                        "desc": "一块散发着恶臭的变异生物组织，或许有研究价值。",
+                        "type": "material",
+                        "rarity": "rare",
+                        "dropProbability": 0.7
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_search"
+        },
+        "node_abandoned_ward": {
+            "name": "废弃病房区",
+            "desc": "这里曾是病房，如今只剩下破碎的病床和散落的医疗器械。空气中弥漫着浓烈的血腥味和死亡的气息，令人窒息。走廊尽头的黑暗深处，似乎有微弱的呻吟声传来，若有若无，让人毛骨悚然。",
+            "visualPrompt": "Ruined patient ward area, broken beds scattered, smashed medical devices on floor, strong death and blood smell, faint groans from dark corridor end, collapsed ceiling sections, blood-splattered walls",
+            "threatLevel": 3,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_east_corridor",
+                    "label": "返回东侧走廊"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_isolation_room",
+                    "label": "进入隔离室"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_rusty_blade",
+                    "name": "生锈的手术刀",
+                    "desc": "一把生锈的手术刀，锋利依旧，但使用它可能带来感染的风险。",
+                    "type": "weapon",
+                    "rarity": "rare",
+                    "weaponType": "dagger",
+                    "meleeDamage": 12,
+                    "maxUses": 30
+                }
+            ],
+            "specificEnemy": {
+                "id": "enemy_ward_lurker",
+                "name": "病房潜伏者",
+                "desc": "一个扭曲的人形生物，皮肤苍白，四肢细长，在黑暗中缓慢爬行。它的眼睛在阴影中闪烁着猩红的光芒。",
+                "visualPrompt": "Distorted humanoid creature, pale translucent skin, elongated thin limbs, crawling slowly in darkness, glowing red eyes in shadows, unnaturally quiet movements",
+                "initialState": {
+                    "attribute": {
+                        "strength": 7,
+                        "agility": 8,
+                        "knowledge": 3,
+                        "perception": 6
+                    },
+                    "equipState": {
+                        "weapons": [null, null],
+                        "armors": [null, null, null],
+                        "accessories": [null, null, null, null, null]
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 70,
+                    "buff": 0,
+                    "debuff": 20,
+                    "observe": 10
+                },
+                "nextIntent": {
+                    "type": "debuff",
+                    "desc": "释放具有精神污染的凝视"
+                },
+                "lootTable": [
+                    {
+                        "id": "item_bio_sample_flesh",
+                        "name": "异变组织样本",
+                        "desc": "从变异生物身上提取的组织样本，或许有研究价值。",
+                        "type": "material",
+                        "rarity": "rare",
+                        "dropProbability": 0.7
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_enter"
+        },
+        "node_isolation_room": {
+            "name": "隔离室",
+            "desc": "这间病房被厚重的铁门和加固的玻璃窗封闭着，内部的墙壁上布满了疯狂的涂鸦和血手印。空气中弥漫着绝望的腐臭味，让人感到窒息。角落里，一个破旧的玩偶静静地躺着，它的眼睛似乎在盯着你。",
+            "visualPrompt": "Heavily fortified isolation room, bloodstained walls covered in frantic graffiti and handprints, suffocating decay smell, old doll staring from corner, reinforced iron door, cracked observation window",
+            "threatLevel": 4,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_abandoned_ward",
+                    "label": "返回废弃病房区"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_childs_drawing",
+                    "name": "儿童画",
+                    "desc": "一张扭曲的儿童画，上面描绘着一个巨大的、带着獠牙的怪物，以及一个被困在笼子里的孩子。",
+                    "type": "document",
+                    "rarity": "rare",
+                    "quantity": 1,
+                    "documentContent": "画中是一个被困在病房中的孩子，窗外有一个巨大的、长着尖牙利爪的怪物在窥视。画的下方写着潦草的字迹：'它们来了。我的朋友说，外面的人都是坏人。我们要永远在一起。'"
+                }
+            ]
+        },
+        "node_intensive_care_unit": {
+            "name": "重症监护室",
+            "desc": "这里布满了各种复杂的生命维持系统，呼吸机的皮管像蛇一样在地板上蜿蜒。每个隔间都拉着帘子，帘后透出模糊的人形轮廓。心电监护仪齐声发出尖锐的长鸣，预示着生命的终结。",
+            "visualPrompt": "Intensive Care Unit, complex life support systems, ventilator tubes snaking across floor, closed curtains with vague human silhouettes behind, flatline sirens from monitors, cold medical horror, sense of mass death",
+            "threatLevel": 7,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_east_corridor",
+                    "label": "返回东侧走廊"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_collapsed_section",
+                    "label": "前往塌陷区域"
+                }
+            ],
+            "enemySpawnCondition": "on_sanity_critical"
+        },
+        "node_collapsed_section": {
+            "name": "塌陷区域",
+            "desc": "巨大的结构性塌陷堵塞了前方的道路，钢筋扭曲，混凝土碎裂，形成了一个无法逾越的障碍。空气中弥漫着浓厚的灰尘和腐朽的气味，几具被压扁的尸体依稀可见，显示着这里曾是最后的防线。你无法再前进一步。",
+            "visualPrompt": "Massive structural collapse blocking path completely, twisted rebar and shattered concrete, impassable destruction, thick dust and decay smell, crushed bodies visible in rubble, final dead end, hopeless",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_intensive_care_unit",
+                    "label": "返回重症监护室"
+                },
+                {
+                    "type": "sanctuary_return",
+                    "label": "接受命运，埋葬于此"
+                }
+            ]
+        },
+        "node_stairwell": {
+            "name": "楼梯间",
+            "desc": "黑暗的楼梯间弥漫着潮湿的霉味，每一步都伴随着木板的吱呀声。扶手上的油漆剥落，露出下方冰冷的金属。头顶上方传来微弱的风声，下方则是深不见底的黑暗，仿佛通向另一个世界。",
+            "visualPrompt": "Dark moldy stairwell, creaking wooden steps, peeling paint on handrails revealing cold metal, faint wind sound from above, deep impenetrable darkness below, water dripping from ceiling, oppressive descent",
+            "threatLevel": 1,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_main_lobby",
+                    "label": "返回医院大厅"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_basement_landing",
+                    "label": "下到地下室平台"
+                }
+            ]
+        },
+        "node_basement_landing": {
+            "name": "地下室平台",
+            "desc": "楼梯的尽头是一个狭窄的地下室平台，空气异常冰冷，带着一股泥土和腐烂的混合气味。墙壁上布满了青苔，头顶的管道发出持续的滴水声。微弱的手电光束勉强照亮了通向两侧的黑暗走廊。",
+            "visualPrompt": "Narrow basement landing, extremely cold air, earthy and decay smell, mossy damp walls, dripping overhead pipes, faint flashlight beam revealing dark corridors ahead, sense of descending into earth",
+            "threatLevel": 2,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_stairwell",
+                    "label": "返回楼梯间"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_old_morgue",
+                    "label": "前往旧停尸房"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_utility_tunnel",
+                    "label": "进入维修通道"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_central_elevator",
+                    "label": "进入中央电梯"
+                }
+            ]
+        },
+        "node_central_elevator": {
+            "name": "中央电梯",
+            "desc": "电梯轿厢内壁沾满了黑色的粘稠物质，控制面板上的按键大多已经脱落。顶部的排风扇发出沉闷的轰鸣。这里是连接疗养院不同层级的核心枢纽，但此刻电梯似乎只能通往更深的地方。",
+            "visualPrompt": "Grimy elevator interior, black slime on walls, missing buttons on control panel, loud exhaust fan humming, flickering overhead light, sense of vertical descent into unknown",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_basement_landing",
+                    "label": "返回地下室平台"
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "修理电梯控制面板",
+                    "requirements": {
+                        "time": 3,
+                        "items": [
+                            "item_wrench"
+                        ]
+                    },
+                    "results": {
+                        "soundEffect": "click",
+                        "narrative": "电梯发出剧烈的震动，控制面板重新亮起，通往更深处的按钮激活了。",
+                        "unlock": [
+                            [
+                                "node_director_office",
+                                "前往院长办公室"
+                            ],
+                            [
+                                "node_roof_helipad",
+                                "前往顶楼直升机坪"
+                            ]
+                        ]
+                    }
+                }
+            ]
+        },
+        "node_utility_tunnel": {
+            "name": "维修通道",
+            "desc": "狭窄的维修通道里布满了复杂的管道和电缆，头顶的蒸汽管道不时发出嘶嘶声，空气中弥漫着金属和机油的混合气味。这里的黑暗似乎更加深邃，每一步都可能踩到不明的障碍物。",
+            "visualPrompt": "Narrow utility tunnel, complex pipes and cables along walls, hissing steam from overhead, metal and oil smell, deep oppressive darkness, unknown obstacles on floor, claustrophobic passage",
+            "threatLevel": 1,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_basement_landing",
+                    "label": "返回地下室平台"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_storage_annex",
+                    "label": "进入储藏附楼"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_research_entrance",
+                    "label": "前往研究区入口"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_wrench",
+                    "name": "扳手",
+                    "desc": "一把沾满油污的旧扳手，虽然有些沉重，但作为工具或武器都能派上用场。",
+                    "type": "weapon",
+                    "rarity": "common",
+                    "weaponType": "blunt",
+                    "meleeDamage": 6,
+                    "maxUses": 70
+                }
+            ]
+        },
+        "node_storage_annex": {
+            "name": "储藏附楼",
+            "desc": "堆满了废弃医疗设备和杂物的房间。架子上蒙着厚厚的灰尘，一些箱子被粗暴地打开。空气中弥漫着灰尘和橡胶的气味，空旷的房间里偶尔传来微小的爬行声。",
+            "visualPrompt": "Storage annex, abandoned medical equipment under thick dust, violently opened crates, dim lighting, rubber and dust smell, faint skittering sounds, cobweb-covered shelves",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_utility_tunnel",
+                    "label": "返回维修通道"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_medical_bandages",
+                    "name": "医疗绷带",
+                    "desc": "紧急止血和包扎伤口的医疗绷带，能提供少量治疗。",
+                    "type": "consumable",
+                    "rarity": "common",
+                    "quantity": 2,
+                    "effects": [
+                        [
+                            "heal_hp",
+                            15
+                        ]
+                    ]
+                }
+            ]
+        },
+        "node_old_morgue": {
+            "name": "旧停尸房",
+            "desc": "停尸房的金属抽屉半开着，里面空无一物，只剩下冰冷的空气和死亡的余味。空气中弥漫着福尔马林和腐烂的恶臭，令人作呕。角落里，一个生锈的手术推车孤零零地立着，上面似乎有干涸的血迹。",
+            "visualPrompt": "Old morgue, half-open metal body drawers, freezing cold air, strong formaldehyde and decay smell, rusty gurney with dried bloodstains, flickering fluorescent light, sense of violated death",
+            "threatLevel": 3,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_basement_landing",
+                    "label": "返回地下室平台"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_cremation_chamber",
+                    "label": "进入焚化间"
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "检查一个未完全拉出的抽屉",
+                    "requirements": {
+                        "time": 2,
+                        "puzzleSolved": {
+                            "type": "sequence",
+                            "title": "停尸房的秘密",
+                            "desc": "一个半开的停尸房抽屉被卡住了，你需要找到正确的操作顺序才能将其完全拉出。旁边墙上的图示显示了四个按钮，但顺序被破坏了。",
+                            "solution": "press_3",
+                            "data": {
+                                "sequence": [
+                                    "hold_1",
+                                    null,
+                                    "release_1",
+                                    "press_2"
+                                ],
+                                "missingIndex": 1,
+                                "options": [
+                                    "press_2",
+                                    "press_3",
+                                    "hold_1",
+                                    "release_1"
+                                ],
+                                "correctOption": "press_3"
+                            },
+                            "hints": [
+                                "注意图示中被圈出的部分",
+                                "有些操作可能需要持续按住"
+                            ],
+                            "maxAttempts": 3,
+                            "penalty": {
+                                "sanity": 10,
+                                "lock": "你操作错误，抽屉发出刺耳的摩擦声，然后猛地弹开，一个腐烂的头颅滚落出来，你的理智受到了巨大冲击。"
+                            }
+                        }
+                    },
+                    "results": {
+                        "soundEffect": "click",
+                        "narrative": "你成功地将抽屉完全拉出，里面赫然躺着一把沾血的钥匙和一块工牌。",
+                        "stateChange": {
+                            "gain": [
+                                {
+                                    "id": "item_morgue_key",
+                                    "name": "停尸房钥匙",
+                                    "desc": "一把沾着干涸血迹的古老钥匙，看起来是用来开启某些重要区域的。",
+                                    "type": "material",
+                                    "rarity": "rare"
+                                },
+                                {
+                                    "id": "item_elenas_badge",
+                                    "name": "埃琳娜的工牌",
+                                    "desc": "工牌背面刻着一行字：'不要相信主治医生的谎言'。",
+                                    "type": "document",
+                                    "rarity": "rare",
+                                    "quantity": 1,
+                                    "documentContent": "护士长埃琳娜的身份证明，上面沾着干涸的血迹。背面用尖锐物品刻着：'不要相信主治医生的谎言。他们不是在治疗，是在喂养它。'"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ],
+            "specificEnemy": {
+                "id": "enemy_morgue_abomination",
+                "name": "停尸房畸变体",
+                "desc": "一个由多具尸体扭曲融合而成的巨大肉块，散发着令人作呕的恶臭。它没有眼睛，却能感知到你的一举一动。",
+                "visualPrompt": "Large grotesque mass of fused corpses, putrid overwhelming smell, no eyes but highly perceptive, pulsating and writhing, dragging itself across floor, horrifying amalgamation",
+                "initialState": {
+                    "attribute": {
+                        "strength": 9,
+                        "agility": 4,
+                        "knowledge": 2,
+                        "perception": 10
+                    },
+                    "equipState": {
+                        "weapons": [null, null],
+                        "armors": [null, null, null],
+                        "accessories": [null, null, null, null, null]
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 80,
+                    "buff": 0,
+                    "debuff": 15,
+                    "observe": 5
+                },
+                "nextIntent": {
+                    "type": "attack",
+                    "desc": "拖动巨大的身躯碾压过来"
+                },
+                "lootTable": [
+                    {
+                        "id": "item_strange_organ",
+                        "name": "奇异器官",
+                        "desc": "一个跳动着，散发着微光的奇异器官，似乎不属于任何已知生物。",
+                        "type": "material",
+                        "rarity": "epic",
+                        "dropProbability": 0.3
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_interact"
+        },
+        "node_cremation_chamber": {
+            "name": "焚化间",
+            "desc": "巨大的焚化炉像一只张开大口的钢铁巨兽。炉门半开，内部残留着灰烬和未烧尽的骨骼碎片。墙上的温度计指针疯狂跳动，尽管炉火早已熄灭，房间内依然热得令人窒息。",
+            "visualPrompt": "Massive cremation furnace like a steel beast with open maw, half-open furnace door revealing ash and charred bone fragments, flickering temperature gauge, oppressive heat despite dead furnace, dark soot-covered walls",
+            "threatLevel": 4,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_old_morgue",
+                    "label": "返回旧停尸房"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_charred_locket",
+                    "name": "焦黑的挂坠",
+                    "desc": "一个精美的挂坠盒，内部的照片已被烧焦，但依然散发着微弱的灵能感应。",
+                    "type": "accessory",
+                    "rarity": "cursed",
+                    "effects": [
+                        [
+                            "maxSanity",
+                            -20
+                        ],
+                        [
+                            "perception",
+                            3
+                        ]
+                    ]
+                }
+            ]
+        },
+        "node_research_entrance": {
+            "name": "研究区入口",
+            "desc": "研究区的大门敞开着，露出内部整洁却冰冷的景象。白色的墙壁上张贴着一些模糊不清的图表和警告标语，地板上布满了细小的裂痕。空气中弥漫着一股化学试剂和生物培养液的混合气味。",
+            "visualPrompt": "Research sector entrance, open door revealing clean but cold interior, white walls with blurry charts and biohazard warning signs, cracked floor, chemical reagent and bio-culture fluid smell, sterile gone wrong",
+            "threatLevel": 1,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_utility_tunnel",
+                    "label": "返回维修通道"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_main_lab",
+                    "label": "进入主实验室"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_data_center",
+                    "label": "进入数据中心"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_specimen_storage",
+                    "label": "进入标本储藏室"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_security_outpost",
+                    "label": "前往安全前哨"
+                }
+            ]
+        },
+        "node_main_lab": {
+            "name": "主实验室",
+            "desc": "主实验室的核心区域，各种精密仪器和显微镜散落在工作台上，屏幕上仍显示着复杂的实验数据。空气中弥漫着一股浓烈的福尔马林和血腥味。中央的培养皿中，似乎还有一些模糊的生物组织在蠕动。",
+            "visualPrompt": "Main laboratory, precision instruments and microscopes on workbenches, screens displaying complex experiment data, strong formaldehyde and blood smell, central petri dish with writhing biological tissue, flickering overhead lights, scattered research notes",
+            "threatLevel": 2,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_research_entrance",
+                    "label": "返回研究区入口"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_chem_storage",
+                    "label": "进入化学品储藏室"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_bio_test_pod",
+                    "label": "进入生物测试舱"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_research_notes_lab",
+                    "name": "研究员笔记",
+                    "desc": "一本沾满污渍的实验笔记，记录了关于异常生物样本的初步分析。",
+                    "type": "document",
+                    "rarity": "rare",
+                    "quantity": 1,
+                    "documentContent": "样本编号：Alpha-7。初步分析显示，该生物组织具有极强的再生能力和适应性。其细胞结构与已知地球生命完全不同，似乎能扭曲周围的空间结构。警告：直接接触可能导致精神污染。实验体Omega展现出前所未有的生物-机械融合天赋，细胞主动吞噬并改造植入物。但理智水平显著下降。我们曾以为找到了进化的钥匙..."
+                }
+            ]
+        },
+        "node_chem_storage": {
+            "name": "化学品储藏室",
+            "desc": "狭小的储藏室里堆满了贴有危险标识的化学品容器。空气中弥漫着刺鼻的化学气体，让人呼吸不畅。一些容器已经倾倒，腐蚀性的液体在地板上留下了焦黑的痕迹。",
+            "visualPrompt": "Small chemical storage room, hazardous chemical containers with warning labels, pungent chemical fumes, overturned containers with corrosive liquid stains on floor, dim yellow emergency light, cramped and dangerous",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_main_lab",
+                    "label": "返回主实验室"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_acid_vial",
+                    "name": "强酸试剂",
+                    "desc": "一小瓶高腐蚀性强酸，可以用来溶解某些障碍物或作为简易武器。",
+                    "type": "consumable",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "effects": [
+                        [
+                            "heal_hp",
+                            -10
+                        ]
+                    ]
+                }
+            ]
+        },
+        "node_bio_test_pod": {
+            "name": "生物测试舱",
+            "desc": "一个巨大的透明测试舱占据了房间中央，里面空空如也，但舱壁上布满了内侧的抓痕和血迹。周围的控制面板已经失效，屏幕上残留着模糊的监控画面，显示着某种生物在舱内疯狂挣扎的场景。",
+            "visualPrompt": "Large transparent bio-test pod dominating room center, empty but covered in claw marks and bloodstains from inside, defunct control panels, blurry surveillance footage of struggling creature on screens, cold clinical horror",
+            "threatLevel": 1,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_main_lab",
+                    "label": "返回主实验室"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_damaged_data_chip",
+                    "name": "损坏的数据芯片",
+                    "desc": "一个从控制台剥落的损坏数据芯片，或许能从中恢复一些信息。",
+                    "type": "document",
+                    "rarity": "rare",
+                    "quantity": 1,
+                    "documentContent": "数据恢复失败。仅能读取片段：'...实验体失控...隔离失效...所有人员撤离，重复，所有人员撤离...它不是在逃跑，它是在...扩张...' 信号中断。"
+                }
+            ]
+        },
+        "node_specimen_storage": {
+            "name": "标本储藏室",
+            "desc": "冰冷的金属架上摆满了装有各种生物标本的玻璃容器，有些容器已经破碎，里面的不明生物组织流淌出来，在地上形成黏稠的血肉池。空气中弥漫着刺鼻的福尔马林和腐烂生物的恶臭。一些标本容器中，可以清晰地看到半机械半肉体的畸形生物，它们在营养液中扭曲着。",
+            "visualPrompt": "Cold metal shelves lined with specimen containers, broken jars leaking viscous bio-matter forming pools on floor, strong formalin and decay smell, half-mechanical half-flesh creatures twisting in nutrient fluid, grotesque collection",
+            "threatLevel": 2,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_research_entrance",
+                    "label": "返回研究区入口"
+                }
+            ],
+            "items": [
+                {
+                    "id": "item_mutagenic_sample",
+                    "name": "诱变剂样本",
+                    "desc": "一小瓶高活性的诱变剂，可能用于生物实验。",
+                    "type": "material",
+                    "rarity": "rare",
+                    "quantity": 1
+                }
+            ]
+        },
+        "node_data_center": {
+            "name": "数据中心",
+            "desc": "服务器嗡嗡作响的房间，但大部分机柜都已断电，只剩下零星的指示灯闪烁着微光。空气中弥漫着电子元件烧焦的气味，几台终端机被暴力破坏，屏幕上显示着加密的错误信息。",
+            "visualPrompt": "Server room, most racks unpowered with few blinking indicator lights, burnt electronics smell, violently damaged terminals showing encrypted errors, tangled cables on floor, cold mechanical atmosphere",
+            "threatLevel": 1,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_research_entrance",
+                    "label": "返回研究区入口"
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "尝试破解受损的终端机",
+                    "requirements": {
+                        "time": 2,
+                        "puzzleSolved": {
+                            "type": "code",
+                            "title": "终端机访问代码",
+                            "desc": "终端机需要一个四位数的访问代码，屏幕上闪烁着提示：'日期倒序'。",
+                            "solution": "1224",
+                            "data": {
+                                "minLength": 4,
+                                "maxLength": 4,
+                                "possibleCharacters": "0123456789"
+                            },
+                            "hints": [
+                                "检查附近的日历或文档",
+                                "疏散日期是2412年12月24日"
+                            ],
+                            "maxAttempts": 5,
+                            "penalty": {
+                                "sanity": 5,
+                                "lock": "你尝试了错误的密码，终端发出刺耳的警报声，让你的理智受到冲击。"
+                            }
+                        }
+                    },
+                    "results": {
+                        "soundEffect": "click",
+                        "narrative": "你成功破解了终端机，获得了紧急疏散日志和一份权限卡。",
+                        "stateChange": {
+                            "gain": [
+                                {
+                                    "id": "item_evac_log",
+                                    "name": "紧急疏散日志",
+                                    "desc": "一份记录了设施紧急疏散过程的日志。",
+                                    "type": "document",
+                                    "rarity": "rare",
+                                    "quantity": 1,
+                                    "documentContent": "日期：2412年12月24日。紧急疏散令已下达。Alpha区隔离失效，不明生物体已突破遏制。所有研究数据已上传至中央数据库，但物理样本无法转移。项目'白色沉默'宣告失败。我们试图剥夺它的感官来困住它，但它早已学会在虚空中低语。祝我们好运。"
+                                },
+                                {
+                                    "id": "item_security_keycard_blue",
+                                    "name": "蓝色安全钥匙卡",
+                                    "desc": "一张印有'研究区访问'字样的蓝色钥匙卡。",
+                                    "type": "material",
+                                    "rarity": "rare"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "node_security_outpost": {
+            "name": "安全前哨",
+            "desc": "一扇厚重的钢门紧闭着，上面有一个小小的观察窗。内部的灯光微弱，显示着一个狭小的房间，里面有一张倾倒的椅子和一个失效的监控屏幕。空气中弥漫着淡淡的血腥味和被遗弃的绝望感。",
+            "visualPrompt": "Security outpost, heavy steel door with small observation window, dim light inside, overturned chair, defunct surveillance screens, faint blood smell, sense of abandoned last stand, scattered ammunition",
+            "threatLevel": 2,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_research_entrance",
+                    "label": "返回研究区入口"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_containment_chamber",
+                    "label": "前往高等级收容室"
+                }
+            ],
+            "nodeNpc": {
+                "id": "npc_dr_elara_vance",
+                "name": "伊莱拉·万斯博士",
+                "desc": "一位身穿沾血白大褂的女性，蜷缩在角落里，双眼无神，口中喃喃自语着听不清的话语。她的脸上写满了恐惧与疲惫。",
+                "gender": "female",
+                "visualPrompt": "Female scientist in bloodstained white lab coat, huddled in corner, vacant terrified eyes, mumbling incoherently, exhaustion and horror on face",
+                "hide": true,
+                "style": "healer",
+                "initialState": {
+                    "attribute": {
+                        "strength": 3,
+                        "agility": 4,
+                        "knowledge": 12,
+                        "perception": 8
+                    },
+                    "vital": {
+                        "maxHp": 60,
+                        "maxSanity": 120,
+                        "maxStamina": 70,
+                        "maxVigor": 80
+                    },
+                    "inventory": [
+                        {
+                            "id": "item_medical_scanner",
+                            "name": "医疗扫描仪",
+                            "desc": "一个便携式医疗扫描仪，能诊断伤势和分析生物体。",
+                            "type": "accessory",
+                            "rarity": "rare",
+                            "effects": [
+                                [
+                                    "perception",
+                                    2
+                                ]
+                            ]
+                        }
+                    ],
+                    "trust": 20,
+                    "level": 1,
+                    "xp": 0,
+                    "deck": [],
+                    "equipState": {
+                        "weapons": [null, null],
+                        "armors": [null, null, null],
+                        "accessories": [null, null, null, null, null]
+                    },
+                    "quest": {}
+                }
+            },
+            "interactions": [
+                {
+                    "desc": "与伊莱拉·万斯博士对话",
+                    "requirements": {
+                        "time": 2
+                    },
+                    "results": {
+                        "soundEffect": "click",
+                        "narrative": "博士的眼神在你的呼唤下聚焦了一瞬，她颤抖着低语：'他们…他们都在那里…在黑暗中…我看到了…那些眼睛…它在等待…它在成长…'她的理智似乎已经濒临崩溃，但她将一张ID卡交给你。",
+                        "stateChange": {
+                            "sanity": -5,
+                            "gain": [
+                                {
+                                    "id": "item_doctor_id_card",
+                                    "name": "博士ID卡",
+                                    "desc": "一张属于伊莱拉·万斯博士的ID卡，上面有她的照片和权限等级。",
+                                    "type": "material",
+                                    "rarity": "rare"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "node_containment_chamber": {
+            "name": "高等级收容室",
+            "desc": "一道厚重的合金门紧闭着，门上方的红色警示灯不断闪烁。门缝中渗出微弱的荧光，并伴随着一种低沉的、令人心悸的脉动声。空气中弥漫着强烈的血腥味和一丝腐蚀性气体的味道，仿佛有什么被囚禁的东西正在门后躁动不安。",
+            "visualPrompt": "Heavy alloy containment door, flashing red warning light above, faint fluorescent glow seeping from under door, low pulsating sound like a heartbeat, strong blood and corrosive gas smell, sense of immense agitation from within",
+            "threatLevel": 6,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_security_outpost",
+                    "label": "返回安全前哨"
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "使用蓝色安全钥匙卡打开收容室",
+                    "requirements": {
+                        "time": 1,
+                        "items": [
+                            "item_security_keycard_blue"
+                        ]
+                    },
+                    "results": {
+                        "soundEffect": "door_open",
+                        "narrative": "钥匙卡在读卡器上发出嗡鸣，厚重的合金门缓缓滑开，露出内部的景象。一股冰冷而恶心的气息扑面而来。",
+                        "unlock": [
+                            [
+                                "node_containment_chamber_inner",
+                                "进入高等级收容室内部"
+                            ]
+                        ]
+                    }
+                }
+            ]
+        },
+        "node_containment_chamber_inner": {
+            "name": "收容室内部",
+            "desc": "收容室的中心，一团不断蠕动、扭曲的血肉和触手构成的生物占据了整个空间。它没有清晰的形态，只有无数闪烁着恶意的眼睛和撕裂空间的利爪。空气中弥漫着令人疯狂的、不属于这个世界的低语。地面已经被生物质完全覆盖。",
+            "visualPrompt": "Inner containment chamber, pulsating mass of flesh and tentacles filling the space, shifting form with multiple malevolent eyes, reality-bending claws, floor covered in organic biomass, overwhelming cosmic horror, whispered voices in unknown language",
+            "threatLevel": 8,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_containment_chamber",
+                    "label": "返回高等级收容室"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_data_core",
+                    "label": "进入被改造的数据核心"
+                }
+            ],
+            "specificEnemy": {
+                "id": "enemy_ancient_horror",
+                "name": "远古恐怖",
+                "desc": "一团不断蠕动、扭曲的血肉和触手构成的生物。它没有清晰的形态，只有无数闪烁着恶意的眼睛和撕裂空间的利爪。它是实验的最终产物，也是所有低语的源头。",
+                "visualPrompt": "Lovecraftian cosmic horror, pulsating mass of flesh and tentacles, shifting form with countless malevolent eyes, reality-bending claws, ancient and incomprehensibly powerful, source of all whispers",
+                "initialState": {
+                    "attribute": {
+                        "strength": 12,
+                        "agility": 8,
+                        "knowledge": 10,
+                        "perception": 10
+                    },
+                    "equipState": {
+                        "weapons": [null, null],
+                        "armors": [null, null, null],
+                        "accessories": [null, null, null, null, null]
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 50,
+                    "buff": 10,
+                    "debuff": 30,
+                    "observe": 10
+                },
+                "nextIntent": {
+                    "type": "debuff",
+                    "desc": "在你的脑海中植入疯狂的低语"
+                },
+                "lootTable": [
+                    {
+                        "id": "item_cosmic_shard",
+                        "name": "虚空碎片",
+                        "desc": "一块散发着微弱紫光的奇异晶体，触感冰冷，似乎蕴含着某种超凡力量。",
+                        "type": "material",
+                        "rarity": "epic",
+                        "dropProbability": 0.3
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_enter"
+        },
+        "node_data_core": {
+            "name": "数据核心",
+            "desc": "数据核心是一个被金属和生物组织彻底改造的房间。巨大的服务器机架被肉质的藤蔓缠绕，发出低沉的嗡鸣声。核心处理器单元被一个跳动的巨大肉瘤包裹，散发出微弱的红光。空气中充满了数据传输的静电味和血肉的腥味，你感觉到一股强大的、非人的意识正在这里涌动。",
+            "visualPrompt": "Data core, metal and organic fusion, server racks intertwined with fleshy tendrils, pulsating tumor around core processor emitting red glow, static and blood smell, sense of powerful non-human consciousness, beating heart of the facility",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_containment_chamber_inner",
+                    "label": "返回收容室内部"
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "尝试接入核心数据终端",
+                    "requirements": {
+                        "time": 3,
+                        "puzzleSolved": {
+                            "type": "code",
+                            "title": "核心数据访问码",
+                            "desc": "核心终端被锁定，需要输入一个安全代码。根据研究员日志的提示，这似乎与'欧米伽'的出生日期有关，需要倒序排列。",
+                            "solution": "62017412",
+                            "data": {
+                                "minLength": 8,
+                                "maxLength": 8
+                            },
+                            "hints": [
+                                "研究员日志中提到了'欧米伽'的出生日期",
+                                "欧米伽档案显示出生日期为2147年10月26日",
+                                "倒序排列：21471026 -> 62017412"
+                            ],
+                            "maxAttempts": 5,
+                            "penalty": {
+                                "sanity": 10,
+                                "lock": "错误的输入触发了反制协议，一股精神冲击袭来！"
+                            }
+                        }
+                    },
+                    "results": {
+                        "soundEffect": "click",
+                        "narrative": "你成功接入了数据核心！海量的信息涌入你的脑海，你明白了'欧米伽'的真正本质和它的最终目的——它正在将整个设施改造为自己的巢穴，并试图将所有生物同化，最终超越物理存在，成为纯粹的信息生命体。",
+                        "stateChange": {
+                            "sanity": -20,
+                            "gain": [
+                                {
+                                    "id": "item_omega_data_log",
+                                    "name": "欧米伽核心数据日志",
+                                    "desc": "从数据核心下载的关于'欧米伽'及其计划的最高机密数据。",
+                                    "type": "document",
+                                    "rarity": "epic",
+                                    "quantity": 1,
+                                    "documentContent": "【绝密】欧米伽核心数据：\n代号：Ω\n起源：非地球智慧实体，通过生物整合技术渗透并寄生于实验体体内，加速其进化。\n目标：同化所有生物与非生物物质，实现超维度信息生命体转化，超越宇宙物理法则。\n当前状态：已完成对医疗站的初步同化，正在构建信息网络，准备向外扩张。\n警告：无法物理摧毁。唯一阻止方法是切断其信息网络核心，或…在其进化完成前，将其意识从宿主中剥离。"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "node_director_office": {
+            "name": "院长办公室",
+            "desc": "与外面的混乱不同，这里显得异常整洁。厚重的红木办公桌上放着一盏绿色的台灯，散发出温和的光。墙上挂满了各类医学奖状，但在台灯光线照不到的阴影里，墙纸似乎在蠕动。空气中弥漫着一股雪茄烟和古龙水的陈旧气味。",
+            "visualPrompt": "Luxurious but eerie director's office, green desk lamp on mahogany desk, medical awards on walls, writhing shadows in corners, cigar smoke and cologne smell, pristine amid chaos, unsettling contrast",
+            "threatLevel": 2,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_roof_helipad",
+                    "label": "前往顶楼直升机坪"
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "查阅办公桌上的实验报告",
+                    "requirements": {
+                        "time": 2,
+                        "items": [
+                            "item_directors_key"
+                        ]
+                    },
+                    "results": {
+                        "soundEffect": "click",
+                        "narrative": "报告揭示了'白色沉默'协议的真相：通过剥夺感官，让受试者的意识进入一个被称为'阈限空间'的维度。但他们的意识接触到了某种不可名状的存在，反而被利用。",
+                        "stateChange": {
+                            "sanity": -15
+                        }
+                    }
+                }
+            ]
+        },
+        "node_roof_helipad": {
+            "name": "顶楼直升机坪",
+            "desc": "狂风夹杂着冰冷的雨点打在脸上。直升机坪中央画着一个巨大的'H'字，一架坠毁的直升机残骸正在燃烧，火光照亮了周围浓重的迷雾。远处，城市的轮廓在迷雾中若隐若现，却显得如此遥不可及。",
+            "visualPrompt": "Rooftop helipad in storm, cold rain and wind, burning helicopter wreckage illuminating thick fog, distant unreachable city skyline, large 'H' symbol on ground, desperate escape point",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "sanctuary_return",
+                    "label": "发出求救信号撤离"
+                }
+            ]
+        },
+        "node_hidden_crawlspace": {
+            "name": "隐藏爬行空间",
+            "desc": "这是一个极其狭窄而黑暗的维护管道，空气中充满了灰尘和腐败的霉味。你必须匍匐前进，管道壁上布满了粘稠的、不明生物留下的痕迹。你的每一次呼吸都带着回响，仿佛有什么东西正在黑暗中注视着你。",
+            "visualPrompt": "Extremely narrow dark maintenance crawlspace, dusty and musty, sticky biological residue on pipe walls, echoing breaths, sense of being watched from darkness, claustrophobic and terrifying",
+            "threatLevel": 3,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_vent_system_entry",
+                    "label": "返回通风系统入口"
+                }
+            ],
+            "specificEnemy": {
+                "id": "enemy_vent_stalker",
+                "name": "通风管潜伏者",
+                "desc": "一个由扭曲的肢体和半透明皮肤组成的生物，它在黑暗中几乎隐形，只留下微弱的嘶嘶声和冰冷的凝视。它似乎以恐惧为食。",
+                "visualPrompt": "Near-invisible stalker in darkness, twisted limbs with translucent skin, faint hissing sound, cold predatory gaze, feeds on fear, mimics shadows",
+                "initialState": {
+                    "attribute": {
+                        "strength": 7,
+                        "agility": 10,
+                        "knowledge": 5,
+                        "perception": 12
+                    },
+                    "equipState": {
+                        "weapons": [null, null],
+                        "armors": [null, null, null],
+                        "accessories": [null, null, null, null, null]
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 40,
+                    "buff": 0,
+                    "debuff": 50,
+                    "observe": 10
+                },
+                "nextIntent": {
+                    "type": "attack",
+                    "desc": "利用黑暗进行一次隐蔽的刺穿攻击"
+                },
+                "lootTable": [
+                    {
+                        "id": "item_shadow_essence",
+                        "name": "暗影精华",
+                        "desc": "一小团浓稠的暗影物质，触感冰冷，似乎能影响心智。",
+                        "type": "material",
+                        "rarity": "epic",
+                        "dropProbability": 0.2
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_sanity_critical"
+        },
+        "node_vent_system_entry": {
+            "name": "通风系统入口",
+            "desc": "一道狭窄的金属格栅门挡住了通往通风系统的入口。空气中充满了灰尘和机器运行的微弱震动声，格栅内部一片漆黑，深不见底。你感到一阵微风从里面吹出，带着一股潮湿而腐朽的气味。",
+            "visualPrompt": "Vent system entry, narrow metal grate door, dusty with faint machine vibrations, dark and deep interior beyond grate, damp decaying wind blowing from within, industrial and ominous",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "node_janitors_closet",
+                    "label": "返回清洁工储物间"
+                },
+                {
+                    "type": "local",
+                    "targetId": "node_hidden_crawlspace",
+                    "label": "进入隐藏爬行空间"
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "尝试打开通风系统格栅",
+                    "requirements": {
+                        "time": 1,
+                        "puzzleSolved": {
+                            "type": "sequence",
+                            "title": "格栅锁扣谜题",
+                            "desc": "格栅上有三个圆形锁扣，需要按照'最小的先，最大的后，中间的最后'的顺序按下才能打开。",
+                            "solution": "medium",
+                            "data": {
+                                "sequence": [
+                                    "small",
+                                    "large",
+                                    null
+                                ],
+                                "missingIndex": 2,
+                                "options": [
+                                    "small",
+                                    "medium",
+                                    "large"
+                                ],
+                                "correctOption": "medium"
+                            },
+                            "hints": [
+                                "观察锁扣的尺寸",
+                                "最小的最先，最大的最后"
+                            ],
+                            "maxAttempts": 3,
+                            "penalty": {
+                                "sanity": 3,
+                                "lock": "你按错了顺序，锁扣发出刺耳的噪音，让你感到一阵烦躁。"
+                            }
+                        }
+                    },
+                    "results": {
+                        "soundEffect": "click",
+                        "narrative": "格栅锁扣发出咔哒一声，沉重的格栅门缓缓打开，露出一个黑暗而狭窄的通道。"
+                    }
+                }
+            ]
+        }
+    }
+}

@@ -1,0 +1,728 @@
+{
+    "id": "myco_cybernetic_abyss",
+    "name": "孢络机枢：共生之渊",
+    "background": "数百年前，一个致力于将真菌生态与机械工业结合的秘密研究基地在深渊中建立。最初的共生实验失控后，异化的真菌获得了机械代码的逻辑，而机械核心则长出了血肉。整个设施彻底沦为了一个具有自我意识的赛博真菌蜂巢，所有研究人员都被同化为它的子节点，等待着‘机神’的最终降临。",
+    "topology": "垂直向下的深渊结构。上层为气密舱和被真菌同化的生物群落区（医疗、研究、生活），玩家需通过连接枢纽逐步探索；中层为维系生命与代码流动的孢子升降机和通风口；底层则是充满铁锈、血液与机油的重工业机械祭坛与核心熔炉。",
+    "nodesCount": 16,
+    "visualStyle": "A horrifying descent that transitions from a claustrophobic, bioluminescent fungal hive into a dark, pulsating biomechanical industrial facility. Rusty metal intertwined with fleshy veins, dripping viscous fluids, and flickering holographic runes.",
+    "initial": {
+        "dilationFactor": 0.8,
+        "entrance": "outpost_entrance"
+    },
+    "nodes": {
+        "outpost_entrance": {
+            "name": "前哨站入口",
+            "desc": "沉重的气密门半开着，被厚实的淡紫色菌丝卡住。空气中弥漫着一股令人作呕的甜腻腐烂味，细小的孢子在微弱的应急灯光下飞舞。远处传来阵阵低沉的、如同呼吸般的震动声。",
+            "visualPrompt": "Semi-open sci-fi airlock door, thick purple mycelium growth jamming the mechanism, floating glowing spores, flickering red emergency lights, dark shadows.",
+            "threatLevel": 1,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "decompression_hall",
+                    "label": "进入减压走廊"
+                }
+            ]
+        },
+        "decompression_hall": {
+            "name": "减压走廊",
+            "desc": "这里的墙壁已经完全被肉质的菌毯覆盖，原本坚硬的钢板在脚下变得像海绵一样松软。天花板上垂下无数丝状物，不时滴落粘稠的透明液体。墙上的对讲机只剩下刺耳的静电噪音。",
+            "visualPrompt": "Claustrophobic corridor, walls completely covered in flesh-like fungal mats, spongy organic floor, hanging slimy filaments, dripping viscous transparent fluid, broken intercom.",
+            "threatLevel": 2,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "central_atrium",
+                    "label": "通往中央中庭"
+                }
+            ],
+            "items": [
+                {
+                    "id": "rusted_scalpel",
+                    "name": "生锈的手术刀",
+                    "desc": "一把被真菌侵蚀的手术刀，刀刃依然锋利。",
+                    "type": "weapon",
+                    "rarity": "common",
+                    "weaponType": "dagger",
+                    "meleeDamage": 8,
+                    "maxUses": 20
+                }
+            ]
+        },
+        "central_atrium": {
+            "name": "中央中庭",
+            "desc": "这是一个巨大的圆形空间，中央曾经的喷泉现在长满了一株巨大的发光真菌。淡蓝色的荧光照亮了四周的四个通道入口，仿佛某种生物的咽喉。你可以听到菌丝在墙壁后蠕动的沙沙声。",
+            "visualPrompt": "Large circular hub facility, giant glowing blue bioluminescent mushroom in the center replacing a fountain, four dark cardinal exits looking like organic throats, fleshy textures over metal.",
+            "threatLevel": 3,
+            "childrenIds": [
+                "medical_wing_root",
+                "research_wing_root",
+                "residential_wing_root"
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "security_checkpoint",
+                    "label": "前往安检站"
+                }
+            ]
+        },
+        "medical_wing_root": {
+            "name": "医疗翼枢纽",
+            "desc": "医疗区的指示牌已经断裂，地面上散落着破碎的药瓶和干涸的血迹。这里的真菌呈现出一种病态的深红色，似乎正在吸收残余的生物质。空气中的血腥味与孢子的甜味混合在一起。",
+            "visualPrompt": "Ruined medical wing entrance, sickening deep red fungal growth on the walls, shattered medicine bottles on the floor, large patches of dried blood, broken signage.",
+            "threatLevel": 3,
+            "childrenIds": [
+                "triage_desk",
+                "emergency_ward",
+                "drug_dispensary"
+            ]
+        },
+        "triage_desk": {
+            "name": "分诊台",
+            "desc": "分诊台后坐着一具被菌丝包裹的骸骨，它的手指还僵硬地扣在打字机上。抽屉里塞满了由于受潮而无法辨认的病历单。偶尔有细小的昆虫在菌丝间穿梭。",
+            "visualPrompt": "A rusted hospital triage desk, a skeletal corpse completely encased in fungal threads sitting behind it, hands on an old typewriter, decayed medical paperwork, crawling alien insects.",
+            "threatLevel": 2,
+            "items": [
+                {
+                    "id": "dr_vance_log",
+                    "name": "万斯医生的日志",
+                    "desc": "记录了最初感染阶段的混乱情况。",
+                    "type": "document",
+                    "rarity": "common",
+                    "documentContent": "“它们不是在杀死我们……它们是在重塑我们。我能感觉到肺部的瘙痒，那是新生命的萌发。”"
+                }
+            ]
+        },
+        "emergency_ward": {
+            "name": "急诊病房",
+            "desc": "病床上的床单已经被真菌织成了茧状，里面似乎有什么东西在微微跳动。氧气瓶散落在地，发出嘶嘶的泄露声。墙上的心电监护仪竟然还在跳动，显示出诡异的波形。",
+            "visualPrompt": "Creepy hospital emergency ward, beds covered in pulsating cocoon-like fungal webs, leaking rusted oxygen tanks on the floor, a single active heart monitor showing erratic chaotic waves.",
+            "threatLevel": 4,
+            "specificEnemy": {
+                "id": "fungal_shambler",
+                "name": "真菌蹒跚者",
+                "gender": "both",
+                "desc": "一个曾经是护士的生物，头部被巨大的孢子囊取代，动作僵硬而致命。",
+                "visualPrompt": "A grotesque mutated nurse, head completely replaced by a massive, pulsating, glowing purple spore sac, walking with stiff jerky movements, razor-sharp fungal claws.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 7,
+                        "agility": 3,
+                        "knowledge": 1,
+                        "perception": 4
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 70,
+                    "buff": 10,
+                    "debuff": 10,
+                    "observe": 10
+                },
+                "nextIntent": {
+                    "type": "attack",
+                    "desc": "发狂地挥舞着变异的菌丝手臂"
+                }
+            },
+            "enemySpawnCondition": "on_enter"
+        },
+        "drug_dispensary": {
+            "name": "药品分发处",
+            "desc": "厚重的防护玻璃已经碎裂，货架倒塌在真菌丛中。虽然大部分药品已经变质，但仍有一些密封罐保持完好。这里的空气极其干燥，孢子的浓度反而降低了。",
+            "visualPrompt": "Pharmacy dispensary with shattered thick security glass, collapsed metal shelves overgrown with fungi, a few intact sealed medicine containers glowing faintly, dry and dusty air.",
+            "threatLevel": 2,
+            "items": [
+                {
+                    "id": "fungal_serum",
+                    "name": "抗真菌血清",
+                    "desc": "一种实验性的血清，可以暂时抑制孢子对理智的影响。",
+                    "type": "consumable",
+                    "rarity": "rare",
+                    "effects": [
+                        [
+                            "heal_sanity",
+                            30
+                        ]
+                    ]
+                }
+            ]
+        },
+        "research_wing_root": {
+            "name": "研究翼枢纽",
+            "desc": "这里的墙壁被涂满了复杂的化学公式和疯狂的涂鸦。真菌在这里似乎受到了某种人工干预，呈现出规则的几何形状。空气中弥漫着强烈的臭氧和化学试剂的味道。",
+            "visualPrompt": "Scientific research wing corridor, walls covered in manic chemical formulas scrawled in blood and ink, fungal growths forced into unnatural perfect geometric shapes, blue ozone sparks.",
+            "threatLevel": 3,
+            "childrenIds": [
+                "mycology_lab",
+                "observation_deck",
+                "specimen_vault"
+            ]
+        },
+        "mycology_lab": {
+            "name": "真菌学实验室",
+            "desc": "无数培养皿在实验台上破碎，释放出了五颜六色的霉菌。一台还在运转的离心机发出刺耳的摩擦声，仿佛在控诉这里发生的悲剧。主控电脑的屏幕闪烁着绿色的光芒。",
+            "visualPrompt": "Chaotic laboratory, shattered petri dishes releasing toxic colorful mold clouds, a noisy sparking centrifuge, a terminal computer screen glowing sickly green in the dark.",
+            "threatLevel": 2,
+            "interactions": [
+                {
+                    "desc": "尝试解锁主控电脑",
+                    "requirements": {
+                        "puzzleSolved": {
+                            "type": "sequence",
+                            "title": "样本分析序列",
+                            "desc": "寻找规律，输入缺失的核苷酸序列编号以解锁底层数据库。(提示：质数递增)",
+                            "solution": "5",
+                            "data": {
+                                "sequence": [
+                                    2,
+                                    3,
+                                    null,
+                                    7
+                                ],
+                                "missingIndex": 2,
+                                "options": [
+                                    4,
+                                    5,
+                                    6,
+                                    8
+                                ],
+                                "correctOption": 5
+                            },
+                            "hints": [
+                                "观察已有的数字：2, 3, 7。",
+                                "它们都是只能被1和自身整除的质数。"
+                            ],
+                            "penalty": {
+                                "sanity": -5,
+                                "hp": -5
+                            }
+                        }
+                    },
+                    "results": {
+                        "timeCost": 2,
+                        "soundEffect": "success",
+                        "narrative": "电脑解锁了，你获取了最高安全访问协议。控制台发出蜂鸣声，安检站的大门限制已被解除。",
+                        "stateChange": {
+                            "unlock": [
+                                [
+                                    "security_checkpoint",
+                                    "使用授权码开启安检门"
+                                ]
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "observation_deck": {
+            "name": "观察台",
+            "desc": "从这里可以俯瞰下层的育种池，那里充满了令人不安的粘液。观察窗上满是裂痕，被真菌的触须紧紧缠绕。角落里的保险箱似乎还未被触动。",
+            "visualPrompt": "A dark observation deck with heavily cracked safety glass intertwined with thick fungal tentacles, overlooking a lower level filled with glowing green slime breeding pools, an untouched safe in the corner.",
+            "threatLevel": 3,
+            "items": [
+                {
+                    "id": "bio_keycard",
+                    "name": "生物识别卡",
+                    "desc": "一张沾满粘液的卡片，用于开启底层核心区域的某些旧式物理锁。",
+                    "type": "material",
+                    "rarity": "rare"
+                }
+            ]
+        },
+        "specimen_vault": {
+            "name": "标本保险库",
+            "desc": "巨大的玻璃柱排列在房间里，里面浸泡着各种扭曲的生物标本。其中一个玻璃柱已经破碎，里面的东西消失了，只留下一条湿漉漉的拖痕一直延伸到通风口。",
+            "visualPrompt": "A dark vault filled with tall cylindrical glass tanks containing twisted organic specimens in murky fluid, one tank is violently shattered, leaving a wet trail of slime leading to a dark air vent.",
+            "threatLevel": 5,
+            "specificEnemy": {
+                "id": "stalker_prime",
+                "name": "潜伏者零号",
+                "gender": "both",
+                "desc": "一个高度进化的真菌掠食者，能够完美融入阴影中。",
+                "visualPrompt": "A horrifying hyper-evolved fungal predator with translucent skin, needle-like teeth, blending flawlessly into the dark shadows, glowing yellow eyes.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 8,
+                        "agility": 10,
+                        "knowledge": 5,
+                        "perception": 8
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 80,
+                    "buff": 0,
+                    "debuff": 10,
+                    "observe": 10
+                },
+                "nextIntent": {
+                    "type": "attack",
+                    "desc": "从阴影中发动致命突袭"
+                },
+                "lootTable": [
+                    {
+                        "id": "fungal_heart_organ",
+                        "name": "掠食者孢子心",
+                        "desc": "仍在跳动的高能器官。",
+                        "type": "material",
+                        "rarity": "epic",
+                        "dropProbability": 1
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_search"
+        },
+        "residential_wing_root": {
+            "name": "生活区入口",
+            "desc": "这里曾经是工作人员休息的地方，现在更像是一个巨大的坟场。墙上挂着家人的照片，但脸部都被生长的真菌覆盖，显得格外诡异。走廊尽头传来微弱的歌声。",
+            "visualPrompt": "Creepy abandoned residential hallway, domestic debris scattered, family photos on the wall defaced by blooming fungal growths masking the faces, eerie shadows.",
+            "threatLevel": 2,
+            "childrenIds": [
+                "crew_cabin",
+                "communal_canteen"
+            ]
+        },
+        "crew_cabin": {
+            "name": "幸存者船员舱",
+            "desc": "这个房间曾经被加固过，门后堆满了家具，墙上刻满了求救的符号。床单上留下了一个人形的真菌印记。书桌上有一张未写完的绝望明信片，地板上散落着防身用的工具。",
+            "visualPrompt": "Barricaded small living quarters, desperate carvings on the wall, a bed with a human-shaped mold outline, personal effects scattered, heavy pipe wrench on the floor.",
+            "threatLevel": 2,
+            "items": [
+                {
+                    "id": "old_battery_pack",
+                    "name": "旧能量电池",
+                    "desc": "外壳生锈但内部依然蕴含电能的备用电池组。",
+                    "type": "consumable",
+                    "rarity": "common",
+                    "effects": [
+                        [
+                            "restore_battery",
+                            50
+                        ]
+                    ]
+                },
+                {
+                    "id": "pipe_wrench",
+                    "name": "重型管钳",
+                    "desc": "沉重的金属工具，适合敲碎菌壳或是机械零件。",
+                    "type": "weapon",
+                    "rarity": "common",
+                    "weaponType": "blunt",
+                    "meleeDamage": 15,
+                    "maxUses": 15
+                }
+            ]
+        },
+        "communal_canteen": {
+            "name": "公共食堂",
+            "desc": "食堂的桌椅被真菌连接在了一起，形成了一座巨大的肉质迷宫。自动售货机还在发出嗡嗡声，但吐出来的只有黑色的孢子块。这里的空气非常潮湿，视线受阻。",
+            "visualPrompt": "A large canteen where tables and chairs are fused together into a grotesque maze of flesh and fungus, a buzzing vending machine spewing black spore clumps, dense fog limiting visibility.",
+            "threatLevel": 3,
+            "nodeNpc": {
+                "id": "survivor_elias",
+                "name": "埃利亚斯",
+                "gender": "male",
+                "desc": "一名躲在柜台后的厨师，双眼无神，正对着一盘真菌自言自语。",
+                "visualPrompt": "A disheveled, traumatized chef hiding behind a ruined counter, staring blankly with soulless eyes, whispering to a plate of writhing fungus.",
+                "style": "tactical",
+                "hide": true,
+                "initialState": {
+                    "attribute": {
+                        "strength": 4,
+                        "agility": 3,
+                        "knowledge": 6,
+                        "perception": 5
+                    },
+                    "vital": {
+                        "maxHp": 80,
+                        "maxSanity": 40,
+                        "maxStamina": 60,
+                        "maxVigor": 50
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    },
+                    "inventory": [],
+                    "trust": 20,
+                    "level": 2,
+                    "xp": 100,
+                    "deck": [],
+                    "quest": {}
+                }
+            }
+        },
+        "security_checkpoint": {
+            "name": "安检站",
+            "desc": "一道沉重的电磁门挡住了去路。门边的终端扫描仪正发出红色的警告光。这里的真菌似乎对电流有反应，不断地在粗大的电缆周围抽搐。",
+            "visualPrompt": "Heavy sci-fi electromagnetic blast door, red scanner laser sweeping, thick black high-voltage cables covered in twitching organic fungi reacting to the electric current.",
+            "threatLevel": 3,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "maintenance_crawlspace",
+                    "label": "检查侧面的通风管道 (隐藏路线)"
+                },
+                {
+                    "type": "local",
+                    "targetId": "spore_lift_station",
+                    "label": "通过安检门进入升降机"
+                }
+            ]
+        },
+        "maintenance_crawlspace": {
+            "name": "维护爬道",
+            "desc": "极其狭窄的管道，只能爬行通过。管道壁上长满了滑腻的苔藓，每爬一步都能听到挤压粘液的声音。这里是蜂巢的阴暗角落，隐藏着不为人知的路径。",
+            "visualPrompt": "Extremely narrow dark maintenance vent, claustrophobic tunnel, metallic walls covered in slimy glowing moss, puddles of thick transparent mucus.",
+            "threatLevel": 2,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "lower_ventilation",
+                    "label": "向下爬往通风核心"
+                }
+            ]
+        },
+        "lower_ventilation": {
+            "name": "下层通风核心",
+            "desc": "巨大的风扇叶片早已停止转动，上面挂满了沉重的真菌囊肿。这里的风道通向基地更深处，偶尔能听到从下方传来的机械轰鸣与非人的咆哮声交织在一起。",
+            "visualPrompt": "Massive vertical air shaft, giant stopped rusted fan blades choked by heavy fungal cysts, looking down into an abyss where industrial red lights mix with organic bioluminescence.",
+            "threatLevel": 4,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "spore_lift_station",
+                    "label": "跃下，绕回升降机大厅"
+                }
+            ]
+        },
+        "spore_lift_station": {
+            "name": "孢子升降机站",
+            "desc": "一个巨大的生物与机械复合的升降机位于平台中央，它由纠缠的巨型菌丝与钢铁缆线组成。深渊底部，不再是发光的有机体，而是充满暗红与铁锈的工业炼狱。你必须深入。",
+            "visualPrompt": "A massive industrial elevator platform suspended by an unholy mix of steel cables and giant pulsating mycelium threads, overlooking a terrifying descent into a hellish industrial abyss.",
+            "threatLevel": 2,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "machine_corridor",
+                    "label": "启动升降机，坠入机枢深处"
+                }
+            ]
+        },
+        "machine_corridor": {
+            "name": "受洗通道",
+            "desc": "升降机到底后，这里的画风突变。曾经是某地下设施入口的冰冷走廊，现在金属墙壁上攀附着血管状的粗大缆线，像是有生命般微弱脉动。空气中弥漫着浓烈的机油与腐血的混合气味。",
+            "visualPrompt": "Narrow decaying metal corridor at the bottom of the abyss, biomechanical nightmare, veins and thick power cables intertwined on walls, flickering red emergency lights, holographic cult runes, large bloodstains on metal floor.",
+            "threatLevel": 5,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "flesh_altar",
+                    "label": "推开重门，深入机枢设施"
+                }
+            ]
+        },
+        "flesh_altar": {
+            "name": "分拣祭坛",
+            "desc": "原本的安检大厅被改造成了恐怖的初级祭坛。废弃的担架上散落着失去活性的人造肢体和真菌血肉块。房间中央是一个巨大的、混合着废机油与血液的浑浊池子，探头如同无神的眼睛注视着你。",
+            "visualPrompt": "Abandoned large security hall converted into a dark technological altar, a large central pool swirling with black oil and dark red blood, broken cybernetic limbs mixed with fungal flesh on metal gurneys, staring security cameras.",
+            "threatLevel": 6,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "machine_corridor",
+                    "label": "返回受洗通道"
+                },
+                {
+                    "type": "local",
+                    "targetId": "prayer_ward",
+                    "label": "前往祈祷病房"
+                },
+                {
+                    "type": "local",
+                    "targetId": "specimen_crypt",
+                    "label": "前往标本圣骨匣"
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "凝视血油池的底部",
+                    "results": {
+                        "timeCost": 1,
+                        "soundEffect": "scare",
+                        "narrative": "你看到池底有无数由机械和骨骼拼凑的残骸，它们似乎在液体的浸泡下还在抽搐试图重组...",
+                        "stateChange": {
+                            "sanity": -10
+                        }
+                    }
+                }
+            ],
+            "items": [
+                {
+                    "id": "antiseptic_spray",
+                    "name": "医用强效喷雾",
+                    "desc": "一罐未被污染的医用消毒喷雾，能处理轻微创伤。",
+                    "type": "consumable",
+                    "rarity": "common",
+                    "effects": [
+                        [
+                            "heal_hp",
+                            15
+                        ]
+                    ]
+                }
+            ]
+        },
+        "prayer_ward": {
+            "name": "祈祷病房",
+            "desc": "这里的病床像受难十字架一样被垂直竖立，上面绑着自愿接受机械改造的狂信徒遗骸。广播系统循环播放着刺耳的合成音，那是一段被刻意倒放的电子祈祷文，听起来宛如恶毒的诅咒。",
+            "visualPrompt": "Upright metal hospital beds resembling crucifixes lining the walls, skeletal remains with rusted mechanical augments and fungal wires forced into them, dim glowing surgical lights casting long unsettling shadows.",
+            "threatLevel": 6,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "flesh_altar",
+                    "label": "退回分拣祭坛"
+                },
+                {
+                    "type": "local",
+                    "targetId": "flesh_corridor",
+                    "label": "向内层推进，进入脉动长廊"
+                }
+            ],
+            "items": [
+                {
+                    "id": "cyber_prayer_book",
+                    "name": "全息教典晶体",
+                    "desc": "一块散发着暗红色微光的存储晶体，记录着扭曲的教义。",
+                    "type": "document",
+                    "rarity": "rare",
+                    "documentContent": "献上你软弱的皮囊...献上你生锈的齿轮...在真菌的剧痛中剥离人性，你的代码将成为神之意识的底层逻辑...永生于大合唱之中。"
+                },
+                {
+                    "id": "mech_ritual_blade",
+                    "name": "高频震动祭祀刃",
+                    "desc": "一把结合了工业切割技术与宗教仪式的匕首，刀刃上刻着导血管与符文。",
+                    "type": "weapon",
+                    "rarity": "rare",
+                    "weaponType": "dagger",
+                    "meleeDamage": 18,
+                    "maxUses": 40
+                }
+            ]
+        },
+        "specimen_crypt": {
+            "name": "标本圣骨匣",
+            "desc": "冰冷的金属架上排列着巨大的培养罐，里面浸泡着失败的融合体——半机械半真菌血肉的畸形怪物。在这里，失败的实验品既是废弃标本，也是被狂热崇拜的殉道者圣物。",
+            "visualPrompt": "Cold massive metal shelves reaching the ceiling, large glass cylindrical tanks filled with glowing green and red fluid, grotesque cyborg-fungal specimens floating inside, flickering blue monitors showing bio-stats.",
+            "threatLevel": 7,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "flesh_altar",
+                    "label": "退回分拣祭坛"
+                },
+                {
+                    "type": "local",
+                    "targetId": "flesh_corridor",
+                    "label": "向内层推进，进入脉动长廊"
+                }
+            ],
+            "items": [
+                {
+                    "id": "mech_living_heart",
+                    "name": "机械泵动心脏",
+                    "desc": "一个结合了微型马达的活体心脏，仍在顽强地泵动着防腐剂与血液的混合液。",
+                    "type": "consumable",
+                    "rarity": "epic",
+                    "effects": [
+                        [
+                            "heal_hp",
+                            40
+                        ],
+                        [
+                            "maxHp",
+                            5,
+                            -1
+                        ]
+                    ]
+                }
+            ]
+        },
+        "flesh_corridor": {
+            "name": "脉动缆线走廊",
+            "desc": "深处环境彻底失控了。墙壁的金属材质已经被蠕动的肉质增生物同化，高压电缆像血管一样镶嵌在其中。走廊尽头有一扇被厚重生物质掩盖的巨大闸门，散发着令人窒息的终极压迫感。",
+            "visualPrompt": "Biomechanical nightmare corridor acting as an artery to the core, walls made of heavily pulsing meat completely swallowing thick high-voltage cables, heartbeat sound mixed with violent electrical buzzing, massive locked blast door ahead covered in flesh.",
+            "threatLevel": 8,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "prayer_ward",
+                    "label": "撤回祈祷病房"
+                },
+                {
+                    "type": "local",
+                    "targetId": "specimen_crypt",
+                    "label": "撤回圣骨匣"
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "尝试破解并切开生物质闸门",
+                    "requirements": {
+                        "puzzleSolved": {
+                            "type": "logic",
+                            "title": "三位一体解锁序列",
+                            "desc": "闸门控制台被血丝缠绕，屏幕显示加密逻辑：'升华遵循铁律。纯粹的血肉唤醒感知；冰冷的钢铁注入逻辑；最后两者在痛苦中融合。' 你需要调整管线注入顺序。",
+                            "solution": "激活血液循环 -> 启动电磁发生器 -> 注入融合液",
+                            "data": {
+                                "premises": [
+                                    "协议1：血肉（血液循环）是感知的基础，必须优先启动。",
+                                    "协议2：没有逻辑的感知是混沌，钢铁（电磁发生器）紧随其后。",
+                                    "协议3：融合（融合液）是最终的目的，必须在两者就绪后进行。"
+                                ],
+                                "question": "请选择正确的闸门控制流管线注入顺序：",
+                                "options": [
+                                    "启动电磁发生器 -> 激活血液循环 -> 注入融合液",
+                                    "激活血液循环 -> 启动电磁发生器 -> 注入融合液",
+                                    "注入融合液 -> 激活血液循环 -> 启动电磁发生器"
+                                ],
+                                "correctIndex": 1
+                            },
+                            "hints": [
+                                "协议1明确规定血液循环必须优先。",
+                                "协议2指明电磁发生器必须在感知（血液）就绪之后。",
+                                "协议3强调融合是在两者都就绪之后的最终步骤。"
+                            ],
+                            "penalty": {
+                                "sanity": -15,
+                                "hp": -10,
+                                "lock": "生物防卫机制反噬，你遭到了电击与神经毒素的侵袭。"
+                            }
+                        }
+                    },
+                    "results": {
+                        "timeCost": 2,
+                        "soundEffect": "door_open",
+                        "narrative": "随着一阵令人牙酸的金属撕裂声与血肉撕扯声，闸门缓缓升起，露出了内部那令人窒息的核心空间。",
+                        "stateChange": {
+                            "unlock": [
+                                [
+                                    "inner_sanctum",
+                                    "进入核心熔炉圣所"
+                                ]
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "inner_sanctum": {
+            "name": "核心熔炉圣所",
+            "desc": "设施最深处的心脏地带。一个倒金字塔形的巨大祭坛矗立在破碎的主培养罐遗址上。周围的墙面上，用机油和鲜血密密麻麻地写满了历代被献祭的“神选者”的系统编号和人类姓名。",
+            "visualPrompt": "Cavernous industrial core room, an inverted pyramid altar rising from a shattered giant bio-tank, walls completely covered in manic writing in blood and black oil, blinding industrial spotlights intersecting on the altar.",
+            "threatLevel": 9,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "flesh_corridor",
+                    "label": "逃离圣所，退回长廊"
+                },
+                {
+                    "type": "local",
+                    "targetId": "final_crucible",
+                    "label": "踏上终极祭坛，直面神造物"
+                }
+            ],
+            "items": [
+                {
+                    "id": "forbidden_blueprint",
+                    "name": "受孕蓝图",
+                    "desc": "一张描绘着如何将人类神经中枢、真菌母体与反应堆并联的疯狂图纸。",
+                    "type": "document",
+                    "rarity": "epic",
+                    "documentContent": "终极协议：神不是被信仰出来的，是被制造出来的。当我们把一万个痛苦的灵魂压缩进量子处理器的核心，并赋予其真菌的无限繁衍性，我们迎来的将是算法的永生。神，即将睁开眼睛。"
+                }
+            ]
+        },
+        "final_crucible": {
+            "name": "终极祭坛",
+            "desc": "祭坛之上，躺着一个由无数受害者的残肢、真菌囊肿与重型机械核心强行融合而成的庞然大物。它的数条排气管喷吐着炽热的蒸汽，胸腔处透明的外壳下，几十个心脏在同步跳动。它的无数只机械眼与真菌复眼锁定了你。",
+            "visualPrompt": "Monstrous colossal entity on a raised metallic altar, a horrific unholy fusion of multiple human bodies, fungal masses, and heavy machinery gears, exhaust pipes venting scorching steam, dozens of hearts beating synchronously under a glass chest plate, hundreds of glowing eyes staring down.",
+            "threatLevel": 10,
+            "specificEnemy": {
+                "id": "flesh_automaton_god",
+                "name": "雏形机神",
+                "gender": "both",
+                "desc": "被无数绝望者的血肉与狂乱代码喂养出的融合体。它既是一个人，也是所有人；它既是冰冷的机器，也是沸腾的恶意。",
+                "visualPrompt": "Colossal biomechanical god-fetus, writhing mass of limbs, fungal stalks, and grinding metal gears, blinding red laser eyes mixed with spore clouds, towering and horrific.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 15,
+                        "agility": 8,
+                        "knowledge": 12,
+                        "perception": 10
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [],
+                        "accessories": []
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 60,
+                    "buff": 10,
+                    "debuff": 20,
+                    "observe": 10
+                },
+                "nextIntent": {
+                    "type": "attack",
+                    "desc": "锁定目标，准备执行物理粉碎与精神污染的双重肃清"
+                },
+                "lootTable": [
+                    {
+                        "id": "divine_machine_core",
+                        "name": "机神火种",
+                        "desc": "蕴含着极度浓缩的生物电能与驳杂记忆的神性精华。",
+                        "type": "material",
+                        "rarity": "epic",
+                        "dropProbability": 1
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_enter",
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "inner_sanctum",
+                    "label": "跳下祭坛退避，暂避锋芒"
+                },
+                {
+                    "type": "sanctuary_return",
+                    "label": "启动底部排污舱闸门，带着机神残骸逃离深渊"
+                }
+            ]
+        }
+    }
+}

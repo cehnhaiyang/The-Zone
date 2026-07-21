@@ -1,0 +1,610 @@
+{
+  "id": "zone_tartarus_001",
+  "name": "塔耳塔洛斯深海黑牢",
+  "initial": {
+    "dilationFactor": 1.2,
+    "entrance": "n_01"
+  },
+  "visualStyle": "深海抗压舱结构，墙壁渗着冰冷的盐水与不明生物黏液，全息投影闪烁着刺眼的红光，伴随着低频的钢铁挤压声。这里是与世隔绝的法外之地。",
+  "nodes": {
+    "n_01": {
+      "name": "01-减压气闸舱",
+      "desc": "海水刚从这里被排空，空气中弥漫着臭氧与铁锈的味道。身后的重型防水门已经彻底锁死，你只能前进。",
+      "visualPrompt": "A flooded industrial airlock, rusty heavy steel doors, dim emergency red lights, water puddles on the floor, claustrophobic atmosphere, cyberpunk deep sea style.",
+      "threatLevel": 1,
+      "childrenIds": [
+        "n_02"
+      ]
+    },
+    "n_02": {
+      "name": "02-生化洗消区",
+      "desc": "天花板上的喷头还在滴落具有腐蚀性的消毒液，几套破损的防护服散落在角落。",
+      "visualPrompt": "Decontamination chamber, chemical showers dripping green fluid, hazmat suits torn on the floor, flickering fluorescent lights.",
+      "threatLevel": 2,
+      "childrenIds": [
+        "n_01",
+        "n_03"
+      ],
+      "items": [
+        {
+          "id": "c_medkit_01",
+          "name": "应急抗菌剂",
+          "desc": "标准的医疗喷雾，能稍微处理外伤。",
+          "rarity": "common",
+          "type": "consumable",
+          "effects": [
+            [
+              "heal_hp",
+              15,
+              0
+            ]
+          ],
+          "discoveryThreshold": 2,
+          "quantity": 2
+        }
+      ]
+    },
+    "n_03": {
+      "name": "03-中央环形枢纽",
+      "desc": "黑牢的十字路口。巨大的全息监管塔伫立在中央，但屏幕全是雪花噪点。左侧通往牢房，右侧通往行政区，正前方是安检口。",
+      "visualPrompt": "Central panopticon hub in a dark futuristic prison, shattered holographic displays, multiple corridors branching out, ominous shadows.",
+      "threatLevel": 3,
+      "childrenIds": [
+        "n_02",
+        "n_04",
+        "n_06",
+        "n_16"
+      ]
+    },
+    "n_04": {
+      "name": "04-主安检站",
+      "desc": "通往武器库的必经之路。防弹玻璃碎了一地，安保终端机显示着‘接线短路’的错误警告。",
+      "visualPrompt": "Shattered security checkpoint, broken bulletproof glass, sparks flying from a damaged terminal, dark hallway ahead.",
+      "threatLevel": 4,
+      "childrenIds": [
+        "n_03",
+        "n_05"
+      ],
+      "interactions": [
+        {
+          "desc": "修复终端机",
+          "requirements": {
+            "time": 0,
+            "puzzleSolved": {
+              "type": "wire",
+              "title": "终端机电路覆写",
+              "desc": "你需要重新连接主板上的断路以欺骗门禁系统。",
+              "solution": "MATCH_PORTS",
+              "data": {
+                "wires": [
+                  { "id": "w1", "color": "red", "label": "主电源" },
+                  { "id": "w2", "color": "blue", "label": "数据总线" }
+                ],
+                "ports": [
+                  { "id": "p1", "label": "供电接口", "correctWireId": "w1" },
+                  { "id": "p2", "label": "协议解密端口", "correctWireId": "w2" }
+                ]
+              },
+              "penalty": {
+                "hp": 5
+              }
+            }
+          },
+          "results": {
+            "soundEffect": "success",
+            "narrative": "电火花闪过，沉重的金属门随着液压声缓缓开启。",
+            "unlock": [
+              [
+                "n_05",
+                "进入军械库"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    "n_05": {
+      "name": "05-战术军械库",
+      "desc": "大部分武器已经被洗劫一空，但你在一个隐蔽的防爆柜里发现了一些遗留的装备。",
+      "visualPrompt": "Looted armory room, empty gun racks, one open secure locker with a futuristic weapon inside, tactical gear scattered.",
+      "threatLevel": 1,
+      "childrenIds": [
+        "n_04"
+      ],
+      "items": [
+        {
+          "id": "w_stun_baton",
+          "name": "高压电击棍",
+          "desc": "狱警的标准配备，能造成不俗的钝击与电荷伤害。",
+          "rarity": "rare",
+          "type": "weapon",
+          "weaponType": "blunt",
+          "meleeDamage": 12,
+          "maxUses": 50,
+          "discoveryThreshold": 0,
+          "quantity": 1
+        }
+      ]
+    },
+    "n_06": {
+      "name": "06-A级牢房区走廊",
+      "desc": "两侧是密密麻麻的蜂巢式牢房，大部分门开着。空气中弥漫着令人不安的腥臭味。",
+      "visualPrompt": "Dark prison cell block corridor, doors hanging off hinges, eerie silence, visceral stains on the concrete floor.",
+      "threatLevel": 5,
+      "childrenIds": [
+        "n_03",
+        "n_07",
+        "n_08",
+        "n_10"
+      ]
+    },
+    "n_07": {
+      "name": "07-禁闭室通道",
+      "desc": "专门关押高危目标的地方。灯光完全失效，你能听到深处传来某种非人的咀嚼声。",
+      "visualPrompt": "Pitch black solitary confinement hallway, scratch marks on heavy iron doors, claustrophobic and terrifying.",
+      "threatLevel": 8,
+      "childrenIds": [
+        "n_06"
+      ],
+      "specificEnemy": {
+        "id": "e_mutant_prisoner",
+        "name": "异化畸变囚犯",
+        "desc": "已经被深海高压和异常物质同化的肉块，勉强保持着人形。",
+        "visualPrompt": "A grotesque mutated humanoid prisoner, swollen muscles, glowing veins, terrifying monster in the dark.",
+        "intentDistribution": {
+          "attack": 70,
+          "buff": 10,
+          "debuff": 20,
+          "observe": 0
+        },
+        "nextIntent": {
+          "type": "attack",
+          "desc": "疯狂抓挠"
+        },
+        "initialState": {
+          "attribute": {
+            "strength": 8,
+            "agility": 3,
+            "knowledge": 1,
+            "perception": 2
+          },
+          "equipState": {
+            "weapons": [null, null],
+            "armors": [],
+            "accessories": []
+          }
+        }
+      },
+      "enemySpawnCondition": "on_enter",
+      "items": [
+        {
+          "id": "doc_inmate_log",
+          "name": "沾血的铭牌",
+          "desc": "上面刻着：‘为了更伟大的进化。’",
+          "rarity": "common",
+          "type": "document",
+          "documentContent": "他们把我们当成培养皿...海底下潜藏的不是神，是深渊...",
+          "discoveryThreshold": 3,
+          "quantity": 1
+        }
+      ]
+    },
+    "n_08": {
+      "name": "08-公共食堂",
+      "desc": "桌椅被掀翻在地，犹如发生过一场大暴动。全息屏上还循环播放着‘保持镇静’的标语。",
+      "visualPrompt": "Trashed prison cafeteria, overturned metal tables, food trays scattered, holographic 'Keep Calm' sign glaring.",
+      "threatLevel": 4,
+      "childrenIds": [
+        "n_06",
+        "n_09"
+      ]
+    },
+    "n_09": {
+      "name": "09-后厨废墟",
+      "desc": "一片狼藉的厨房，储藏室的门半掩着，里面似乎还有未被污染的补给。",
+      "visualPrompt": "Ruined industrial kitchen, broken refrigerators, cans on the floor, dim lights.",
+      "threatLevel": 2,
+      "childrenIds": [
+        "n_08"
+      ],
+      "items": [
+        {
+          "id": "c_ration_01",
+          "name": "高能量合成口粮",
+          "desc": "口感像塑料，但能有效补充体力与理智。",
+          "rarity": "common",
+          "type": "consumable",
+          "effects": [
+            [ "heal_hp", 5, 0 ],
+            [ "heal_sanity", 10, 0 ]
+          ],
+          "discoveryThreshold": 1,
+          "quantity": 3
+        }
+      ]
+    },
+    "n_10": {
+      "name": "10-公共淋浴间",
+      "desc": "地面全是不明积水，水管破裂，水声掩盖了周围的响动，令人极度不安。",
+      "visualPrompt": "Creepy communal showers, rusted pipes, water spraying everywhere, fog and steam obscuring vision.",
+      "threatLevel": 6,
+      "childrenIds": [
+        "n_06",
+        "n_11"
+      ],
+      "events": [
+        "event_sanity_drain"
+      ]
+    },
+    "n_11": {
+      "name": "11-医疗隔离区大门",
+      "desc": "厚重的生物隔离门将这里与生活区隔开。门上的生物危害标志显得刺眼。",
+      "visualPrompt": "Massive bio-hazard quarantine door, heavy duty yellow and black caution stripes, clinical white lighting.",
+      "threatLevel": 3,
+      "childrenIds": [
+        "n_10",
+        "n_12",
+        "n_14"
+      ]
+    },
+    "n_12": {
+      "name": "12-主手术室",
+      "desc": "手术台上有被粗暴解剖的痕迹，无影灯在半空中摇晃。这里进行过违背伦理的实验。",
+      "visualPrompt": "Gory operating theater, surgical lights swinging, restraints on the table, bloodied surgical tools.",
+      "threatLevel": 5,
+      "childrenIds": [
+        "n_11",
+        "n_13"
+      ]
+    },
+    "n_13": {
+      "name": "13-地下太平间",
+      "desc": "冷柜的温度已经失效。许多抽屉被从内部推开了。",
+      "visualPrompt": "Creepy morgue, metal body drawers, some pulled open from the inside, freezing fog on the floor.",
+      "threatLevel": 9,
+      "childrenIds": [
+        "n_12"
+      ],
+      "events": [
+        "event_jumpscare"
+      ],
+      "items": [
+        {
+          "id": "acc_ring_01",
+          "name": "死者的执念指环",
+          "desc": "从某具尸体上摘下的戒指，带着诡异的冰冷感。",
+          "rarity": "epic",
+          "type": "accessory",
+          "effects": [
+            [ "maxSanity", 20 ],
+            [ "perception", 2 ]
+          ],
+          "discoveryThreshold": 5,
+          "quantity": 1
+        }
+      ]
+    },
+    "n_14": {
+      "name": "14-生物培养室",
+      "desc": "数个巨大的玻璃柱伫立在房间中央，里面装满绿色培养液。有些柱子已经碎裂。",
+      "visualPrompt": "Bio-lab with giant glass incubation tanks filled with glowing green liquid, some shattered with tendrils spilling out.",
+      "threatLevel": 6,
+      "childrenIds": [
+        "n_11",
+        "n_15"
+      ]
+    },
+    "n_15": {
+      "name": "15-核心收容室",
+      "desc": "整个监狱的最机密区域。空气中弥漫着高浓度的灵能辐射。",
+      "visualPrompt": "High-tech containment vault, intensely glowing core, reality distortion effects, heavy blast doors.",
+      "threatLevel": 12,
+      "childrenIds": [
+        "n_14"
+      ],
+      "interactions": [
+        {
+          "desc": "窃取收容物",
+          "requirements": {
+            "time": 0
+          },
+          "results": {
+            "soundEffect": "horror",
+            "narrative": "你触碰了那个不该触碰的东西，警报轰然响起，深渊的目光锁定了你。",
+            "stateChange": {
+              "sanity": -20,
+              "spawnEnemy": [
+                {
+                  "id": "e_abyss_watcher",
+                  "name": "深渊监视者",
+                  "desc": "不可名状的生化聚合体，专门猎杀越界者。",
+                  "visualPrompt": "Eldritch biological monstrosity, multiple eyes, shadow tendrils, horrifying boss creature.",
+                  "intentDistribution": {
+                    "attack": 50,
+                    "buff": 20,
+                    "debuff": 30,
+                    "observe": 0
+                  },
+                  "nextIntent": {
+                    "type": "debuff",
+                    "desc": "精神压迫"
+                  },
+                  "initialState": {
+                    "attribute": {
+                      "strength": 12,
+                      "agility": 6,
+                      "knowledge": 8,
+                      "perception": 10
+                    },
+                    "equipState": {
+                      "weapons": [null, null],
+                      "armors": [],
+                      "accessories": []
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "n_16": {
+      "name": "16-行政大楼电梯间",
+      "desc": "一部还能勉强运作的深井电梯。电梯门上用血写着：‘不要往下看’。",
+      "visualPrompt": "Industrial elevator shaft entrance, blood message on the metal doors, dark abyss below the platform.",
+      "threatLevel": 3,
+      "childrenIds": [
+        "n_03",
+        "n_17",
+        "n_20"
+      ]
+    },
+    "n_17": {
+      "name": "17-机房数据中心",
+      "desc": "服务器还在发出巨大的轰鸣声，这里存储着整个黑牢的运行日志。",
+      "visualPrompt": "Server room with rows of blinking mainframe computers, tangled cables, cool blue LED lighting.",
+      "threatLevel": 4,
+      "childrenIds": [
+        "n_16",
+        "n_18"
+      ],
+      "interactions": [
+        {
+          "desc": "黑入主干网络",
+          "requirements": {
+            "time": 0,
+            "puzzleSolved": {
+              "type": "sequence",
+              "title": "防火墙数字阵列",
+              "desc": "补全安全协议的数字序列以绕过防火墙。",
+              "solution": "34",
+              "data": {
+                "sequence": [ 1, 2, 5, 14, null ],
+                "missingIndex": 4,
+                "options": [ 28, 34, 41, 55 ],
+                "correctOption": 34
+              },
+              "penalty": {
+                "hp": 0,
+                "sanity": 10
+              }
+            }
+          },
+          "results": {
+            "soundEffect": "success",
+            "narrative": "你成功下载了高权限秘钥，可以进入典狱长办公室了。",
+            "unlock": [
+              [
+                "n_18",
+                "开启办公室大门"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    "n_18": {
+      "name": "18-典狱长办公室",
+      "desc": "极其奢华的房间，与外面的破败形成鲜明对比。落地窗外是深不见底的海沟。",
+      "visualPrompt": "Luxurious but ruined warden office, mahogany desk, smashed panoramic window showing deep dark ocean outside.",
+      "threatLevel": 2,
+      "childrenIds": [
+        "n_17",
+        "n_19"
+      ],
+      "items": [
+        {
+          "id": "doc_warden_confession",
+          "name": "加密录音带",
+          "desc": "记录了最后的失控时刻。",
+          "rarity": "rare",
+          "type": "audio",
+          "audioScript": "实验失控了。水压不是问题...问题是‘它们’学会了思考。封闭设施，谁也不准离开。",
+          "discoveryThreshold": 2,
+          "quantity": 1
+        }
+      ]
+    },
+    "n_19": {
+      "name": "19-行政避难所",
+      "desc": "一间坚固的安全屋。你在这里发现了一个幸存者。",
+      "visualPrompt": "Fortified panic room, thick steel walls, emergency supplies piled up, a terrified survivor hiding in the corner.",
+      "childrenIds": [
+        "n_18"
+      ],
+      "items": [
+        {
+          "id": "mat_rare_alloy",
+          "name": "高压深潜合金",
+          "desc": "一块从损坏的深潜舱上剥离的特殊合金板，能够承受难以想象的物理压力。",
+          "rarity": "rare",
+          "type": "material",
+          "discoveryThreshold": 0,
+          "quantity": 1
+        }
+      ],
+      "nodeNpc": {
+        "id": "npc_engineer_01",
+        "name": "首席工程师-科尔",
+        "desc": "处于精神崩溃边缘的工程师，紧紧抱着一把扳手。",
+        "visualPrompt": "A traumatized engineer in a dirty jumpsuit, holding a wrench tightly, paranoid expression.",
+        "gender": "male",
+        "hide": true,
+        "style": "tactical",
+        "initialState": {
+          "level": 3,
+          "xp": 0,
+          "trust": 40,
+          "quest": {},
+          "attribute": {
+            "strength": 4,
+            "agility": 5,
+            "knowledge": 8,
+            "perception": 6
+          },
+          "vital": {
+            "maxHp": 80,
+            "maxSanity": 50,
+            "maxStamina": 100,
+            "maxVigor": 100
+          },
+          "inventory": [],
+          "equipState": {
+            "weapons": [null, null],
+            "armors": [],
+            "accessories": []
+          },
+          "deck": []
+        }
+      }
+    },
+    "n_20": {
+      "name": "20-底层维护竖井",
+      "desc": "深不见底的维修井，空气变得极其炎热，伴随着令人作呕的硫磺味。",
+      "visualPrompt": "Deep vertical maintenance shaft, rusty ladders going down into ominous red fog, extreme heat distortion.",
+      "threatLevel": 6,
+      "childrenIds": [
+        "n_16",
+        "n_21"
+      ]
+    },
+    "n_21": {
+      "name": "21-反应堆冷却池",
+      "desc": "沸腾的冷却水散发着刺目的切伦科夫辐射蓝光。在水底，有什么巨大的东西在游动。",
+      "visualPrompt": "Nuclear reactor cooling pool, intense Cherenkov blue radiation glow, silhouette of a massive creature swimming in the deep water.",
+      "threatLevel": 8,
+      "childrenIds": [
+        "n_20",
+        "n_22"
+      ]
+    },
+    "n_22": {
+      "name": "22-主干动力核心",
+      "desc": "地热提取与聚变核心所在地。整个设施的心脏，也是异变最密集的源头。",
+      "visualPrompt": "Massive fusion reactor core room, arcs of electricity jumping across pylons, flesh and metal fused together on the walls.",
+      "threatLevel": 15,
+      "childrenIds": [
+        "n_21",
+        "n_23"
+      ],
+      "enemySpawnCondition": "on_enter",
+      "specificEnemy": {
+        "id": "e_core_amalgamation",
+        "name": "核心融合体-伽马",
+        "desc": "前任反应堆操作员们的融合产物，具有极高的能量抗性与破坏力。",
+        "visualPrompt": "Biomechanical boss monster fused with nuclear reactor parts, glowing radioactive veins, heavily armored.",
+        "intentDistribution": {
+          "attack": 60,
+          "buff": 30,
+          "debuff": 10,
+          "observe": 0
+        },
+        "nextIntent": {
+          "type": "buff",
+          "desc": "过载充能"
+        },
+        "initialState": {
+          "attribute": {
+            "strength": 15,
+            "agility": 4,
+            "knowledge": 2,
+            "perception": 5
+          },
+          "equipState": {
+            "weapons": [null, null],
+            "armors": [],
+            "accessories": []
+          }
+        }
+      }
+    },
+    "n_23": {
+      "name": "23-撤离逃生甬道",
+      "desc": "反应堆后面的逃生通道。墙壁的结构已经严重变形，仿佛在承受难以想象的水压。",
+      "visualPrompt": "Crumbling escape corridor, metal walls buckling inward under immense ocean pressure, sparking emergency lights.",
+      "threatLevel": 7,
+      "childrenIds": [
+        "n_22",
+        "n_24"
+      ]
+    },
+    "n_24": {
+      "name": "24-维生保障控制站",
+      "desc": "启动逃生舱的最后一道控制台。倒计时正在闪烁，系统随时可能崩溃。",
+      "visualPrompt": "Life support control station, frantic red countdown timers on monitors, chaotic wires and desperate atmosphere.",
+      "threatLevel": 4,
+      "childrenIds": [
+        "n_23",
+        "n_25"
+      ],
+      "interactions": [
+        {
+          "desc": "强制解锁逃生舱",
+          "requirements": {
+            "time": 0,
+            "puzzleSolved": {
+              "type": "memory",
+              "title": "权限验证码",
+              "desc": "在系统崩溃前记住并输入授权指令。",
+              "solution": "MEMORY_MATCH",
+              "data": {
+                "sequence": ["A", "D", "X", "7", "Omega"],
+                "displayTime": 3000,
+                "inputLength": 5
+              },
+              "penalty": {
+                "hp": 0,
+                "sanity": 15
+              }
+            }
+          },
+          "results": {
+            "soundEffect": "notification",
+            "narrative": "逃生舱的闸门‘咔哒’一声弹开，深海的轰鸣声似乎都在这一刻安静了。",
+            "unlock": [
+              [
+                "n_25",
+                "进入逃生舱"
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    "n_25": {
+      "name": "25-深海弹射逃生舱",
+      "desc": "最后一具完好的逃生舱。当你坐进去时，身后的设施发出了震耳欲聋的撕裂声。",
+      "visualPrompt": "Claustrophobic interior of a deep sea escape pod, single seat, glowing green 'LAUNCH' button, glass porthole showing the dark abyss.",
+      "childrenIds": [
+        "n_24"
+      ],
+      "exits": [
+        {
+          "type": "sanctuary_return",
+          "label": "启动弹射序列",
+        }
+      ]
+    }
+  }
+}

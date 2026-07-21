@@ -1,0 +1,909 @@
+{
+    "id": "fleshmetal_1",
+    "name": "血肉与机械",
+    "visualStyle": "Biomechanic horror, flickering fluorescent lights, rust and dried blood on metallic surfaces, exposed pulsating cables, oppressive and claustrophobic atmosphere",
+    "generatedPlotPoints": [
+        {
+            "id": "pp_fleshmetal_truth",
+            "type": "main",
+            "content": "肉体与机械的完美融合并非人类科技的进化，而是深渊基金会‘阿斯克勒庇俄斯计划’的失控产物——为降临者打造完美躯壳的预演。",
+            "hint": "在数据档案室提取隐藏的蓝图数据，或获取异构样本绝密报告"
+        },
+        {
+            "id": "pp_overseer_fate",
+            "type": "side",
+            "content": "主管似乎在最后时刻意识到了实验的残酷真相并试图逃离，但他真的成功登上了‘方舟’吗？",
+            "hint": "在主管办公室找到被揉碎的方舟票根和未发出的绝望邮件草稿"
+        }
+    ],
+    "initial": {
+        "entrance": "entrance_hall",
+        "dilationFactor": 1.0
+    },
+    "nodes": {
+        "entrance_hall": {
+            "name": "入口大厅",
+            "desc": "冰冷的合金墙壁环绕着这里，一道厚重的金属防爆门在身后伴随刺耳的液压嘶鸣缓缓咬合，彻底切断了退路。空气中弥漫着高浓度医用消毒剂与极度腐败的腥甜血气，强烈的嗅觉冲突令人胃部痉挛。头顶损坏的紧急照明灯以不规则的频率闪烁着猩红光晕，勉强照亮了地板上干涸的、混杂着黑色机油与黄色生物组织液的密集拖拽痕迹。",
+            "visualPrompt": "Closed heavy metal blast door, erratic flashing red emergency lights, dried dark blood and oil trails on cold grated metal floor, claustrophobic shadows.",
+            "threatLevel": 1,
+            "childrenIds": [
+                "reception_desk",
+                "security_post"
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "processing_corridor",
+                    "label": "深入幽暗的处理走廊"
+                }
+            ]
+        },
+        "reception_desk": {
+            "name": "废弃接待台",
+            "desc": "这里曾是深渊基金会外围前台，如今只剩下布满蛛网状裂纹的防弹玻璃和沾满块状黑褐色污渍的惨白台面。倾倒的内网终端屏幕已经完全碎裂，裸露的排线偶尔在空气中爆出幽蓝的静电火花，发出类似节肢动物爬行的嘶嘶声。角落的废墟里堆放着几件已被不明发黄体液浸透的白大褂，而背后的墙面上，有人用指甲和鲜血抠出了扭曲的字样：‘没有方舟’。",
+            "visualPrompt": "Shattered reception desk, bulletproof glass with spiderweb cracks, blood-stained lab coats in dark corner, sparking broken terminal, bloody frantic writing on the wall.",
+            "threatLevel": 0,
+            "items": [
+                {
+                    "id": "medical_log_alpha",
+                    "name": "医疗日志：初始融合",
+                    "desc": "一本沾着血迹与防腐剂的纸质记录本，封皮印有深渊基金会褪色的倒三角标志。",
+                    "type": "document",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "documentContent": "实验记录 FM-01：组织融合度达到73%。基于‘阿斯克勒庇俄斯计划’的指导，排异反应被高频电击强行压制，但实验体的心智似乎被某种集体的低语覆盖了……他们不再因为撕裂皮肉而尖叫，反而开始虔诚地亲吻那些植入体内的冰冷齿轮。红雾浓度正在呈指数级上升。"
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "尝试破解墙壁后方的隐藏保险箱面板",
+                    "requirements": {
+                        "time": 10,
+                        "puzzleSolved": {
+                            "type": "wire",
+                            "title": "短路覆写",
+                            "desc": "你必须强忍恶心，将仍在微微蠕动的生物神经触须与老旧的机械接口正确对接，才能通过生物电荷短路锁死机制。",
+                            "solution": "Red-A, Blue-B, Green-C",
+                            "data": {
+                                "wires": [
+                                    {
+                                        "id": "w1",
+                                        "color": "red",
+                                        "label": "供血纤维"
+                                    },
+                                    {
+                                        "id": "w2",
+                                        "color": "blue",
+                                        "label": "冷却液管"
+                                    },
+                                    {
+                                        "id": "w3",
+                                        "color": "green",
+                                        "label": "神经冲动束"
+                                    }
+                                ],
+                                "ports": [
+                                    {
+                                        "id": "p1",
+                                        "label": "主供电口",
+                                        "correctWireId": "w1"
+                                    },
+                                    {
+                                        "id": "p2",
+                                        "label": "热交换阀",
+                                        "correctWireId": "w2"
+                                    },
+                                    {
+                                        "id": "p3",
+                                        "label": "逻辑处理器",
+                                        "correctWireId": "w3"
+                                    }
+                                ]
+                            },
+                            "hints": [
+                                "红色通常代表生命或能量。",
+                                "蓝色常用于冷却系统。",
+                                "绿色对应数据和逻辑。"
+                            ],
+                            "penalty": {
+                                "hp": -5,
+                                "sanity": -2
+                            }
+                        }
+                    },
+                    "results": {
+                        "soundEffect": "success",
+                        "narrative": "伴随一阵沉闷的机械齿轮脱扣声，保险箱沉重的面板弹开，内部保存着高级权限秘钥和一管未被污染的补给品。",
+                        "unlock": [
+                            [
+                                "overseer_office",
+                                "利用秘钥开启主管办公室门禁"
+                            ]
+                        ],
+                        "stateChange": {
+                            "gain": [
+                                {
+                                    "id": "neural_fluid_vial",
+                                    "name": "神经抑制液",
+                                    "desc": "清理人专用的蓝色生物注射剂，能强行压制突触的异常放电，消除幻听并缝合理智。",
+                                    "type": "consumable",
+                                    "rarity": "rare",
+                                    "effects": [
+                                        [
+                                            "heal_sanity",
+                                            15
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "overseer_office",
+                    "label": "进入主管办公室"
+                }
+            ]
+        },
+        "overseer_office": {
+            "name": "主管办公室",
+            "lock": "门禁面板持续闪烁着致命的红光，系统提示需在接待台获取物理授权秘钥。",
+            "desc": "房间内装潢考究的胡桃木家具与外部的血肉炼狱宛如两个平行空间，但沉寂的空气中同样弥漫着深沉的腐烂气息。名贵的办公桌中央放着一杯咖啡，液面早已结出一层惨白的霉斑；地毯上扔着一张被暴躁揉碎的、带有‘方舟’字样的单程票根。正前方的墙壁上挂着一幅用颜料混合了不明血浆绘制的诡异画作，画面上的红色迷雾仿佛在随着你的目光缓缓流转。",
+            "visualPrompt": "Luxurious mahogany office frozen in time, moldy coffee cup on desk, torn ticket on heavy carpet, deeply unsettling oil painting of moving red mist.",
+            "threatLevel": 1,
+            "items": [
+                {
+                    "id": "foundation_pistol",
+                    "name": "基金会制式手枪",
+                    "desc": "一把采用生物膜识别技术的高级枪械，枪口残留着高能粒子发射后的焦痕，握把底端刻有清理人小队的专属徽记。",
+                    "type": "weapon",
+                    "rarity": "epic",
+                    "weaponType": "firearm",
+                    "rangeDamage": 18,
+                    "maxUses": 12,
+                    "quantity": 1
+                },
+                {
+                    "id": "overseer_confession",
+                    "name": "未发出的邮件草稿",
+                    "desc": "遗留在全息终端机缓存中的底层文字残片。",
+                    "type": "document",
+                    "rarity": "rare",
+                    "documentContent": "【发送失败/网络协议未响应】……我们被彻底抛弃了。高层启动了方舟协议，切断了主干道网络。那些挖出来的外星晶体根本不是用来驱动义体的电池，它们是...某种庞大实体的器官。我们自以为在研究进化，其实是在帮它组装降临的血肉载体。我现在能听见它庞大的身躯在排气系统里摩擦的声音了，上帝啊，原谅我。"
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "reception_desk",
+                    "label": "返回接待台"
+                }
+            ]
+        },
+        "security_post": {
+            "name": "安保岗亭",
+            "desc": "这间狭小的强化防弹室曾经是区域内的安全堡垒。此刻，内墙布满了触目惊心的放射状抓痕，绝大部分监控屏幕已被外力物理砸碎，唯有一台未断电的CRT主显示器发出幽绿且扭曲的光谱。防弹桌面上散落着几枚黄铜弹壳和已经长毛的食物包装。沉闷的空气被浓烈的无烟火药焦糊味、机油味以及人类在极度恐惧下分泌的酸臭汗液彻底填满。",
+            "visualPrompt": "Cramped reinforced security room, deep claw marks on walls, one glowing green CRT monitor emitting distorted light, scattered brass bullet casings.",
+            "threatLevel": 2,
+            "interactions": [
+                {
+                    "desc": "搜查瘫倒在死角、已被开膛破肚的安保队长残骸",
+                    "requirements": {
+                        "time": 10
+                    },
+                    "results": {
+                        "soundEffect": "search",
+                        "narrative": "你戴着战术手套的手艰难地探入被某种锋利金属刃切开的胸腔防弹衣夹层中。在粘稠且冰冷的血肉浆糊里，你摸索到了一张硬质卡片和一枚带有微弱温度的电池。",
+                        "stateChange": {
+                            "gain": [
+                                {
+                                    "id": "access_card_alpha",
+                                    "name": "阿尔法访问卡",
+                                    "desc": "一张用于切断设施深层区域物理锁的授权卡，表面浸染了暗红的血迹与不明生物酸。",
+                                    "type": "material",
+                                    "rarity": "rare"
+                                },
+                                {
+                                    "id": "power_cell_small",
+                                    "name": "微型聚变电池",
+                                    "desc": "通用高能电池标准件，能够有效缓解神经链接系统因算力过载导致的电量衰竭。",
+                                    "type": "consumable",
+                                    "rarity": "common",
+                                    "effects": [
+                                        [
+                                            "restore_battery",
+                                            25
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "desc": "仔细检查那台仍在运作的CRT显示器，试图从扭曲的光谱中解读出有用信息。",
+                    "requirements": {
+                        "time": 5
+                    },
+                    "results": {
+                        "soundEffect": "static",
+                        "narrative": "你调整了显示器的偏转线圈，在一阵剧烈的干扰纹之后，屏幕上断断续续地播出了一段循环录像：一个穿着白大褂的身影在走廊里被无形的力量拖入阴影，只留下一只鞋子。录像的角落，有个被反复圈出的区域ID——‘experimentation_sector’。看来，那里就是一切悲剧的核心。",
+                        "stateChange": {
+                            "sanity": -3
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "entrance_hall",
+                    "label": "返回入口大厅"
+                }
+            ]
+        },
+        "processing_corridor": {
+            "name": "处理走廊",
+            "desc": "这是一条仿佛没有尽头的重工业金属通道。两侧排列着厚重的维护舱门，门缝与液压转轴处正以令人心悸的频率向外渗出粘稠的黑绿色聚合液体。头顶破损的荧光灯管发出尖锐刺耳的高频电磁嗡鸣，在忽明忽暗的频闪中，墙壁大面积的锈蚀斑块看起来就像是正在呼吸的肺叶组织。军靴踩在被黏液覆盖的网格地板上，不断发出令人头皮发麻的吧唧声。",
+            "visualPrompt": "Long claustrophobic metallic corridor, violent flickering fluorescent lights, black and green ooze leaking from heavy mechanical doors, grated metal floor covered in slime.",
+            "threatLevel": 3,
+            "childrenIds": [
+                "storage_room",
+                "data_archive",
+                "waste_disposal"
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "entrance_hall",
+                    "label": "返回大厅"
+                },
+                {
+                    "type": "local",
+                    "targetId": "experimentation_sector",
+                    "label": "推开沉重的防爆门向核心深入"
+                }
+            ],
+            "enemySpawnCondition": "on_search",
+            "specificEnemy": {
+                "id": "corrupted_guard",
+                "name": "异化安保人员",
+                "desc": "一具被底层机械指令反向寄生的尸骸。其暴露出的钛合金骨骼已粗暴地刺穿了腐败的表皮，人类的肉体组织与凯夫拉防弹衣发生了诡异的融合共生。它手中残破的警用电击棍正无规则地喷射着致命的高压电弧。",
+                "visualPrompt": "Horrifying zombie-like security guard, flesh fused seamlessly with kevlar vest, titanium endoskeleton piercing through rotting skin, holding a wildly sparking stun baton.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 12,
+                        "agility": 8,
+                        "knowledge": 3,
+                        "perception": 10
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 60,
+                    "buff": 10,
+                    "debuff": 20,
+                    "observe": 10
+                },
+                "lootTable": [
+                    {
+                        "id": "guard_baton",
+                        "name": "过载电击棍",
+                        "desc": "一把被粗暴改装的钝器，其内置的电容模块已经被破坏，每次挥舞都会带起危险的残余电流。",
+                        "type": "weapon",
+                        "rarity": "common",
+                        "weaponType": "blunt",
+                        "meleeDamage": 8,
+                        "maxUses": 15,
+                        "dropProbability": 0.4
+                    },
+                    {
+                        "id": "kevlar_scrap",
+                        "name": "凯夫拉防弹衣碎片",
+                        "desc": "从异化安保人员身上剥离的防弹材料，虽然沾满了污垢，但仍能为轻型护甲的临时修补提供原料。",
+                        "type": "material",
+                        "rarity": "common",
+                        "dropProbability": 0.7
+                    }
+                ]
+            }
+        },
+        "waste_disposal": {
+            "name": "废料排放池",
+            "desc": "你进入了一个下沉式的巨型排污集流中心。中央巨大的废料池内，如同沸腾的岩浆般翻滚着暗红色、带有高腐蚀性的浑浊废液。高浓度的硫磺毒气与生物质极度腐败产生的恶臭瞬间击穿了呼吸器的过滤层，令你的视网膜边缘开始出现扭曲的噪点幻觉。排污沟渠周围堆积着如同山丘般未能熬过排异反应的残肢断臂，隐约间，你甚至能看到几颗安装在残破颅骨里的机械复眼正随着液面的起伏死死地锁定你。",
+            "visualPrompt": "Massive sunken disposal room, central pool of boiling highly corrosive dark red fluid, mountains of severed bio-mechanical limbs on edges, lurking mechanical eyes in the meat.",
+            "threatLevel": 4,
+            "enemySpawnCondition": "on_search",
+            "specificEnemy": {
+                "id": "biomech_hound",
+                "name": "机械融合猎犬",
+                "desc": "一种违背了基础物理与生物法则的拼接合成兽。由多只军犬的残缺躯干通过粗暴的液压轴承强行缝合，其原本的下颚被直接切除，替换成了两把仍在高速运转、因卷入过量血肉而卡顿的电锯。",
+                "visualPrompt": "Grotesque multi-limbed bio-mechanical canine, legs replaced with hydraulic pistons, lower jaw replaced with a dual bloody chainsaw apparatus.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 10,
+                        "agility": 16,
+                        "knowledge": 1,
+                        "perception": 14
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 80,
+                    "buff": 0,
+                    "debuff": 20,
+                    "observe": 0
+                },
+                "lootTable": [
+                    {
+                        "id": "hydraulic_joint",
+                        "name": "伺服液压关节",
+                        "desc": "从怪兽肢体上硬生生扯下的高强度传动模块，具备极佳的工程延展性。",
+                        "type": "material",
+                        "rarity": "rare",
+                        "dropProbability": 0.5
+                    },
+                    {
+                        "id": "chainsaw_blade_fragment",
+                        "name": "链锯刃碎片",
+                        "desc": "从机械猎犬下颚崩裂的锋利金属碎片，可作为锻造或交易的稀有材料。",
+                        "type": "material",
+                        "rarity": "rare",
+                        "dropProbability": 0.3
+                    }
+                ]
+            },
+            "interactions": [
+                {
+                    "desc": "强忍着生理性的反胃，在高温且极具腐蚀性的红浊废料池边缘徒手摸索可用物资。",
+                    "requirements": {
+                        "time": 15
+                    },
+                    "results": {
+                        "soundEffect": "item_pickup",
+                        "narrative": "你将手探入那坨粘稠的腐肉废铁混合物中。强酸液体瞬间溶解了外层防护，烧灼着你的表皮神经。在理智即将因剧烈痛苦而崩溃的瞬间，你从一具残骸的肋骨深处拽出了一个保存完好的高强度密封罐。",
+                        "stateChange": {
+                            "hp": -5,
+                            "sanity": -10,
+                            "gain": [
+                                {
+                                    "id": "pure_adrenaline",
+                                    "name": "纯化肾上腺素",
+                                    "desc": "基金会生化部特供的猛药。注射后将完全屏蔽疼痛并极大激发肌体潜能，代价是严重的细胞透支。",
+                                    "type": "consumable",
+                                    "rarity": "epic",
+                                    "effects": [
+                                        [
+                                            "heal_hp",
+                                            30
+                                        ],
+                                        [
+                                            "buff_str",
+                                            5,
+                                            3
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "processing_corridor",
+                    "label": "逃离这处令人作呕的深渊"
+                }
+            ]
+        },
+        "storage_room": {
+            "name": "生化储藏室",
+            "desc": "原本规整的储藏空间已被暴力破坏。成排的高密度合金货架严重变形，无数贴有【模因危害】模糊标签的加固生化容器坠落在地，碎裂的内壁正不断溢出发出荧光辐射的绿色胶状物。沉闷的空气仿佛凝固一般，腐败血液发酵的恶臭与高浓度臭氧混杂在一起，挤压着肺部的最后一丝氧气。在房间尽头的垃圾堆中，某台残缺不全的设备正伴随着频率极不稳定的电流噼啪声，徒劳地向外界闪烁着求救的红色信号灯。",
+            "visualPrompt": "Cramped claustrophobic storage, severely buckled metal racks, broken containment units leaking highly radioactive glowing green slime, flashing distress red light in junk pile.",
+            "threatLevel": 2,
+            "items": [
+                {
+                    "id": "damaged_audio_log",
+                    "name": "损坏的音频日志",
+                    "desc": "外壳由于遭受极端物理挤压而严重变形，但其内置的磁晶体核心仍在维持基础读取运转。",
+                    "type": "audio",
+                    "rarity": "epic",
+                    "quantity": 1,
+                    "audioScript": "（极度刺耳的电流杂音穿透鼓膜）……警告……他们以为自己在改造它……（粗重的喘息声）错了！这根本不是手术，这是单向的同化！金属拥有自己的意识，它在骨髓和神经鞘里生根发芽……第二清理人小队已全军覆没……我们带来的防污染面罩全是摆设，它不通过空气传播，它通过——【令人毛骨悚然的骨骼碎裂声，伴随着极不自然的非人类嘶吼，随后录音被暴力切断】"
+                },
+                {
+                    "id": "scrap_metal_pile",
+                    "name": "医用废钢晶体",
+                    "desc": "沾有凝固血渍的特殊记忆合金残片，其微观结构正展现出一种诡异的自我排布倾向。",
+                    "type": "material",
+                    "rarity": "common",
+                    "quantity": 3
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "冒着辐射风险，在破碎的生化容器中收集相对完整的绿色胶状物样本。",
+                    "requirements": {
+                        "time": 5
+                    },
+                    "results": {
+                        "soundEffect": "item_pickup",
+                        "narrative": "你用一块合金碎片小心翼翼地刮取了一些仍在发光的绿色胶状物，并将其密封进一个空的注射器管中。尽管隔着容器，你仍能感受到一种微弱的、不祥的脉动。这东西或许可以作为某种强效催化剂，但使用它需要付出代价。",
+                        "stateChange": {
+                            "sanity": -2,
+                            "gain": [
+                                {
+                                    "id": "mutagenic_slime_sample",
+                                    "name": "致突变粘液样本",
+                                    "desc": "从破裂的模因容器中提取的高风险物质。它似乎能极大地刺激细胞再生，但其中的模因污染可能会对使用者的心智造成不可逆的损害。",
+                                    "type": "consumable",
+                                    "rarity": "rare",
+                                    "effects": [
+                                        [
+                                            "heal_hp",
+                                            40
+                                        ],
+                                        [
+                                            "heal_sanity",
+                                            -20
+                                        ]
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "processing_corridor",
+                    "label": "返回处理走廊"
+                }
+            ]
+        },
+        "data_archive": {
+            "name": "数据档案室",
+            "desc": "这里曾是整个设施的数字大脑，现已沦为科技的坟场。无数台烧毁的超级服务器机柜杂乱无章地倾倒交叠，空气中刺鼻的塑料焦糊味与线路板熔毁的臭氧气息令人窒息。废墟深处，几块仍在苟延残喘的显示面板正被如血液般鲜红的底层乱码吞没，持续向外辐射着极高频的尖锐啸叫。地上厚积的积水已变为粘稠的不明浆液，浸泡着堆积如山的纸质加密档案，使其逐渐化为不可名状的腐泥。",
+            "visualPrompt": "Devastated server farm, cascaded racks of burnt mainframes, floor flooded with thick slime and ruined documents, monitors screaming with blood-red corrupted hex codes.",
+            "threatLevel": 4,
+            "items": [
+                {
+                    "id": "hetero_report",
+                    "name": "异构样本绝密报告",
+                    "desc": "被物理手段刻意密封于钛合金圆筒内的高权限内部审计文件，表面刻有‘阅后即焚’的盲文警告。",
+                    "type": "document",
+                    "rarity": "rare",
+                    "quantity": 1,
+                    "discoveryThreshold": 12,
+                    "documentContent": "深度分析已确认：样本的生物基质与外星无机金属结构的纠缠模式违背了热力学第二定律。它不需要能量输入即可实现原子级别的超限自我修复。这不是基因重组，这是物理维度的强行降维打击。当‘肉体与金属’达到完美的均衡稳态时，那个潜伏在深渊底层的庞大意识，将获得物理层面的绝对锚点。"
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "连接个人脑机接口，尝试在底层逻辑风暴中回溯服务器残存的加密扇区数据。",
+                    "requirements": {
+                        "time": 20,
+                        "puzzleSolved": {
+                            "type": "logic",
+                            "title": "异构代码解密",
+                            "desc": "全息控制台上的数据流极度不稳定。防御协议的逻辑门已被外星模因逻辑污染，你必须找到唯一的真实底层回路以避开逆向反噬。",
+                            "solution": "扇区C",
+                            "data": {
+                                "premises": [
+                                    "扇区A的底层日志记录：核心感染源的扩散原点必定在扇区B。",
+                                    "扇区B的底层日志记录：扇区A的所有数据流均已被模因污染篡改，其陈述为谎言。",
+                                    "扇区C的底层日志记录：本扇区的存储空间内不包含任何核心蓝图结构的指针。"
+                                ],
+                                "question": "基于深渊防跌落安全协议：若系统中仅存在一个未被降维逻辑渗透（绝对说真话）的扇区，且同时仅有一个扇区保存了未损坏的核心蓝图片段。那么，蓝图数据究竟储存在哪里？",
+                                "options": [
+                                    "扇区A",
+                                    "扇区B",
+                                    "扇区C"
+                                ],
+                                "correctIndex": 2
+                            },
+                            "hints": [
+                                "如果A是对的，那么B和C中必有一个是错的。",
+                                "假设A在说谎，那么B所说的‘A在说谎’就是真的。",
+                                "C声称自己没有蓝图。如果C是唯一说真话的，那么A和B都在说谎，蓝图就在C。"
+                            ],
+                            "penalty": {
+                                "sanity": -10,
+                                "hp": -5
+                            }
+                        }
+                    },
+                    "results": {
+                        "soundEffect": "success",
+                        "narrative": "一阵能够撕裂耳膜的电子杂音轰鸣后，你突破了模因屏障。被禁忌的知识如同冰冷的钢针般顺着神经链接疯狂刺入你的大脑皮层。你成功剥离出了一份核心工程蓝图。",
+                        "stateChange": {
+                            "gain": [
+                                {
+                                    "id": "blueprint_fleshmetal",
+                                    "name": "血肉机械融合蓝图",
+                                    "desc": "由无数精密机械图纸与令人发指的人体解剖结构图缝合而成的三维数据体。",
+                                    "type": "document",
+                                    "rarity": "epic",
+                                    "documentContent": "【高危协议解密成功】……操作守则第一条：禁止对实验体进行任何形式的化学或物理麻醉。极致的神经痛楚是诱导液态金属矩阵与大脑神经元产生突触共鸣的唯一催化剂。通过维持致死量边缘的交流电刺激与持续制造深层恐惧，生物免疫机制将彻底崩溃并转为狂热的物理接纳……这无关科学，这是迎接神明的献祭仪式。"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "processing_corridor",
+                    "label": "返回处理走廊"
+                }
+            ]
+        },
+        "experimentation_sector": {
+            "name": "核心实验区",
+            "desc": "你踏入了设施的心脏地带。这座宏大的穹顶枢纽如同巨型生物的心室，数条外挂着密密麻麻粗壮线缆的通道呈放射状延伸至不可见的幽深处。穹顶半空中悬吊着数台已停止运作的巨型工业机械臂，它们如同僵死的巨大节肢动物，末端液压钳上还串着已经发黑干瘪的不明脏器。空气被深处传来的极端高温炙烤得产生了视觉畸变，伴随着一阵阵如同巨型机械肺部抽吸的超低频震颤，你的牙床都在产生共振酸痛。",
+            "visualPrompt": "Gigantic underground lab hub, immense dead robotic surgical arms hanging from vaulted ceiling grasping dried flesh, thick pulsating bio-cables lining the walls, heavy heat distortion.",
+            "threatLevel": 6,
+            "childrenIds": [
+                "operating_room",
+                "autopsy_room",
+                "fabrication_bay"
+            ],
+            "interactions": [
+                {
+                    "desc": "在中央控制台的权限槽内插入阿尔法卡，并强行超控主反应堆的门禁序列。",
+                    "requirements": {
+                        "time": 15,
+                        "items": [
+                            "access_card_alpha"
+                        ],
+                        "puzzleSolved": {
+                            "type": "sequence",
+                            "title": "系统重载序列",
+                            "desc": "主屏幕已被血红色的警报占满，系统要求立刻输入底层生物电荷的稳定序列，否则防御机制将引发反向熔毁。",
+                            "solution": "13",
+                            "data": {
+                                "sequence": [
+                                    1,
+                                    1,
+                                    2,
+                                    3,
+                                    5,
+                                    8
+                                ],
+                                "missingIndex": 6,
+                                "options": [
+                                    10,
+                                    11,
+                                    12,
+                                    13
+                                ],
+                                "correctOption": 13
+                            },
+                            "hints": [
+                                "仔细观察数字间的联系。",
+                                "每一个数字可能与前两个数字有关。"
+                            ],
+                            "penalty": {
+                                "hp": -15
+                            }
+                        }
+                    },
+                    "results": {
+                        "soundEffect": "door_open",
+                        "narrative": "一阵剧烈的地动山摇后，前方的超重型防爆门在巨大的液压泄压嘶嘶声中艰难退缩。门缝后，一股几乎能点燃衣物的灼热红光裹挟着金属燃烧的气味瞬间倾泻而出，照亮了那条直通深渊底层的灾变之路。",
+                        "unlock": [
+                            [
+                                "reactor_core",
+                                "顶着致命的高温前往聚变核心"
+                            ]
+                        ]
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "processing_corridor",
+                    "label": "退回处理走廊暂避锋芒"
+                },
+                {
+                    "type": "local",
+                    "targetId": "reactor_core",
+                    "label": "顶着致命的高温前往聚变核心"
+                }
+            ]
+        },
+        "operating_room": {
+            "name": "联合手术室",
+            "desc": "一间被纯粹的暴行摧毁的无菌室。中央矗立的重型合金手术台上，加固束缚带被惊人的物理力量直接崩断，台面浸透了发黑的、具有极强粘性的生物残渣与断裂的光纤线管。顶部的多向无影灯支架遭受过野蛮的撞击，严重扭曲折叠如同一棵枯死的金属畸形树，在通风管道微弱的气流中发出令人心慌的‘嘎吱’摇晃声。极其浓烈的工业福尔马林混杂着生锈铁器的气味，如同利刃般直刺鼻腔黏膜。",
+            "visualPrompt": "Devastated surgical theater, heavy operating table covered in black blood and snapped fiber optics, violently twisted dead surgical overhead lights, bleak clinical aesthetic ruined by violence.",
+            "threatLevel": 5,
+            "items": [
+                {
+                    "id": "surgical_scalpel",
+                    "name": "高周波手术刀",
+                    "desc": "利用微观超声频震荡分离分子键的顶级尖端器械。其刀锋处甚至并未发生卷刃，附带的微型电池仍在维持轻微的震频。",
+                    "type": "weapon",
+                    "rarity": "rare",
+                    "quantity": 1,
+                    "weaponType": "dagger",
+                    "meleeDamage": 15,
+                    "maxUses": 25
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "小心翼翼地检查手术台旁的心电监护仪，它似乎还在记录着什么。",
+                    "requirements": {
+                        "time": 5
+                    },
+                    "results": {
+                        "soundEffect": "heartbeat",
+                        "narrative": "你按下监护仪的重启键，屏幕上并非显示常规的生命体征，而是循环着一行字：‘它让我活着，为了切割。它让我感受一切，为了品尝痛苦。救救我。杀了我。’ 你猛地关掉屏幕，但那绝望的哀求似乎已烙印在你的脑海里。",
+                        "stateChange": {
+                            "sanity": -8
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "experimentation_sector",
+                    "label": "离开手术室"
+                }
+            ]
+        },
+        "autopsy_room": {
+            "name": "异构解剖室",
+            "desc": "惨白的解剖冷榻上，随意地堆放着一团挑战人类理智底线的异端残骸——一半是尚具人形的脊椎与胸腔，另一半则是与其骨骼结构完美生长互锁的液压传动矩阵。残骸的胸骨被极度残忍地向两侧野蛮撕开，暴露出内部早已空空如也的空腔。四周墙角胡乱堆放着数个打着刺眼黄色【生化危害/极危】标识的废料桶，其中不断有黏稠且散发着高辐射荧光绿色的毒液满溢滴落，在死寂的房间内敲击出致命的‘吧嗒吧嗒’声。",
+            "visualPrompt": "Cold autopsy room, horrifying half-human spine fused perfectly with mechanical pistons ripped open on metal slab, biohazard drums overflowing with radioactive glowing green sludge.",
+            "threatLevel": 5,
+            "interactions": [
+                {
+                    "desc": "克服极度的心理抗拒，近距离观察解剖台上那具令人作呕的异构融合骨架。",
+                    "requirements": {
+                        "time": 5
+                    },
+                    "results": {
+                        "soundEffect": "scare",
+                        "narrative": "就在你凝视深渊的瞬间，那具本该死透的残骸内部，猛然爆发出一阵震耳欲聋的高转速齿轮咬合巨响！一只隐藏的金属折叠刺刃如毒蛇般弹射而出，险些将你的颈动脉切断。在你的防弹纤维上留下一道深深的豁口后，它才彻底因最后的一丝储能耗尽而陷入死寂。你的心脏剧烈泵血，冷汗浸透了后背。",
+                        "stateChange": {
+                            "hp": -10,
+                            "sanity": -5
+                        }
+                    }
+                },
+                {
+                    "desc": "用工具撬开残骸胸骨，检查其内部空腔，寻找可能遗漏的线索。",
+                    "requirements": {
+                        "time": 10,
+                        "items": [
+                            "surgical_scalpel"
+                        ]
+                    },
+                    "results": {
+                        "soundEffect": "item_pickup",
+                        "narrative": "高周波手术刀轻松切开坚韧的钙化组织。在空腔的脊柱内壁上，你发现了一行用激光蚀刻的微小文字：‘核心就是心脏。杀死心脏，就能杀死神。’ 这似乎是实验体在彻底丧失自我意识前留下的最后警告。",
+                        "stateChange": {
+                            "sanity": -3
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "experimentation_sector",
+                    "label": "离开解剖室"
+                }
+            ]
+        },
+        "fabrication_bay": {
+            "name": "组织培养车间",
+            "desc": "数道直通天花板的超大型高压透明培养矩阵沿墙壁排开。在极其浑浊、呈现类似死水般灰黄色的‘人造羊水’中，隐约悬浮着大量躯干扭曲、肢体以反关节形态和工业部件强行铆接的畸形肉块。它们甚至还在培养液的对流中缓慢且诡异地痉挛抽搐。工业级强效生化粘合剂的刺鼻化学毒气与有机体腐烂崩解的终极恶臭交织，足以让任何未经训练的大脑瞬间产生排异休克。脚底的金属过滤格栅之下，正持续不断地喷涌出高达上百摄氏度、发出尖锐嘶嘶声的高压白色盲目蒸汽。",
+            "visualPrompt": "Rows of massive floor-to-ceiling glass vats filled with murky yellowish fluid containing twitching violently mutated biomechanical forms, blinding white high-pressure steam venting from floor grates.",
+            "threatLevel": 6,
+            "items": [
+                {
+                    "id": "strange_artifact",
+                    "name": "蠕动的金属结晶",
+                    "desc": "一件完全剥离了常规物质定义的超维产物。似血肉般柔软温热，却又呈现出钛合金的冷冽光泽。握在掌心，你能清晰感受到它正在与你的心脏同步跳动。",
+                    "type": "consumable",
+                    "rarity": "cursed",
+                    "quantity": 1,
+                    "effects": [
+                        [
+                            "heal_hp",
+                            60
+                        ],
+                        [
+                            "heal_sanity",
+                            -30
+                        ],
+                        [
+                            "buff_str",
+                            3,
+                            5
+                        ]
+                    ]
+                }
+            ],
+            "interactions": [
+                {
+                    "desc": "在主控制面板上尝试启动培养罐的紧急排液程序，彻底终结这些畸形造物的痛苦。",
+                    "requirements": {
+                        "time": 10
+                    },
+                    "results": {
+                        "soundEffect": "power_down",
+                        "narrative": "你砸下紧急排液按钮，伴随着一阵令人牙酸的金属摩擦声，所有培养罐内的浑浊液体开始迅速下降。那些悬浮的畸形肉块在失去浮力后，重重地摔在罐底，在一阵剧烈的痉挛后，终于归于永恒的平静。在你终结它们可悲存在的瞬间，你感到一阵冰冷的快意，但也清楚地意识到，这么做只是抹去了冰山一角。",
+                        "stateChange": {
+                            "sanity": -5
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "experimentation_sector",
+                    "label": "离开培养车间"
+                }
+            ]
+        },
+        "reactor_core": {
+            "name": "聚变反应核心",
+            "lock": "通往核心的万吨级防爆门在物理逻辑层被彻底熔断锁死，系统底层强制要求获取阿尔法访问卡并在外围控制台执行生物序列覆写程序方可解锁。",
+            "desc": "你步入了一个足以容纳一座小型摩天大楼的地心洞穴。视野中央，矗立着一颗如同恒星般疯狂脉动着狂暴幽蓝色能量的聚变核心。然而，令人毛骨悚然的是，无数根直径超过一米的鲜活血肉脉管与粗如腰部的工业超导电缆已经如同寄生藤蔓般，将其缠绕成了令人窒息的巨网。核心每跳动一次，周遭的空气就会因为极限的炙烤而发生剧烈的光学扭曲。在这里，呼吸等于吞咽火炭，肺部充满了金属融化与血肉焦枯混合出的末日焦香。那直击灵魂深处的低频轰鸣，正试图将你的内脏震作一团血水。",
+            "visualPrompt": "Colossal cavernous underground abyss, blindingly bright blue fusion core suffocated by intertwined massive fleshy veins and black industrial superconductor cables, extreme heat distortion rendering the air liquid.",
+            "threatLevel": 9,
+            "childrenIds": [
+                "containment_unit"
+            ],
+            "specificEnemy": {
+                "id": "flesh_metal_abomination",
+                "name": "血肉机械憎恶",
+                "desc": "它是阿斯克勒庇俄斯计划结出的终极恶果。一团彻底失去固定形态，由沸腾的生殖血肉、破碎的人类骨架与报废的重工业重型机械杂交融合而成的混沌巨兽。它那由扭曲装甲板构成的主躯干上，密密麻麻地镶嵌着数百只闪烁着极具恶毒红光的电子复眼，锋利的复合节肢如同死神的镰刀。它不仅存在于三维空间，它的移动甚至在小范围内引发了空间的轻微塌缩折叠。",
+                "visualPrompt": "Gigantic chaotic abomination formed of boiling flesh, broken human bones, and twisted heavy industrial machinery, hundreds of malignant glowing red electronic eyes, scythe-like composite limbs, distorting the space around it.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 18,
+                        "agility": 8,
+                        "knowledge": 2,
+                        "perception": 15
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 70,
+                    "buff": 10,
+                    "debuff": 20,
+                    "observe": 0
+                },
+                "lootTable": [
+                    {
+                        "id": "core_control_card",
+                        "name": "核心控制主卡",
+                        "desc": "这张代表绝对权限的物理识别卡，曾经被上一任携带者连同半个手臂一起被怪物吞入腹中。现在它表面挂满了腐蚀性的胃酸与浓黑的机油。",
+                        "type": "material",
+                        "rarity": "epic",
+                        "dropProbability": 1.0
+                    },
+                    {
+                        "id": "abomination_heart",
+                        "name": "憎恶的脉动核心",
+                        "desc": "怪物胸腔内残存的能量核心，仍然散发着不祥的蓝光和热量。它似乎蕴含着强大的力量，但其中也掺杂着怪物无尽的憎恨。",
+                        "type": "accessory",
+                        "rarity": "cursed",
+                        "effects": [
+                            ["strength", 5],
+                            ["maxHp", 20],
+                            ["maxSanity", -30]
+                        ]
+                    }
+                ]
+            },
+            "enemySpawnCondition": "on_enter",
+            "interactions": [
+                {
+                    "desc": "强行靠近仍在喷射致命辐射的主控台，将黏着胃酸的控制主卡刺入读卡凹槽，切断封锁协议。",
+                    "requirements": {
+                        "time": 20,
+                        "items": [
+                            "core_control_card"
+                        ]
+                    },
+                    "results": {
+                        "soundEffect": "power_down",
+                        "narrative": "一阵令整个地下防线随之战栗的巨大闷响后，前方通道内那些原本狂暴抽搐、彻底锁死去路的机械与血肉混合触手仿佛瞬间被抽干了生命，迅速枯萎退缩、散落成灰烬。通往最终维度奇点的物理屏障，崩溃了。",
+                        "unlock": [
+                            [
+                                "exit_portal",
+                                "踏过灰烬，走向深渊的出口"
+                            ]
+                        ]
+                    }
+                },
+                {
+                    "desc": "将高周波手术刀刺入最近的巨型血肉脉管，观察聚变核心的反应。",
+                    "requirements": {
+                        "time": 10,
+                        "items": [
+                            "surgical_scalpel"
+                        ]
+                    },
+                    "results": {
+                        "soundEffect": "combat_crit",
+                        "narrative": "手术刀毫无阻碍地刺入脉管，一股高压的、滚烫的黑色血浆喷溅而出。整个核心的光芒短暂地黯淡了一瞬，缠绕着它的脉管也因为剧痛而猛烈抽搐。缠绕在核心上的血肉似乎松脱了一些，核心的尖啸频率产生了微弱的扰动。你的攻击似乎对这里的‘生态系统’造成了实质性的伤害。",
+                        "stateChange": {
+                            "hp": -15,
+                            "sanity": -10
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "experimentation_sector",
+                    "label": "顶着辐射暂时后撤至实验区"
+                },
+                {
+                    "type": "local",
+                    "targetId": "exit_portal",
+                    "label": "踏过灰烬，走向深渊的出口"
+                }
+            ]
+        },
+        "containment_unit": {
+            "name": "绝对收容室",
+            "desc": "这间狭小囚室的设计初衷就是为了抵御战术核弹的内爆。其暗黑色的贫铀装甲墙壁表面，被某种未知的锐器疯狂刨抓，留下了密密麻麻、深达数寸的沟壑伤痕。地面的正中心，一副被彻底粉碎的超高强度合金镣铐凄惨地散落着，其断裂的卡扣上甚至还残留着因巨大拉扯力而被强行剥离的大块肌腱与皮肉。这里的空气绝对静止，充斥着一种足以让时间冻结的纯粹恐惧，死寂到了极点，以至于你心脏每一次向外泵血的沉闷回声，都宛如雷鸣般在耳畔炸裂。",
+            "visualPrompt": "Pitch-black heavily armored containment cell, incredibly deep frantic scratch marks gouged into depleted uranium walls, shattered super-alloy restraints scattered on the floor dripping with torn tendons, terrifying total silence.",
+            "threatLevel": 8,
+            "items": [
+                {
+                    "id": "diary_page",
+                    "name": "绝望的日记残页",
+                    "desc": "用颤抖且沾满血迹的笔触，记录了某个高等实验体在自我意识彻底湮灭前所经历的最后疯狂。",
+                    "type": "document",
+                    "rarity": "rare",
+                    "quantity": 1,
+                    "documentContent": "……救命……它们在我的内脏里爬行。微型的齿轮和钛合金纤维正在替代我的骨髓生长，它们物理切断了我的痛觉神经传导。我听到了隐藏在机器代码背后的那个庞大神明在呼唤我。清理人的模因过滤器失效了，我不再感受到痛苦，我只觉得这具金属躯壳……如此完美。同化，同化即是永生。"
+                },
+                {
+                    "id": "super_alloy_plating",
+                    "name": "超合金装甲碎块",
+                    "desc": "从被扯碎的拘束镣铐上强行剥离下来的高纯度装甲残片。质量极大，拿在手中有一种极其沉闷的压迫感，将其加装可以提供近乎绝对的物理抗性缓冲。",
+                    "type": "armor",
+                    "rarity": "epic",
+                    "quantity": 1,
+                    "maxUses": 50,
+                    "defense": 15
+                }
+            ]
+        },
+        "exit_portal": {
+            "name": "维度转移门廊",
+            "lock": "巨量的粗大机械触手与仍具有活性的神经肉体管道如同茧一般死死缠绕并封锁了前路。维度转移门的底层物理断路器尚未接通。",
+            "desc": "在空旷且被冰冷黑暗吞噬的长廊尽头，一座刻满了反逻辑的扭曲肉体符文与高精密纳米机械回路的巨型传送门门框静穆矗立。门体表面并未附着任何光源，却自行向外散发着一种连光线都能吞没的幽深蓝紫色辐射。它边缘的空间因为重力引力波的异常正在发生高频的肉眼可见扭曲折射，并伴随着令人牙酸的、类似玻璃在极寒下碎裂的连绵细响。踏入此地，之前所有令人作呕的血腥与腐臭均被一扫而空，取而代之的，是一种不属于人类已知宇宙的绝对冰冷与虚无感。",
+            "visualPrompt": "Colossal impossible mechanical portal gateway towering in total darkness, engraved with writhing fleshy runes and hyper-dense circuitry, emitting a terrifying deep blue-purple radiation, reality bending and fracturing like frozen glass around its edges.",
+            "threatLevel": 0,
+            "exits": [
+                {
+                    "type": "local",
+                    "targetId": "reactor_core",
+                    "label": "回头面对炼狱"
+                },
+                {
+                    "type": "zone_transfer",
+                    "targetId": "NEXT_ZONE",
+                    "label": "跨过事件视界，踏入无尽未知"
+                }
+            ]
+        }
+    }
+}

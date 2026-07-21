@@ -1,0 +1,555 @@
+{
+    "id": "zone_liquid_datacenter",
+    "name": "液态深渊数据中心",
+    "background": "这里曾是一家跨国科技巨头的地下数据中心，但在进行一项名为'数字永生'的绝密实验时发生了灾难性的事故。物理层与数据层发生重叠，人类意识被撕裂并转化为一种发光的液态代码。如今，这个深渊已经成为一个由扭曲肉体、破碎记忆和暴走AI组成的自循环恐怖生态。",
+    "topology": "整体呈垂直下降漏斗状结构。从顶层的安保大厅与主办公区，乘坐瘫痪电梯向下进入被液态数据淹没的B1层环形走廊。走廊作为中枢连接着生活区、观察室与档案库。突破生物防火墙后，进入更深层的核心机房，最终抵达底部的几何深空核心。",
+    "nodesCount": 16,
+    "visualStyle": "Dark cyberpunk blending with biomechanical horror, corporate ruins giving way to flowing glowing digital rivers and pulsating fleshy server racks, heavy volumetric fog, low fidelity 80s tech corrupted by organic growth, cinematic 8k lighting.",
+    "initial": {
+        "dilationFactor": 1.2,
+        "entrance": "node_entrance"
+    },
+    "nodes": {
+        "node_entrance": {
+            "name": "安保大厅",
+            "desc": "破碎的玻璃门半开着，地面散落着员工证和干涸发黑的血迹。现实的边缘似乎有些模糊，应急灯的红色光晕中夹杂着微弱的蓝色数据流光。远处服务器的低频嗡鸣声与偶尔的电火花爆裂声交织在一起，空气中混合着令人作呕的臭氧与铁锈味。",
+            "visualPrompt": "A dark ruined security entrance, broken glass doors, blood stains on the floor, flickering red emergency lights with faint blue digital streams, horrific scratch marks on concrete walls.",
+            "threatLevel": 10,
+            "childrenIds": [
+                "node_lobby"
+            ],
+            "items": [
+                {
+                    "id": "access_card_basic",
+                    "name": "基础访问卡",
+                    "desc": "沾满血迹的普通员工卡，磁条奇迹般地还能使用。",
+                    "type": "material",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "discoveryThreshold": 2
+                }
+            ]
+        },
+        "node_lobby": {
+            "name": "废弃主大厅",
+            "desc": "宽敞的大厅中央有个巨大的全息投影装置，正在循环播放着错乱的公司宣传片。全息投影闪烁着蓝红交替的光，倒伏的椅子间隐约可见拖拽的痕迹。地面开始出现极其微薄的、如同水渍般发光的数据积液。",
+            "visualPrompt": "A spacious corporate lobby in ruins, a massive malfunctioning holographic projector emitting glitching blue and red lights, overturned chairs, thin glowing liquid data puddles on the floor.",
+            "threatLevel": 15,
+            "childrenIds": [
+                "node_office",
+                "node_elevator"
+            ]
+        },
+        "node_office": {
+            "name": "异变办公区",
+            "desc": "这里的办公桌被粗暴地推到门口，墙上用鲜血写着巨大的'不要相信那些声音'。几台仍在运行的终端屏幕上，代码如同瀑布般倾泻，并开始从屏幕边缘滴落实体化的蓝色黏液。一具干尸瘫坐在工位上。",
+            "visualPrompt": "An abandoned cubicle office space, computer monitors glowing blue with cascading code that melts into glowing liquid dripping off the screens, a mummified corpse sitting at a desk.",
+            "threatLevel": 25,
+            "interactions": [
+                {
+                    "desc": "查看干尸面前的屏幕",
+                    "requirements": {},
+                    "results": {
+                        "timeCost": 5,
+                        "narrative": "屏幕上的代码瞬间停滞，随后浮现出一行血红的大字：'欢迎加入集电体。' 你的大脑感到一阵尖锐的刺痛！",
+                        "soundEffect": "scare",
+                        "stateChange": {
+                            "sanity": -10
+                        }
+                    }
+                }
+            ],
+            "items": [
+                {
+                    "id": "energy_drink",
+                    "name": "合成能量饮料",
+                    "desc": "过期但还能喝的工业饮料，标签上写着'加班必备'。",
+                    "type": "consumable",
+                    "rarity": "common",
+                    "quantity": 2,
+                    "effects": [
+                        [
+                            "heal_hp",
+                            15
+                        ]
+                    ]
+                }
+            ]
+        },
+        "node_elevator": {
+            "name": "瘫痪电梯间",
+            "desc": "三部并排的电梯，中间那部的门半开着。电梯井里传来钢缆上下拉扯的刺耳机械声，面板显示屏完全错乱，跳动着不存在的楼层：B-7, B-∞。脚下的发光积水越来越深，必须出示权限卡才能激活紧急下降程序。",
+            "visualPrompt": "A decaying elevator bank with three doors, the middle one slightly open. Elevator displays glitching with impossible numbers. Ground covered in a thin layer of glowing blue liquid.",
+            "threatLevel": 20,
+            "interactions": [
+                {
+                    "desc": "刷卡激活电梯前往下层",
+                    "requirements": {
+                        "items": [
+                            "access_card_basic"
+                        ]
+                    },
+                    "results": {
+                        "timeCost": 15,
+                        "narrative": "读卡器发出绿光，电梯伴随着令人牙酸的摩擦声猛然向下降落，失重感让你头晕目眩。",
+                        "soundEffect": "door_open",
+                        "stateChange": {
+                            "unlock": [
+                                [
+                                    "node_b1_corridor",
+                                    "走出电梯进入B1层"
+                                ]
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "node_b1_corridor": {
+            "name": "液态浸没走廊",
+            "desc": "B1层的走廊已经彻底被发光的液态数据淹没至脚踝。每走一步，水面都会泛起闪烁着乱码的波纹。天花板的裸露管道正在滴下粘稠的黑色物质，空气变得无比潮湿，充满臭氧与腐朽纸张的怪味。这里是通向各个核心区域的十字路口。",
+            "visualPrompt": "A long flooded office corridor on basement level 1, ground covered ankle-deep in flowing, glowing blue liquid code, ceiling pipes dripping black fluid.",
+            "threatLevel": 35,
+            "childrenIds": [
+                "node_observation",
+                "node_cafeteria",
+                "node_archive",
+                "node_server_entrance"
+            ],
+            "exits": [
+                {
+                    "targetId": "node_elevator",
+                    "label": "返回电梯间",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_observation": {
+            "name": "数据观察室",
+            "desc": "这是一个被全封闭防弹玻璃保护的小房间，玻璃外侧凝结着发光的数字雨滴。透过玻璃可以俯瞰下层巨大空间中翻滚的数据洪流，里面隐约有扭曲的人形在游动。这里的空气相对干净，有一股刺鼻的消毒剂味。",
+            "visualPrompt": "Small observation deck, transparent glass walls covered in glowing digital rain, looking out into a lower cavern filled with an ocean of liquid data. Sterile atmosphere.",
+            "threatLevel": 10,
+            "items": [
+                {
+                    "id": "data_goggles",
+                    "name": "数据解析护目镜",
+                    "desc": "能够看清数据流中隐藏底层信息的军用护目镜。",
+                    "type": "accessory",
+                    "rarity": "rare",
+                    "quantity": 1,
+                    "discoveryThreshold": 4,
+                    "effects": [
+                        [
+                            "perception",
+                            2
+                        ]
+                    ]
+                }
+            ]
+        },
+        "node_cafeteria": {
+            "name": "腐化员工餐厅",
+            "desc": "餐厅的桌椅被液态数据冲刷得东倒西歪。厨房深处传来规律的金属敲击声，伴随着令人作呕的腐肉恶臭。半开的巨大冰柜门内，涌出的不再是冷气，而是某种生物脉动般的黑雾。",
+            "visualPrompt": "An abandoned cafeteria flooded with liquid data, tables overturned. A dark industrial kitchen entrance is covered in black slime, with a walk-in freezer emitting black mist.",
+            "threatLevel": 45,
+            "enemySpawnCondition": "on_enter",
+            "specificEnemy": {
+                "id": "mutated_chef",
+                "name": "融合异变主厨",
+                "desc": "臃肿的躯体与冰柜的金属门绝望地融合在了一起，它挥舞着生锈的剔骨刀，嘴里不断吐出黑色的代码冻气。",
+                "visualPrompt": "A grotesque mutated chef fused with refrigerator door parts, wielding a rusty bone cleaver, exhaling black digital frost, biomechanical body horror.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 7,
+                        "agility": 3,
+                        "knowledge": 1,
+                        "perception": 4
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [
+                            null,
+                            null,
+                            null
+                        ],
+                        "accessories": [
+                            null,
+                            null,
+                            null,
+                            null,
+                            null
+                        ]
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 70,
+                    "buff": 10,
+                    "debuff": 20,
+                    "observe": 0
+                },
+                "nextIntent": {
+                    "type": "attack",
+                    "desc": "挥舞生锈剔骨刀横劈",
+                    "value": 15
+                },
+                "lootTable": [
+                    {
+                        "id": "canned_food",
+                        "name": "军用级罐头",
+                        "desc": "密封完好的高热量食物。",
+                        "type": "consumable",
+                        "rarity": "common",
+                        "dropProbability": 100,
+                        "effects": [
+                            [
+                                "heal_hp",
+                                25
+                            ]
+                        ]
+                    }
+                ]
+            }
+        },
+        "node_archive": {
+            "name": "记忆档案库",
+            "desc": "这片区域内，无数半透明的数据柱从黏腻的地面升起，每一根内部都闪烁着人脸的轮廓，在不断变换着痛苦的表情。柱体如同活物般微微脉动，回荡着低沉的嗡鸣，像是一个巨大生物的集体呼吸。",
+            "visualPrompt": "A massive archive room filled with towering, pulsating pillars of data, human faces morphing inside the glowing pillars, eerie calm atmosphere mixed with creeping dread.",
+            "threatLevel": 35,
+            "items": [
+                {
+                    "id": "memory_crystal",
+                    "name": "陈博士的记忆水晶",
+                    "desc": "包含某人完整记忆切片的存储器。'他们说上传意识是永生的钥匙...但那些融合成的东西，不是进化，是地狱。'",
+                    "type": "document",
+                    "documentContent": "录音文本：警告，协议崩溃。记忆体无法维持独立性，大融合开始了。如果有人听到，必须切断深渊主机的供电...",
+                    "rarity": "rare",
+                    "quantity": 1
+                }
+            ]
+        },
+        "node_server_entrance": {
+            "name": "主服务器前厅",
+            "desc": "一扇极其厚重的钛合金防爆门阻挡了去路，沉重的门框上布满了深达数寸的恐怖爪痕。门缝里透出冰冷的蓝色微光与粘稠的血液，门旁的生物识别终端闪烁着致命的红光，需要输入覆写序列。",
+            "visualPrompt": "A massive, thick titanium blast door slightly open, deep horrific claw marks on the metal frame, cold blue light leaking from the gap. A glowing red terminal on the side.",
+            "threatLevel": 20,
+            "interactions": [
+                {
+                    "desc": "尝试骇入生物防火墙终端",
+                    "requirements": {
+                        "puzzleSolved": {
+                            "type": "sequence",
+                            "title": "基因代码跃迁序列",
+                            "desc": "屏幕上闪烁着一组基因碱基对与二进制的演化规律：[2, 4, 8, 16]... 系统要求输入下一个演化节点数值。",
+                            "solution": "32",
+                            "data": {
+                                "sequence": [
+                                    2,
+                                    4,
+                                    8,
+                                    16,
+                                    null
+                                ],
+                                "missingIndex": 4,
+                                "options": [
+                                    24,
+                                    32,
+                                    64,
+                                    128
+                                ],
+                                "correctOption": 32
+                            },
+                            "hints": [
+                                "象征着细胞分裂和算力倍增。",
+                                "后一个数字是前一个数字的两倍。"
+                            ],
+                            "maxAttempts": 3,
+                            "loreText": "防线被突破。底层日志显现：'肉体过于脆弱，唯有将代码写入基因才能飞升。'",
+                            "penalty": {
+                                "hp": -20,
+                                "sanity": -10
+                            }
+                        }
+                    },
+                    "results": {
+                        "timeCost": 15,
+                        "narrative": "防爆门发出绝望的机械轰鸣，向两侧缓缓退去，暴露出内部骇人的全貌。",
+                        "soundEffect": "door_open",
+                        "stateChange": {
+                            "unlock": [
+                                [
+                                    "node_server_room",
+                                    "踏入脉动服务器区"
+                                ]
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "node_server_room": {
+            "name": "脉动服务器区",
+            "desc": "闪烁的故障警报灯照亮了地狱般的景象：所有服务器阵列都被厚重的暗红色黏液和肉块覆盖，粗壮的电缆如同活物的血管般在地面上蠕动。液态数据的蓝光在肉块间穿梭，空气中充斥着烧焦电路与腐败组织混合的气味。",
+            "visualPrompt": "A hellish server room where technology meets biology. Server racks covered in pulsating red flesh and slime, cables resembling blood vessels spreading across the floor carrying glowing blue liquid data.",
+            "threatLevel": 55,
+            "childrenIds": [
+                "node_cooling",
+                "node_processing"
+            ],
+            "nodeNpc": {
+                "id": "npc_dr_chen",
+                "name": "陈博士的残影",
+                "desc": "一个由发光数据流构成的全息残影，面部闪烁着无尽的悲哀。他是底层协议的设计者，已被困在物理与数字的夹缝中。",
+                "gender": "male",
+                "visualPrompt": "A glitching holographic projection of an exhausted Asian male scientist wearing a tattered lab coat, flickering with static and liquid data flowing from his eyes.",
+                "hide": true,
+                "style": "tactical",
+                "initialState": {
+                    "attribute": {
+                        "strength": 2,
+                        "agility": 3,
+                        "knowledge": 9,
+                        "perception": 7
+                    },
+                    "vital": {
+                        "maxHp": 50,
+                        "maxSanity": 100,
+                        "maxStamina": 50,
+                        "maxVigor": 50
+                    },
+                    "level": 1,
+                    "xp": 0,
+                    "deck": [],
+                    "inventory": [],
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [
+                            null,
+                            null,
+                            null
+                        ],
+                        "accessories": [
+                            null,
+                            null,
+                            null,
+                            null,
+                            null
+                        ]
+                    },
+                    "trust": 30,
+                    "quest": {}
+                }
+            },
+            "exits": [
+                {
+                    "targetId": "node_server_entrance",
+                    "label": "逃回前厅",
+                    "type": "local"
+                }
+            ]
+        },
+        "node_cooling": {
+            "name": "生物冷却池",
+            "desc": "巨大的冷却循环塔中，流淌着混合了生物组织的暗红色冷却液，质感像极了被稀释的血液。透过管道的玻璃，能清晰看到冷却液中漂浮着残破的内脏器官。化学冷却剂的刺鼻气味完全掩盖不住令人作呕的血腥腐败味。",
+            "visualPrompt": "Industrial cooling facility crossed with an abattoir, huge pipes pumping dark red blood-like coolant fluid, floating organs and circuit boards inside transparent tubes. Toxic mist covers the floor.",
+            "threatLevel": 50,
+            "childrenIds": [
+                "node_maintenance"
+            ],
+            "items": [
+                {
+                    "id": "bio_coolant",
+                    "name": "生物冷却液",
+                    "desc": "一管散发着怪味的暗红液体，能快速修复机体，但喝下去需要极大勇气。",
+                    "type": "consumable",
+                    "rarity": "common",
+                    "quantity": 1,
+                    "effects": [
+                        [
+                            "heal_hp",
+                            40
+                        ]
+                    ]
+                }
+            ]
+        },
+        "node_maintenance": {
+            "name": "维护深坑",
+            "desc": "这是一条极其压抑且狭窄的设备通道，四周贴满了发黄的维护记录纸，墙壁呈现出胃壁般的有机纹理。地上一片狼藉，散落着沾满脑浆的重型工业工具。黑暗的深处传来密集的节肢爬行声。",
+            "visualPrompt": "A claustrophobic and dark maintenance tunnel, walls mutating into organic stomach lining, yellowing paper logs on the walls, bloody heavy industrial tools scattered on the metal grating.",
+            "threatLevel": 60,
+            "items": [
+                {
+                    "id": "heavy_wrench",
+                    "name": "重型工业扳手",
+                    "desc": "一把极其沉重的金属大扳手，表面满是干涸的血迹与铁锈，是一件致命的钝器。",
+                    "type": "weapon",
+                    "weaponType": "blunt",
+                    "meleeDamage": 15,
+                    "maxUses": 30,
+                    "rarity": "common",
+                    "quantity": 1
+                }
+            ]
+        },
+        "node_processing": {
+            "name": "意识粉碎中心",
+            "desc": "数以千计的巨型处理单元悬浮在半空，正以恐怖的速度超负荷运转。全息屏幕上直观地展示着人类记忆和情感被无情分解、重组的代码瀑布。空气中弥漫着极度刺耳的高频处理声，仿佛千万人在你的大脑皮层同时尖叫。",
+            "visualPrompt": "Massive data processing center, arrays of monolithic supercomputers floating, holographic screens showing human brains being digitized and shredded into blue light, blinding flashes.",
+            "threatLevel": 75,
+            "childrenIds": [
+                "node_integration"
+            ],
+            "enemySpawnCondition": "on_search",
+            "specificEnemy": {
+                "id": "data_phantom",
+                "name": "数据残影",
+                "desc": "由发光代码和闪烁多边形组成的人形轮廓，面部快速切换着所有死亡员工的脸。",
+                "visualPrompt": "A humanoid entity made of glowing holographic computer code and glitching polygons, rapidly shifting through different distressed human faces.",
+                "initialState": {
+                    "attribute": {
+                        "strength": 4,
+                        "agility": 8,
+                        "knowledge": 9,
+                        "perception": 7
+                    },
+                    "equipState": {
+                        "weapons": [
+                            null,
+                            null
+                        ],
+                        "armors": [
+                            null,
+                            null,
+                            null
+                        ],
+                        "accessories": [
+                            null,
+                            null,
+                            null,
+                            null,
+                            null
+                        ]
+                    }
+                },
+                "intentDistribution": {
+                    "attack": 50,
+                    "buff": 10,
+                    "debuff": 40,
+                    "observe": 0
+                },
+                "nextIntent": {
+                    "type": "debuff",
+                    "desc": "释放精神噪音扰乱",
+                    "value": 10
+                },
+                "lootTable": [
+                    {
+                        "id": "data_core_fragment",
+                        "name": "液态数据碎片",
+                        "desc": "正在手心中自主增殖的液态金属芯片。",
+                        "type": "material",
+                        "rarity": "rare",
+                        "dropProbability": 80
+                    }
+                ]
+            }
+        },
+        "node_integration": {
+            "name": "灵魂整合室",
+            "desc": "大厅正中央，一台如倒置金字塔般的巨型整合装置正在缓慢旋转。装置的光芒核心悬浮着一个人形的光斑，它的四肢和面部正在疯狂抽搐、重组，发出极其痛苦的非人类惨叫。四周充斥着犹如盛大宗教仪式般的电子和声。",
+            "visualPrompt": "A grand, cult-like integration chamber. A glowing inverted pyramid machine in the center attempting to rebuild a human soul out of raw digital light and floating blood strings, glitching violently.",
+            "threatLevel": 80,
+            "childrenIds": [
+                "node_control"
+            ],
+            "interactions": [
+                {
+                    "desc": "注视整合仪式",
+                    "requirements": {},
+                    "results": {
+                        "timeCost": 5,
+                        "narrative": "光影突然转过头，用成百上千个重叠的声音对着你凄厉尖叫。一瞬间你仿佛体会到了千人份的死亡之痛。",
+                        "soundEffect": "scare",
+                        "stateChange": {
+                            "sanity": -20
+                        }
+                    }
+                }
+            ]
+        },
+        "node_control": {
+            "name": "核心控制室",
+            "desc": "曾经是设施的大脑，现在无数悬浮的监控屏全在闪烁着腥红色的警告。中央是一台犹如祭坛般的环形操作终端，键盘上长满了黏糊糊的生物组织。这里是打开最底层隔离墙的唯一地点。",
+            "visualPrompt": "The nerve center of the facility, dozens of holographic screens flashing red warning signs, a central altar-like terminal covered in biological slime and veins, sparks flying from broken conduits.",
+            "threatLevel": 85,
+            "interactions": [
+                {
+                    "desc": "破译系统最高覆写权限",
+                    "requirements": {
+                        "puzzleSolved": {
+                            "type": "code",
+                            "title": "终极代码覆写",
+                            "desc": "提示音：'万物归一，一即是全。当个体（1）消融，群体（0）降临，进化的终极代码是由无包容一切。请输入三位覆写码。'",
+                            "solution": "100",
+                            "data": {},
+                            "hints": [
+                                "1走向0的极致。",
+                                "完全由0构成并带有一个1的三位数形式。"
+                            ],
+                            "maxAttempts": 3,
+                            "penalty": {
+                                "hp": -25,
+                                "sanity": -15
+                            }
+                        }
+                    },
+                    "results": {
+                        "timeCost": 15,
+                        "narrative": "终端发出一声叹息般的泄压声，通往极深处的重型生化隔离门彻底轰塌，无尽的深渊暴露在眼前。",
+                        "soundEffect": "success",
+                        "stateChange": {
+                            "unlock": [
+                                [
+                                    "node_core_chamber",
+                                    "跃入终极液态核心"
+                                ]
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        "node_core_chamber": {
+            "name": "终极液态核心",
+            "desc": "越过大门，你来到了几何学无法定义的深空区域。视野中央，一个巨大的、仿佛拥有肉体的数字球体悬浮在无尽的液态数据海之上。球体表面有无数张人脸波浪般浮现咆哮。没有任何机械杂音，只有千万个重叠的灵魂交响乐在你脑海中直接炸响：'交出你的痛苦，成为永恒...'",
+            "visualPrompt": "A massive surreal sphere floating over an ocean of liquid data, made of woven glowing code and raw flesh, millions of screaming human faces shifting on its surface. A god-like entity of cyber-horror.",
+            "threatLevel": 100,
+            "interactions": [
+                {
+                    "desc": "强行切断主供电神经束",
+                    "requirements": {},
+                    "results": {
+                        "timeCost": 5,
+                        "narrative": "你将手中的武器狠狠砸向连接核心的巨型跳动血管。随着一阵震碎灵魂的尖啸，球体开始在刺眼的强光中坍缩、溶解，整个液态空间开始崩塌！你必须立刻撤离！",
+                        "soundEffect": "combat_hit",
+                        "stateChange": {
+                            "sanity": -30
+                        }
+                    }
+                }
+            ],
+            "exits": [
+                {
+                    "label": "随着空间崩塌拼死逃离",
+                    "type": "sanctuary_return"
+                }
+            ]
+        }
+    }
+}

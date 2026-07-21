@@ -1,0 +1,304 @@
+{
+  "id": "mugen_train",
+  "name": "无限列车站",
+  "theme": "Mugen Train",
+  "visualStyle": "废弃的20世纪末高速列车站,工业衰败,幽灵般的蓝光,VHS风格的故障特效",
+  "initial": {
+    "entrance": "station_lobby"
+  },
+  "nodes": [
+    {
+      "id": "station_lobby",
+      "name": "候车大厅",
+      "desc": "宽敞的候车大厅,尘埃弥漫,空气中弥漫着废弃的金属味。所有时钟都停在3:47,指针逆时针微动,令人不安。",
+      "visualSummary": "Vast, desolate train station lobby, broken benches, dim ambient light from high, grimy windows, large clocks frozen at 3:47.",
+      "exits": [
+        {
+          "targetId": "ticket_hall",
+          "label": "前往售票大厅",
+          "type": "local"
+        },
+        {
+          "targetId": "security_office",
+          "label": "前往安保办公室",
+          "type": "local"
+        },
+        {
+          "targetId": "maintenance_access",
+          "label": "下行至维修通道",
+          "type": "local"
+        },
+        {
+          "targetId": "platform_1",
+          "label": "前往1号站台",
+          "type": "local"
+        },
+        {
+          "targetId": "exit_platform_2",
+          "label": "前往2号站台出口",
+          "type": "local"
+        }
+      ],
+      "threatLevel": 20,
+      "items": [
+        {
+          "id": "flashlight_battery",
+          "name": "手电筒电池",
+          "type": "battery",
+          "rarity": "common",
+          "desc": "一块旧的手电筒电池,可能还有一些电量。",
+          "quantity": 1,
+          "effectType": "restore_battery",
+          "effectValue": 25
+        }
+      ]
+    },
+    {
+      "id": "ticket_hall",
+      "name": "售票大厅",
+      "desc": "售票大厅的窗口被砸碎,柜台上散落着泛黄的票根和几张模糊的员工照片。一种被注视的感觉让你心神不宁。",
+      "visualSummary": "Ticket booths with shattered glass, counters covered in old, faded ticket stubs and blurry employee photos. Eerie, silent atmosphere.",
+      "exits": [
+        {
+          "targetId": "station_lobby",
+          "label": "返回候车大厅",
+          "type": "local"
+        }
+      ],
+      "threatLevel": 25,
+      "items": [
+        {
+          "id": "emergency_rations",
+          "name": "应急口粮",
+          "type": "consumable",
+          "rarity": "common",
+          "desc": "一包压缩饼干,能提供一些能量。",
+          "quantity": 1,
+          "effectType": "heal_hp",
+          "effectValue": 10
+        }
+      ]
+    },
+    {
+      "id": "security_office",
+      "name": "安保办公室",
+      "desc": "监控屏幕已成碎片,墙上留有挣扎的痕迹。一个倒地的警卫尸体旁闪烁着手电筒的光芒。Elara低语:'这里发生过搏斗...他们没能撑住。'",
+      "visualSummary": "Small, claustrophobic security office, shattered monitor screens, scratch marks on walls. A dead guard's body on the floor with a flickering flashlight beside it.",
+      "exits": [
+        {
+          "targetId": "station_lobby",
+          "label": "返回候车大厅",
+          "type": "local"
+        },
+        {
+          "targetId": "staff_lounge",
+          "label": "通往员工休息室",
+          "type": "local"
+        }
+      ],
+      "threatLevel": 40,
+      "SpecificEnemy": {
+        "id": "corrupted_guard",
+        "name": "畸变警卫",
+        "desc": "曾经的安保人员,现在只剩下扭曲的躯壳和执行命令的本能。它的眼睛在黑暗中闪烁红光。",
+        "visualPrompt": "A heavily mutated security guard, former human, with distorted limbs and glowing red eyes, wearing tattered security uniform.",
+        "attributes": {
+          "agility": 3,
+          "knowledge": 2,
+          "perception": 4,
+          "strength": 5
+        },
+        "modifiers": ["aggressive", "armored"]
+      },
+      "enemySpawnCondition": "on_enter",
+      "items": [
+        {
+          "id": "security_keycard",
+          "name": "安保钥匙卡",
+          "type": "key",
+          "rarity": "common",
+          "desc": "一张印有列车公司标志的旧钥匙卡。",
+          "quantity": 1
+        },
+        {
+          "id": "melee_baton",
+          "name": "警用伸缩棍",
+          "type": "weapon",
+          "rarity": "common",
+          "desc": "一根金属警棍,虽然有些损坏,但仍能使用。",
+          "quantity": 1,
+          "meleeDamage": 15,
+          "weaponType": "blunt"
+        }
+      ]
+    },
+    {
+      "id": "staff_lounge",
+      "name": "员工休息室",
+      "desc": "员工休息室的桌椅东倒西歪,咖啡机旁散落着一些旧杂志。这个房间看起来相对完好,但你总觉得有什么东西在盯着你。",
+      "visualSummary": "Messy breakroom with overturned tables and chairs, old magazines scattered near a broken coffee machine. Seems untouched but feels watched.",
+      "exits": [
+        {
+          "targetId": "security_office",
+          "label": "返回安保办公室",
+          "type": "local"
+        }
+      ],
+      "threatLevel": 20,
+      "items": [
+        {
+          "id": "pain_pills",
+          "name": "止痛药",
+          "type": "consumable",
+          "rarity": "common",
+          "desc": "一小瓶止痛药,也许能缓解疼痛。",
+          "quantity": 1,
+          "effectType": "heal_hp",
+          "effectValue": 15
+        }
+      ]
+    },
+    {
+      "id": "maintenance_access",
+      "name": "维修通道入口",
+      "desc": "通往地下区域的楼梯间,空气潮湿而冰冷。金属扶手锈迹斑斑,向下延伸。一个老维修工靠在墙边喃喃自语。",
+      "visualSummary": "Dark, damp stairwell leading downwards into a maintenance area, rusty metal railings. An old, distraught mechanic is leaning against the wall.",
+      "exits": [
+        {
+          "targetId": "station_lobby",
+          "label": "返回候车大厅",
+          "type": "local"
+        },
+        {
+          "targetId": "underground_corridor",
+          "label": "下行至地下走廊",
+          "type": "local"
+        }
+      ],
+      "threatLevel": 30,
+      "nodeNpc": {
+        "id": "mechanic_li",
+        "name": "维修工 - 老李",
+        "desc": "一位满脸油污的老维修工,眼神中带着绝望和疲惫。他靠在墙边,喃喃自语。",
+        "visualPrompt": "An old, grizzled male mechanic, covered in grease and grime, leaning against a rusty wall in a dimly lit train maintenance access tunnel. His eyes are wide with despair and fatigue. He wears dirty overalls.",
+        "attributes": {
+          "strength": 4,
+          "agility": 2,
+          "knowledge": 5,
+          "perception": 3
+        },
+        "hp": 40,
+        "maxHp": 60,
+        "gender": "male",
+        "sanity": 30,
+        "trust": 20,
+        "vigor": 50
+      },
+      "unlock": {
+        "desc": "老李似乎知道一些关于列车的秘密,但他的精神状态很差,需要帮助才能交流。",
+        "requiredItemIds": ["healing_salve"],
+        "successNarrative": "你给老李使用了药膏,他颤抖着平静下来,开始讲述一些关于列车和地下控制室的片段信息。",
+        "targets": ["signal_control_room"]
+      },
+      "visualStyle": "Damp, industrial, muted colors, focused on the NPC's despair."
+    },
+    {
+      "id": "underground_corridor",
+      "name": "地下维修走廊",
+      "desc": "地下维修区的主走廊,管道纵横交错,头顶是密集的电缆。远处传来微弱的嗡鸣声,似乎是某种机械在运行。",
+      "visualSummary": "Long, dimly lit industrial corridor with exposed pipes, wires, and machinery overhead. A faint, unsettling hum echoes.",
+      "exits": [
+        {
+          "targetId": "maintenance_access",
+          "label": "上行至维修通道入口",
+          "type": "local"
+        },
+        {
+          "targetId": "signal_control_room",
+          "label": "前往信号控制室",
+          "type": "local"
+        },
+        {
+          "targetId": "storage_depot",
+          "label": "前往储存仓库",
+          "type": "local"
+        },
+        {
+          "targetId": "power_junction",
+          "label": "前往电力接合点",
+          "type": "local"
+        }
+      ],
+      "threatLevel": 30
+    },
+    {
+      "id": "signal_control_room",
+      "name": "信号控制室",
+      "desc": "废弃的信号控制室,操作台上的指示灯大部分熄灭。一块屏幕闪烁着乱码,屏幕下方有一个二进制输入端口。",
+      "visualSummary": "Dilapidated control room with dark panels, one flickering screen displaying garbled binary code. A keypad for input is visible.",
+      "exits": [
+        {
+          "targetId": "underground_corridor",
+          "label": "返回地下维修走廊",
+          "type": "local"
+        }
+      ],
+      "threatLevel": 35,
+      "unlock": {
+        "desc": "主信号控制面板上的紧急解锁终端,需要输入一个二进制代码以恢复系统。",
+        "puzzleData": {
+          "type": "cipher",
+          "title": "紧急信号重校准",
+          "desc": "终端显示一个损坏的二进制序列,需要修复。提示: 序列代表紧急代码 'STOP'。",
+          "solution": "01010011010101000100111101010000",
+          "cipherData": {
+            "cipherText": "01010011 01010100 01001111 01010000",
+            "cipherType": "binary",
+            "plainText": "STOP"
+          },
+          "hints": [
+            "这是一个表示紧急状态的词。",
+            "思考列车最需要什么指令。",
+            "将'停止'转换为二进制。"
+          ],
+          "loreText": "这串二进制代码似乎是列车系统在面临灾难时自动生成的一个紧急指令。",
+          "maxAttempts": 3,
+          "timeLimit": 60
+        },
+        "successNarrative": "信号灯重新亮起,你感觉到某种阻碍被清除了。远处传来沉重的机械声。",
+        "targets": ["central_server_room"]
+      },
+      "visualStyle": "Technological decay, flickering lights, binary code on screen, eerie blue glow."
+    },
+    {
+      "id": "storage_depot",
+      "name": "储存仓库",
+      "desc": "堆满废弃设备的仓库,空气中弥漫着机油和灰尘的味道。一个角落里堆着破旧的补给箱。你感到一阵寒意从背后袭来。",
+      "visualSummary": "Large, dusty warehouse filled with old, broken machinery and stacked crates. A sense of unseen presence.",
+      "exits": [
+        {
+          "targetId": "underground_corridor",
+          "label": "返回地下维修走廊",
+          "type": "local"
+        },
+        {
+          "targetId": "abandoned_tunnel_sec",
+          "label": "穿过废弃隧道",
+          "type": "local",
+          "isHidden": true
+        }
+      ],
+      "threatLevel": 45,
+      "SpecificEnemy": {
+        "id": "maintenance_bot",
+        "name": "失控维修机器人",
+        "desc": "一个曾经用于维护的机器人,现在被腐蚀和扭曲,发出刺耳的摩擦声,攻击一切靠近它的物体。",
+        "visualPrompt": "A rusty, corrupted maintenance robot with sparking wires and sharp, metallic limbs. Its optical sensors glow red.",
+        "attributes": {
+          "agility": 4,
+          "knowledge": 1,
+          "perception": 3,
+          "strength": 4
+        },
+        "modifiers": ["mechanical", "berserk"]
+      
