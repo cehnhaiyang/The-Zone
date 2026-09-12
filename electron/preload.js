@@ -70,16 +70,6 @@ contextBridge.exposeInMainWorld('electron', {
     saveNpcMemoryProfile: (npcName, profileId, dialogue, memory, metaName) => ipcRenderer.invoke('fs:save-npc-memory-profile', { npcName, profileId, dialogue, memory, metaName }),
     loadNpcMemoryProfile: (npcName, profileId) => ipcRenderer.invoke('fs:load-npc-memory-profile', { npcName, profileId }),
     deleteNpcProfile: (npcName, profileId) => ipcRenderer.invoke('fs:delete-npc-profile', { npcName, profileId }),
-
-    // ChromaDB 向量存储
-    chroma: {
-      init: (persistDir) => ipcRenderer.invoke('chroma:init', { persistDir }),
-      store: (collection, ids, embeddings, documents, metadatas) => ipcRenderer.invoke('chroma:store', { collection, ids, embeddings, documents, metadatas }),
-      search: (collection, queryEmbeddings, nResults, where) => ipcRenderer.invoke('chroma:search', { collection, queryEmbeddings, nResults, where }),
-      delete: (collection, ids, where) => ipcRenderer.invoke('chroma:delete', { collection, ids, where }),
-      count: (collection) => ipcRenderer.invoke('chroma:count', { collection }),
-      get: (collection, where) => ipcRenderer.invoke('chroma:get', { collection, where })
-    }
   }
 });
 

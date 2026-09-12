@@ -7,8 +7,8 @@ const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 
-// ==================== ChromaDB 向量存储 ====================
-const { ChromaClient } = require('chromadb');
+// ==================== LanceDB 嵌入式向量存储 ====================
+const lancedb = require('@lancedb/lancedb');
 
 let mainWindow;
 
@@ -121,11 +121,9 @@ ipcMain.handle('fs:save-zone', async (_, { ZoneTemplate, NM, arcId }) => {
       filePath = path.join(episodicDir, `${sanitize(ZoneTemplate.id)}.json`);
       console.log('[fs:save-zone] 单元剧模式，保存路径:', filePath);
     } else {
-      // 兼容旧模式：保存到 maps/zone_{zoneId}.json
-      const mapsDir = path.join(getAppDataPath(), 'maps');
-      await ensureDir(mapsDir);
-      filePath = path.join(mapsDir, `zone_${sanitize(ZoneTemplate.id)}.json`);
-      console.log('[fs:save-zone] 兼容模式（无叙事模式），保存路径:', filePath);
+      // 历史"兼容旧模式"（无叙事模式时写 maps/zone_{id}.json）已移除，
+      // 叙事模式必须显式传入 chain/episodic。
+      throw new Error(`未知叙事模式：${NM}`);
     }
 
     await fs.writeFile(filePath, JSON.stringify(ZoneTemplate, null, 2), 'utf-8');
@@ -693,7 +691,7 @@ ipcMain.handle('fs:list-npc-profiles', async (_, { npcName }) => {
             const parsed = JSON.parse(await fs.readFile(metaPath, 'utf-8'));
             metaName = parsed.name || entry.name;
             lastModified = parsed.lastModified || lastModified;
-          } catch {}
+          } catch { }
         } else {
           const stat = fsSync.statSync(subDir);
           lastModified = stat ? stat.mtimeMs : lastModified;
@@ -772,149 +770,4 @@ ipcMain.handle('fs:delete-npc-profile', async (_, { npcName, profileId }) => {
   } catch (error) {
     return { success: false, error: error.message };
   }
-});
-
-// ==================== ChromaDB 向量存储服务（纯存储层） ====================
-
-const CHROMA_STORE = {
-  client: null,
-  dialogueCollection: null,
-  summaryCollection: null,
-  isInitialized: false,
-  DIALOGUE_COLLECTION: 'dialogues',
-  SUMMARY_COLLECTION: 'summaries',
-
-  // 初始化向量存储
-  async initialize(persistDir) {
-    if (this.isInitialized) return;
-    try {
-      this.client = new ChromaClient({ path: persistDir });
-      try {
-        this.dialogueCollection = await this.client.getCollection({ name: this.DIALOGUE_COLLECTION });
-      } catch {
-        this.dialogueCollection = await this.client.createCollection({
-          name: this.DIALOGUE_COLLECTION,
-          metadata: { description: 'NPC对话历史存储' }
-        });
-      }
-      try {
-        this.summaryCollection = await this.client.getCollection({ name: this.SUMMARY_COLLECTION });
-      } catch {
-        this.summaryCollection = await this.client.createCollection({
-          name: this.SUMMARY_COLLECTION,
-          metadata: { description: '对话语义摘要存储' }
-        });
-      }
-      this.isInitialized = true;
-    } catch (error) {
-      console.error('[ChromaStore] Initialization failed:', error);
-      throw error;
-    }
-  },
-
-  // 存储向量数据
-  async store(collection, ids, embeddings, documents, metadatas) {
-    const coll = collection === 'summaries' ? this.summaryCollection : this.dialogueCollection;
-    if (!coll) throw new Error('Collection not initialized');
-    await coll.add({ ids, embeddings, documents, metadatas });
-  },
-
-  // 向量检索
-  async search(collection, queryEmbeddings, nResults, where) {
-    const coll = collection === 'summaries' ? this.summaryCollection : this.dialogueCollection;
-    if (!coll) throw new Error('Collection not initialized');
-    return coll.query({
-      queryEmbeddings,
-      nResults,
-      where,
-      include: ['documents', 'metadatas', 'distances']
-    });
-  },
-
-  // 删除数据
-  async delete(collection, ids, where) {
-    const coll = collection === 'summaries' ? this.summaryCollection : this.dialogueCollection;
-    if (!coll) return;
-    if (ids && ids.length > 0) {
-      await coll.delete({ ids });
-    } else if (where) {
-      const docs = await coll.get({ where });
-      if (docs.ids.length > 0) {
-        await coll.delete({ ids: docs.ids });
-      }
-    }
-  },
-
-  // 获取数量
-  async count(collection) {
-    const coll = collection === 'summaries' ? this.summaryCollection : this.dialogueCollection;
-    if (!coll) return 0;
-    return coll.count();
-  },
-
-  // 获取集合数据
-  async get(collection, where) {
-    const coll = collection === 'summaries' ? this.summaryCollection : this.dialogueCollection;
-    if (!coll) return { ids: [] };
-    return coll.get({ where });
-  }
-};
-
-// ==================== ChromaDB IPC 处理器 ====================
-
-ipcMain.handle('chroma:init', async (_, { persistDir }) => {
-  try {
-    const chromaDir = persistDir || path.join(getAppDataPath(), 'chroma_data');
-    await ensureDir(chromaDir);
-    await CHROMA_STORE.initialize(chromaDir);
-    return { success: true };
-  } catch (error) {
-    console.error('[ChromaStore] Initialize failed:', error);
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('chroma:store', async (_, { collection, ids, embeddings, documents, metadatas }) => {
-  try {
-    await CHROMA_STORE.store(collection, ids, embeddings, documents, metadatas);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('chroma:search', async (_, { collection, queryEmbeddings, nResults, where }) => {
-  try {
-    const results = await CHROMA_STORE.search(collection, queryEmbeddings, nResults, where);
-    return { success: true, results };
-  } catch (error) {
-    return { success: false, error: error.message, results: null };
-  }
-});
-
-ipcMain.handle('chroma:delete', async (_, { collection, ids, where }) => {
-  try {
-    await CHROMA_STORE.delete(collection, ids, where);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('chroma:count', async (_, { collection }) => {
-  try {
-    const count = await CHROMA_STORE.count(collection);
-    return { success: true, count };
-  } catch (error) {
-    return { success: false, error: error.message, count: 0 };
-  }
-});
-
-ipcMain.handle('chroma:get', async (_, { collection, where }) => {
-  try {
-    const docs = await CHROMA_STORE.get(collection, where);
-    return { success: true, docs };
-  } catch (error) {
-    return { success: false, error: error.message, docs: { ids: [] } };
-  }
-});
+})

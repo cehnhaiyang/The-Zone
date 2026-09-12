@@ -1,14 +1,10 @@
 node_modules
 .agents
 .codebuddy
-
-# 密钥与凭据
-constants/config.ts
-
-# 个人脚本
 scripts
-
-# 生成/运行时数据
-model
-the-zone-data/memory
-the-zone-data/saves
+*.md
+docx
+dist
+dist-electron
+src/constants/config.ts
+config.ts
