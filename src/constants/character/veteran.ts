@@ -1,167 +1,182 @@
-import type { PlayerTemplate, NpcTemplate, QuestTemplate, Tactic } from '../../meta';
+import type { PlayerTemplate } from '../../meta';
 
 /**
- * 老兵 - 进攻型
- *
- * 核心定位：持续输出、前线压制、以战养战
- * 玩法特色：高力量与高生命支撑正面交火，战术偏向削弱敌人和稳定自身
- * 风险收益：精神创伤限制了理智上限，但战场经验让他在高压下仍能保持输出
+ * 老兵 - 进攻型 (Attack)
+ * 核心定位：前线压制、近身处决、以战养战
+ * 玩法特色：凭借强悍体魄与战壕刀法正面攻坚，单手持刺刀触发空手增益，暴击无视常驻护甲防御力
+ * 风险收益：PTSD 严重侵蚀理智上限，但高血量、耐力与肌肉记忆使其在高压交火中屹立不倒
  */
-
-const VETERAN_QUESTS: QuestTemplate[] = [
-    {
-        id: 'veteran_black_rite_aftermath',
-        desc: 'Barnes 需要一份迟到的撤退报告。找到「黑仪式」行动记录仪，确认当年那条命令究竟来自谁。',
-        difficulty: 6,
-        goals: [
-            {
-                id: 'veteran_black_rite_recorder',
-                name: '黑仪式记录仪',
-                desc: '一台外壳被高温熔蚀的战术记录仪，仍残留着断断续续的加密音频。',
-                type: 'data',
-                rarity: 'organized',
-                documentContent:
-                    '……撤退指令被覆盖……目标不是回收，是喂养……重复，不要看它的……',
-                audioScript:
-                    '静电噪声中传来 Barnes 自己的声音，正在下达一条他完全不记得的命令。'
-            }
-        ],
-        rewards: [
-            {
-                id: 'veteran_memory_patch',
-                name: '黑仪式臂章',
-                desc: '被烧焦的部队臂章。它不能原谅你，但能提醒你记住还剩下什么。',
-                type: 'accessory',
-                rarity: 'deep',
-                effects: [
-                    ['maxSanity', 20],
-                    ['strength', 1]
-                ]
-            },
-            {
-                id: 'veteran_field_sedative',
-                name: '军用镇静剂',
-                desc: '标签已经模糊。针剂里剩下的液体还能把尖叫声压下去一会儿。',
-                type: 'consumable',
-                rarity: 'organized',
-                effects: [['heal_sanity', 25]]
-            }
-        ]
-    }
-];
-
-const VETERAN_PLAYER_TACTICS: Tactic[] = [
-    {
-        type: 'attack',
-        id: 'veteran_suppressing_fire',
-        name: '压制火力',
-        desc: '以密集攻击压制单个敌人，破坏其节奏与机动能力。',
-        apCost: 2,
-        tacticEffect: [['enemy', 'agility', -4, 2]]
-    },
-    {
-        type: 'defense',
-        id: 'veteran_combat_hardened',
-        name: '战斗硬化',
-        desc: '依靠战场经验激发肌肉记忆，短暂提升自身力量。',
-        apCost: 1,
-        tacticEffect: [['self', 'strength', 3]]
-    },
-    {
-        type: 'defense',
-        id: 'veteran_black_rite_echo',
-        name: '黑仪式回响',
-        desc: '把那段被挖空的记忆压回身体深处，用麻木换取短暂的稳定。',
-        apCost: 1,
-        tacticEffect: [['self', 'sanity', 8]]
-    }
-];
-
-const VETERAN_COMPANION_TACTICS: Tactic[] = [...VETERAN_PLAYER_TACTICS];
-
 export const PLAYER_VETERAN: PlayerTemplate = {
     id: 'veteran',
     name: 'Barnes',
     gender: 'male',
-    desc: '前特种作战部队中士。那次代号「黑仪式」的任务让你成了小队唯一的幸存者。真相被永远封存在机密档案室里，但死去同袍的面容每夜都准时出现在你的梦里。你知道事实——是你下达了错误的撤退指令，把他们送进了那个「东西」的嘴里。酒精、镇静剂和更多的战斗是唯一能让你暂时逃避的方式。',
-    visualPrompt:
-        'A battle-scarred male soldier in his 40s with a crew cut and a cigarette, wearing patched-up military fatigues reinforced with scrap metal plates, a bandolier of grenades across his chest, deep burn scars on his left arm, thousand-yard stare, holding a heavy combat knife, ruined military outpost backdrop with barbed wire and dim spotlights, survival horror military aesthetic, high detail.',
+    desc: '前特种作战部队突击中士。那次代号「黑仪式」的机密清剿任务中，整个小队被深渊基金会的顾问当成了引诱高维生物的活饵，你是唯一的幸存者。真相被永久埋葬在焦黑的工事里，但战友们被撕碎时的惨叫每夜都在耳边回响。你知道真相——是你下达了撤退至死胡同的指令。浓烈的军用威士忌、粗制止痛药以及永不停歇的刺刀冲锋，是唯一能让你暂时压制神经震颤与梦魇的手段。',
+    visualPrompt: 'A battle-hardened male special forces sergeant in his late 40s with a buzz cut and cold haunted eyes, deep burn and claw scars across his face and left arm, wearing patched-up dirty military fatigues reinforced with scrap metal chest plates, bandolier of tactical gear, holding a lethal trench fighting knife with brass knuckles in his right hand, left hand free, ruined barbed-wire military outpost backdrop, dim flare lighting, grim survival horror aesthetic.',
     initialState: {
         attribute: {
-            strength: 25,    // 较强：近战主力，能够稳定造成压制性伤害
-            agility: 14,     // 普通：不够灵巧，但足以完成战术动作
-            wisdom: 10,      // 普通偏弱：不擅长复杂分析与长期规划
-            perception: 22,  // 较强：战场直觉，能在交火中捕捉威胁
-            spiritual: 0     // 无灵力的普通人
+            strength: 26,     // 较强：千锤百炼的近战技巧与强壮筋骨，稳定造成致残重击，背包空间充裕
+            agility: 16,      // 稳健：扎实的战术步伐与格斗本能，基础 AP 达标 (16/5=3)，支撑冲锋与规避
+            wisdom: 10,       // 普通：不擅长复杂理论或高深谋略，信赖最直观的杀敌经验
+            awareness: 22,    // 较强：战场雷达般的危机嗅觉，能在电光火石间捕捉死角
+            will: 10,         // 成年人坚韧：饱受 PTSD 折磨但拥有铁血军人的凡人神经内核
+            cthulhu: 0        // 纯粹凡人：未受异化共生侵染，坚守旧式人类工造防具与纯粹物理杀伤
         },
         vital: {
-            maxHp: 230,      // 优秀：长期作战留下的强悍体魄
-            maxSanity: 90,   // 低于普通人：PTSD 与负罪感持续侵蚀精神
-            maxStamina: 210, // 优秀：久经沙场，耐力极强
-            maxVigor: 190    // 优秀：高强度军事训练留下的底子
+            maxHp: 230,       // 优秀：长期高强度特战淬炼出的强韧体魄
+            maxSanity: 90,    // 偏低：深陷严重 PTSD 与幸存者负罪感，精神临界点极脆弱
+            maxStamina: 210,  // 优秀：令人惊叹的耐力基数，支撑长因果序列与多次战术重铸
+            maxVigor: 190     // 优秀：铁血老兵的军人底子，在恶劣环境中依然精力充沛
         },
         inventory: [
             {
-                id: 'veteran_trench_knife',
-                name: '战壕刀',
-                desc: '锋利、实用、沾过血。适合近距离放血与压制。',
-                type: 'weapon',
-                rarity: 'standard',
-                weaponType: 'prick',
-                weaponDamageType: 'cold',
-                range: 1,
-                damage: 9,
-                maxUses: 120
-            },
-            {
-                id: 'veteran_tactical_vest',
-                name: '战术背心',
-                desc: '旧防弹背心，内衬被手工加固过，仍能挡住部分冲击。',
-                type: 'armor',
-                rarity: 'organized',
-                partialReduction: 0.12,
-                maxUses: 90
-            },
-            {
                 id: 'veteran_painkillers',
-                name: '止痛药',
-                desc: '只能麻痹肉体。恢复少量 HP。',
+                name: '军规强效止痛剂',
+                desc: '只能麻痹受创的痛觉神经。注射后迅速封锁创口痛感，恢复部分生命。',
                 type: 'consumable',
-                rarity: 'standard',
-                effects: [['heal_hp', 30]]
-            },
-            {
-                id: 'veteran_field_whiskey',
-                name: '军用威士忌',
-                desc: '味道像燃料，但能把颤抖压下去一会儿。',
-                type: 'consumable',
-                rarity: 'standard',
+                grade: 'military',
+                size: [1, 1],
                 effects: [
-                    ['heal_vigor', 25],
-                    ['heal_sanity', 5]
+                    ['hp', 35]
                 ]
             },
             {
-                id: 'veteran_dog_tags',
-                name: '染血军牌',
-                desc: '属于某个士兵的身份牌。名字已经被血迹覆盖。',
-                type: 'material',
-                rarity: 'standard'
+                id: 'veteran_field_whiskey',
+                name: '高浓度战地威士忌',
+                desc: '烈得像航空煤油。几大口灌下去，能压下双手的战栗并略微稳固理智，但会迟滞反应。',
+                type: 'consumable',
+                grade: 'standard',
+                size: [1, 2],
+                effects: [
+                    ['vigor', 30],
+                    ['sanity', 10],
+                    ['agility', -2, 2]
+                ]
+            },
+            {
+                id: 'veteran_smoke_grenade',
+                name: 'M18 战术发烟罐',
+                desc: '特种作战标配高浓度烟雾发生器，制造大范围视线遮蔽，短时间内大幅强化战术机动与闪避身法。',
+                type: 'consumable',
+                grade: 'military',
+                size: [1, 1],
+                effects: [
+                    ['agility', 6, 2]
+                ]
+            },
+            {
+                id: 'field_tourniquet',
+                name: '单手战术止血带',
+                desc: '可在战斗中单手旋紧的机械压迫止血装置，防止穿刺与撕裂导致的失血虚脱。',
+                type: 'consumable',
+                grade: 'standard',
+                size: [1, 1],
+                effects: [
+                    ['hp', 20]
+                ]
             }
         ],
-        uniqueTactic: VETERAN_PLAYER_TACTICS
+        equipState: {
+            weapons: {
+                main: {
+                    instanceId: 'veteran_trench_knife_1',
+                    id: 'veteran_trench_knife',
+                    name: '特战刺杀战壕刀',
+                    desc: '一体成型的重型高碳钢战壕刀，附带指虎护手。单手握持时获得命中与暴击质量提升，暴击时彻底无视目标所有基础护甲免伤。',
+                    type: 'weapon',
+                    grade: 'military',
+                    size: [1, 2],
+                    weaponType: 'prick',
+                    weaponDamageType: 'melee',
+                    range: 1, // 贴身档位：战壕肉搏核心距离（第 1 档）
+                    damage: 10,
+                    crit: {
+                        chance: 0.10,
+                        bonus: 6
+                    },
+                    maxUses: 140,
+                    currentUses: 140
+                },
+                side: null // 留空：完美契合单手刺击特性（另一手为空则获得伤害与命中加成）
+            },
+            armors: [
+                {
+                    instanceId: 'veteran_tactical_vest_1',
+                    id: 'veteran_tactical_vest',
+                    name: '特种突击防弹背心',
+                    desc: '经过战场手工铆接加固的重型凯夫拉背心，虽然布满硝烟与划痕，仍能稳健抵御致命冲击。',
+                    type: 'armor',
+                    grade: 'military',
+                    size: [2, 2],
+                    defense: 0.18,
+                    maxUses: 110,
+                    currentUses: 110
+                }
+            ],
+            accessories: [
+                {
+                    instanceId: 'veteran_squad_dog_tags_1',
+                    id: 'veteran_squad_dog_tags',
+                    name: '刻名染血军牌链',
+                    desc: '属于「黑仪式」行动阵亡全组同袍的身份牌，贴在胸口，冰冷刺骨。它时刻提醒你撤退指令的惨痛代价，以负罪之火锻造近战力量，但持续压迫神经。',
+                    type: 'accessory',
+                    grade: 'military',
+                    size: [1, 1],
+                    effects: [
+                        ['maxHp', 20],
+                        ['maxSanity', -5],
+                        ['strength', 2]
+                    ]
+                }
+            ]
+        },
+        uniqueTactic: [
+            {
+                type: 'A',
+                id: 'veteran_suppressive_strike',
+                name: '压制突刺',
+                desc: '利用全身冲力将刺刀狠狠贯入目标关节枢纽，破坏其机动轴心，大幅削弱其速度与敏捷。',
+                apCost: 2,
+                requireWeapon: 'prick',
+                tacticEffect: [
+                    ['single_enemy', 'speed', -4, 2],
+                    ['single_enemy', 'agility', -4, 2]
+                ]
+            },
+            {
+                type: 'D',
+                id: 'veteran_combat_hardened',
+                name: '战壕硬化',
+                desc: '收紧核心肌群，调动多年在尸山血海中锤炼出的近战肌肉记忆，拔高力量并硬化受击面。',
+                apCost: 1,
+                tacticEffect: [
+                    ['self', 'strength', 4, 2],
+                    ['self', 'defense', 0.08, 2]
+                ]
+            },
+            {
+                type: 'U',
+                id: 'veteran_black_rite_echo',
+                name: '黑仪式回响',
+                desc: '将记忆深处同袍的哀嚎强行锁进心底，以药剂般的麻木与精力透支，换取短时间内的神经冷酷与理智回升。',
+                apCost: 1,
+                tacticEffect: [
+                    ['self', 'sanity', 15, 0],
+                    ['self', 'vigor', -8, 0]
+                ]
+            },
+            {
+                type: 'U',
+                id: 'veteran_adrenaline_surge',
+                name: '肾上腺素过载',
+                desc: '短时间透支交感神经，以体力损耗为代价换取短时间的爆发性速度与杀伤力。',
+                apCost: 1,
+                tacticEffect: [
+                    ['self', 'speed', 3, 1],
+                    ['self', 'damage', 5, 1],
+                    ['self', 'stamina', -12, 0]
+                ]
+            }
+        ]
     },
     style: 'attack'
-};
-
-export const COMPANION_VETERAN: NpcTemplate = {
-    ...PLAYER_VETERAN,
-    id: 'veteran_companion',
-    desc: '前特种作战部队中士，「黑仪式」行动的唯一幸存者。他用酒精、暴力和沉默把自己封起来，但只要战线还没有崩，他就会站在最前面。',
-    initialState: {
-        ...PLAYER_VETERAN.initialState,
-        uniqueTactic: VETERAN_COMPANION_TACTICS,
-        trust: 45,
-        quest: VETERAN_QUESTS
-    }
 };

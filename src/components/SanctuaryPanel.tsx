@@ -1,28 +1,26 @@
 import React, { useState, useEffect, useMemo, memo } from 'react';
-import { PlayerState, Item, ItemInstance, Sanctuary, Node, Entity, NpcTemplate, NpcDynamicState, Facility, Resident, SanctuaryState, SanctuaryEvent, SanctuaryEventChange } from '../meta';
+import { PlayerState, Item, ItemInstance, NecessaryResource, Sanctuary, Node, Entity, CompanionTemplate, CompanionDynamicState, Facility, Resident, SanctuaryEvent, isNodeDangerous } from '../meta';
 import { RARITY_MAP } from '../constants';
+import type { FacilityUpgradePayment, InventoryGridApi } from '../hooks';
 import { AudioService } from '../services';
 
 interface SanctuaryPanelProps {
     player: PlayerState;
     sanctuary: Sanctuary;
     onRest: (hours: number) => void;
-    onUseMedicine?: (amount?: number) => void;
     onOrganizeStorage?: () => void;
     onTransferItem?: (item: ItemInstance, target: 'inventory' | 'storage') => void;
     onDepart: () => void;
     onClose?: () => void;
-    getStorageCapacity?: () => number;
     getCustomRestConfig?: (hours: number) => any;
-    morale?: number;
-    isLowMorale?: boolean;
-    maxStorage: number;
+    /** 储物网格契约：仓库取出时按格数判定背包是否装得下 */
+    inventoryGrid: InventoryGridApi;
     // 设施系统
     facilities?: Facility[];
-    dailyProduction?: Partial<SanctuaryState>;
-    onFacilityUpgrade?: (facilityId: string, scrapCost: number, success?: boolean) => void;
-    /** LLM 裁决升级消耗：返回应扣除的废料数（回调内自带降级公式）。 */
-    onFacilityUpgradePriced?: (facilityId: string) => Promise<number>;
+    dailyProduction?: Record<string, number>;
+    onFacilityUpgrade?: (facilityId: string, payment: FacilityUpgradePayment, success?: boolean) => void;
+    /** LLM 裁决升级代价：返回应支付的资源与数量（回调内自带降级兜底）。 */
+    onFacilityUpgradePriced?: (facilityId: string) => Promise<FacilityUpgradePayment>;
     // 居民池
     residents?: Resident[];
     // 事件系统
@@ -40,8 +38,6 @@ interface LayoutNode {
 }
 
 const ICONS = {
-    food: <svg className="w-full h-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>,
-    water: <svg className="w-full h-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg>,
     med: <svg className="w-full h-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>,
     consumable: <svg className="w-full h-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>,
     power: <svg className="w-full h-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>,
@@ -54,6 +50,38 @@ const ICONS = {
     audio: <svg className="w-full h-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg>,
     material: <svg className="w-full h-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"></polygon><line x1="12" y1="22" x2="12" y2="15.5"></line><polyline points="22 8.5 12 15.5 2 8.5"></polyline><polyline points="2 15.5 12 8.5 22 15.5"></polyline><line x1="12" y1="2" x2="12" y2="8.5"></line></svg>,
     default: <svg className="w-full h-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+};
+
+/** 人口卡片的图标：人口是庇护所顶层字段，不属于资源数组。 */
+const POPULATION_ICON =
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>';
+
+/** 读取庇护所顶层数值字段。 */
+const getSanctuaryNumber = (
+    sanctuary: Sanctuary | undefined,
+    field: 'population' | 'erosion'
+): number => (sanctuary ? sanctuary[field] : 0);
+
+/**
+ * 必要资源的卡片呈现。
+ *
+ * 契约中必要资源只有 `food` / `water` 两个数量字段，没有名称与图标，故由视图固定呈现。
+ */
+const NECESSARY_RESOURCE_CARDS: Record<keyof NecessaryResource, { label: string; icon: string }> = {
+    food: {
+        label: '食物',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 8h16l-1.5 12h-13z"></path><path d="M8 8V6a4 4 0 0 1 8 0v2"></path></svg>'
+    },
+    water: {
+        label: '饮水',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3l6 7a7 7 0 1 1-12 0z"></path></svg>'
+    }
+};
+
+/** 取资源显示名：必要资源取视图标签，独特资源取自身声明，未知键退回键名。 */
+const getResourceName = (sanctuary: Sanctuary, key: string): string => {
+    if (key === 'food' || key === 'water') return NECESSARY_RESOURCE_CARDS[key].label;
+    return sanctuary.uniqueResource.find((entry) => entry.id === key)?.name ?? key;
 };
 
 const QUICK_TIME_BUTTONS = [1, 3, 6, 12, 18, 24];
@@ -150,35 +178,36 @@ const CyberStatBar = memo(({ label, value, max, color, subLabel }: { label: stri
     );
 });
 
-const ResourceCard = ({ label, value, iconType, unit }: { label: string; value: number; iconType: keyof typeof ICONS; unit: string }) => (
+const ResourceCard = ({ label, value, icon }: { label: string; value: number; icon: string }) => (
     <div className="bg-[#08080a]/90 border border-amber-900/30 p-3.5 relative group hover:bg-[#0c0c0f] hover:border-amber-600/60 transition-all tech-clip overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(245,158,11,0.03)_50%,transparent_75%)] bg-[length:250%_250%,100%_100%] animate-[bg-pan_3s_linear_infinite] opacity-0 group-hover:opacity-100"></div>
         <div className="cyber-borders"></div>
 
         <div className="flex justify-between items-start mb-2 relative z-10">
-            <div className="w-5 h-5 text-amber-700/60 group-hover:text-amber-400 transition-colors drop-shadow-[0_0_5px_rgba(245,158,11,0)] group-hover:drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]">
-                {ICONS[iconType] || ICONS.default}
-            </div>
+            <div
+                className="w-5 h-5 text-amber-700/60 group-hover:text-amber-400 transition-colors drop-shadow-[0_0_5px_rgba(245,158,11,0)] group-hover:drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]"
+                // 资源图标由契约以 SVG 标记形式随资源数据下发
+                dangerouslySetInnerHTML={{ __html: icon }}
+            ></div>
             <span className="text-[7px] font-mono text-amber-800 uppercase tracking-tighter group-hover:text-amber-500 transition-colors bg-black/40 px-1 border border-amber-900/30">SYS_{label.slice(0, 3)}</span>
         </div>
 
         <div className="text-2xl font-mono text-amber-400 font-bold tracking-tight relative z-10 drop-shadow-[0_0_3px_rgba(245,158,11,0.3)]">{Math.floor(value)}</div>
 
-        <div className="flex items-center justify-between mt-1.5 relative z-10 border-t border-amber-900/20 pt-1.5">
+        <div className="mt-1.5 relative z-10 border-t border-amber-900/20 pt-1.5">
             <span className="text-[8px] font-mono text-amber-600 uppercase tracking-widest">{label}</span>
-            <span className="text-[7px] font-mono text-gray-600">{unit}</span>
         </div>
     </div>
 );
 
-const ItemRow = memo(({ item, actionLabel, onClick, isStorage }: { item: ItemInstance; actionLabel: string; onClick: () => void; isStorage?: boolean }) => {
+const ItemRow = memo(({ item, actionLabel, onClick }: { item: ItemInstance; actionLabel: string; onClick: () => void }) => {
     const icon = ICONS[item.type as keyof typeof ICONS] || ICONS.default;
 
     return (
         <div
-            data-rarity={item.rarity}
-            data-intensity={RARITY_MAP[item.rarity].intensity}
-            style={{ ...RARITY_MAP[item.rarity].vars } as React.CSSProperties}
+            data-rarity={item.grade}
+            data-intensity={RARITY_MAP[item.grade].intensity}
+            style={{ ...RARITY_MAP[item.grade].vars } as React.CSSProperties}
             className="rarity-cell flex items-center justify-between p-2.5 mb-2 transition-all tech-clip group border-l-2 hover:pl-4 cursor-pointer relative overflow-hidden bg-black/40 hover:bg-[#0a0a0c] border border-transparent"
             onClick={() => { AudioService.playSfx('ui_click'); onClick(); }}
         >
@@ -201,7 +230,7 @@ const ItemRow = memo(({ item, actionLabel, onClick, isStorage }: { item: ItemIns
     );
 });
 
-const CompanionCard = ({ npc }: { npc: Entity<NpcTemplate, NpcDynamicState> }) => {
+const CompanionCard = ({ npc }: { npc: Entity<CompanionTemplate, CompanionDynamicState> }) => {
     const { vital } = npc.static.initialState;
     return (
         <div className="bg-[#050508]/90 border border-amber-900/40 p-5 hover:border-amber-500/60 transition-all group relative overflow-hidden tech-clip-rev shadow-lg hover:shadow-[0_0_20px_rgba(245,158,11,0.15)]">
@@ -226,7 +255,7 @@ const CompanionCard = ({ npc }: { npc: Entity<NpcTemplate, NpcDynamicState> }) =
                 <div className="space-y-3">
                     <CyberStatBar label="Integrity" value={npc.dynamic.hp} max={vital.maxHp} color="text-emerald-400" />
                     <CyberStatBar label="Sanity" value={npc.dynamic.sanity} max={vital.maxSanity} color="text-blue-400" />
-                    <CyberStatBar label="Trust Link" value={npc.dynamic.trust || 0} max={100} color="text-amber-400" />
+                    <CyberStatBar label="Affinity Link" value={npc.dynamic.affinity || 0} max={100} color="text-amber-400" />
                 </div>
             </div>
         </div>
@@ -301,9 +330,12 @@ const RestModeSelector: React.FC<Pick<SanctuaryPanelProps, 'player' | 'onRest' |
                     </div>
 
                     <div className="grid grid-cols-2 gap-x-5 gap-y-2.5 text-[9px] font-mono relative z-10">
-                        <div className="flex justify-between border-b border-gray-900/60 pb-1"><span className="text-gray-500">FOOD_DRAIN:</span><span className="text-amber-500/90 font-bold">-{previewConfig.foodConsumption?.toFixed(1) || 0}</span></div>
-                        <div className="flex justify-between border-b border-gray-900/60 pb-1"><span className="text-gray-500">H2O_DRAIN:</span><span className="text-blue-400/90 font-bold">-{previewConfig.waterConsumption?.toFixed(1) || 0}</span></div>
-                        <div className="flex justify-between border-b border-gray-900/60 pb-1"><span className="text-gray-500">PWR_DRAIN:</span><span className="text-yellow-500/90 font-bold">-{previewConfig.electricityConsumption?.toFixed(1) || 0}</span></div>
+                        {Object.entries(previewConfig.consumption ?? {}).map(([resourceId, amount]) => (
+                            <div key={resourceId} className="flex justify-between border-b border-gray-900/60 pb-1">
+                                <span className="text-gray-500">{getResourceName(player.sanctuary, resourceId)}:</span>
+                                <span className="text-amber-500/90 font-bold">-{Number(amount).toFixed(1)}</span>
+                            </div>
+                        ))}
                         <div className="flex justify-between border-b border-gray-900/60 pb-1"><span className="text-gray-500">NRV_DMG:</span><span className="text-red-500/90 font-bold">-{previewConfig.neuralDamage || 0}</span></div>
                     </div>
 
@@ -337,8 +369,8 @@ const RestModeSelector: React.FC<Pick<SanctuaryPanelProps, 'player' | 'onRest' |
     );
 };
 
-const OverviewSection: React.FC<Pick<SanctuaryPanelProps, 'player' | 'sanctuary' | 'morale' | 'isLowMorale' | 'onRest' | 'onUseMedicine' | 'onDepart' | 'getCustomRestConfig'>> = ({
-    player, sanctuary, morale = 0, isLowMorale = false, onRest, onUseMedicine, onDepart, getCustomRestConfig
+const OverviewSection: React.FC<Pick<SanctuaryPanelProps, 'player' | 'sanctuary' | 'onRest' | 'onDepart' | 'getCustomRestConfig'>> = ({
+    player, sanctuary, onRest, onDepart, getCustomRestConfig
 }) => (
     <div className="flex flex-col h-full overflow-y-auto cyber-scrollbar p-6 lg:p-10 relative">
         <div className="text-center mb-10 relative">
@@ -375,26 +407,37 @@ const OverviewSection: React.FC<Pick<SanctuaryPanelProps, 'player' | 'sanctuary'
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <ResourceCard label="Food" value={sanctuary?.food || 0} iconType="food" unit="Unt" />
-                    <ResourceCard label="Water" value={sanctuary?.water || 0} iconType="water" unit="Ltr" />
-                    <ResourceCard label="Med" value={sanctuary?.medicine || 0} iconType="med" unit="Dos" />
-                    <ResourceCard label="Power" value={sanctuary?.electricity || 0} iconType="power" unit="KW/h" />
-                    <ResourceCard label="Scrap" value={sanctuary?.scraps || 0} iconType="scrap" unit="Pcs" />
-                    <ResourceCard label="Pop" value={sanctuary?.population || 0} iconType="pop" unit="Lvng" />
+                    {(Object.keys(NECESSARY_RESOURCE_CARDS) as Array<keyof NecessaryResource>).map(
+                        (key) => (
+                            <ResourceCard
+                                key={key}
+                                label={NECESSARY_RESOURCE_CARDS[key].label}
+                                value={sanctuary.necessaryResource[key]}
+                                icon={NECESSARY_RESOURCE_CARDS[key].icon}
+                            />
+                        )
+                    )}
+                    {sanctuary.uniqueResource.map((entry) => (
+                        <ResourceCard
+                            key={entry.id}
+                            label={entry.name}
+                            value={entry.value}
+                            icon={entry.icon}
+                        />
+                    ))}
+                    <ResourceCard
+                        label="人口"
+                        value={sanctuary.population}
+                        icon={POPULATION_ICON}
+                    />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="bg-[#050508]/90 border border-amber-900/50 p-5 flex flex-col items-center justify-center relative overflow-hidden group tech-clip shadow-lg">
-                        <div className="absolute inset-0 bg-gradient-to-t from-amber-900/15 to-transparent"></div>
-                        <div className="text-[9px] font-mono text-amber-600/80 uppercase tracking-[0.25em] mb-3 font-bold">Sanctuary Morale</div>
-                        <div className={`text-5xl font-mono font-black tracking-tighter ${isLowMorale ? 'text-red-500 animate-pulse drop-shadow-[0_0_15px_rgba(239,68,68,0.6)]' : 'text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]'}`}>{morale.toFixed(1)}</div>
-                        <div className={`text-[8px] font-mono mt-3 px-2.5 py-1 border ${isLowMorale ? 'text-red-400 bg-red-950/50 border-red-900/50' : 'text-emerald-500 bg-emerald-950/30 border-emerald-900/40'}`}>{isLowMorale ? 'WARN: MORALE_COLLAPSE' : 'SYS_STABLE'}</div>
-                    </div>
                     <div className="bg-[#050508]/90 border border-amber-900/50 p-5 flex flex-col items-center justify-center relative overflow-hidden group tech-clip-rev shadow-lg">
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(147,51,234,0.08)_0%,transparent_70%)]"></div>
                         <div className="text-[9px] font-mono text-amber-600/80 uppercase tracking-[0.25em] mb-3 font-bold">Erosion Index</div>
-                        <div className={`text-5xl font-mono font-black tracking-tighter ${(sanctuary?.erosion || 0) > 50 ? 'text-purple-400 drop-shadow-[0_0_15px_rgba(147,51,234,0.6)]' : 'text-blue-500/80 drop-shadow-[0_0_10px_rgba(59,130,246,0.2)]'}`}>{(sanctuary?.erosion || 0).toFixed(1)}%</div>
-                        <div className={`text-[8px] font-mono mt-3 px-2.5 py-1 border ${(sanctuary?.erosion || 0) > 50 ? 'text-purple-400 bg-purple-950/50 border-purple-900/50' : 'text-blue-500 bg-blue-950/30 border-blue-900/40'}`}>{(sanctuary?.erosion || 0) > 50 ? 'CRIT: CONTAMINATION' : 'MIN_INTERFERENCE'}</div>
+                        <div className={`text-5xl font-mono font-black tracking-tighter ${getSanctuaryNumber(sanctuary, 'erosion') > 50 ? 'text-purple-400 drop-shadow-[0_0_15px_rgba(147,51,234,0.6)]' : 'text-blue-500/80 drop-shadow-[0_0_10px_rgba(59,130,246,0.2)]'}`}>{getSanctuaryNumber(sanctuary, 'erosion').toFixed(1)}%</div>
+                        <div className={`text-[8px] font-mono mt-3 px-2.5 py-1 border ${getSanctuaryNumber(sanctuary, 'erosion') > 50 ? 'text-purple-400 bg-purple-950/50 border-purple-900/50' : 'text-blue-500 bg-blue-950/30 border-blue-900/40'}`}>{getSanctuaryNumber(sanctuary, 'erosion') > 50 ? 'CRIT: CONTAMINATION' : 'MIN_INTERFERENCE'}</div>
                     </div>
                 </div>
             </div>
@@ -410,20 +453,6 @@ const OverviewSection: React.FC<Pick<SanctuaryPanelProps, 'player' | 'sanctuary'
                     </div>
 
                     <RestModeSelector player={player} onRest={onRest} getCustomRestConfig={getCustomRestConfig} />
-
-                    <div className="mt-6 pt-6 border-t border-amber-900/30 relative z-10">
-                        <div className="flex items-center justify-between mb-3.5">
-                            <span className="text-[9px] font-mono text-amber-600 uppercase tracking-widest font-bold">Medical Override</span>
-                            <span className="text-[8px] font-mono text-gray-500 bg-gray-900/80 px-1.5 py-0.5 border border-gray-700">COST: 1 MED</span>
-                        </div>
-                        <button
-                            onClick={() => { AudioService.playSfx('ui_click'); onUseMedicine?.(1); }}
-                            disabled={(sanctuary?.medicine || 0) <= 0}
-                            className={`w-full py-3 flex items-center justify-center gap-2 border font-mono text-[10px] tracking-[0.2em] uppercase transition-all tech-clip font-bold ${(sanctuary?.medicine || 0) > 0 ? 'bg-emerald-950/30 border-emerald-700 text-emerald-400 hover:bg-emerald-900/60 hover:text-emerald-200 shadow-[inset_0_0_15px_rgba(16,185,129,0.15)]' : 'bg-black/60 border-gray-800 text-gray-600 cursor-not-allowed'}`}
-                        >
-                            <span className="w-3 h-3 block">{ICONS.med}</span><span>Emergency Heal</span>
-                        </button>
-                    </div>
 
                     <div className="mt-auto pt-10">
                         <button onClick={() => { AudioService.playSfx('ui_click'); onDepart(); }} className="w-full py-4 bg-amber-600/10 border border-amber-500/70 hover:bg-amber-500 hover:text-black hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] text-amber-400 font-black font-mono tracking-[0.5em] uppercase transition-all group relative overflow-hidden tech-clip">
@@ -441,8 +470,8 @@ const OverviewSection: React.FC<Pick<SanctuaryPanelProps, 'player' | 'sanctuary'
     </div>
 );
 
-const StorageSection: React.FC<Pick<SanctuaryPanelProps, 'player' | 'onTransferItem' | 'onOrganizeStorage' | 'maxStorage'>> = ({
-    player, onTransferItem, onOrganizeStorage, maxStorage
+const StorageSection: React.FC<Pick<SanctuaryPanelProps, 'player' | 'onTransferItem' | 'onOrganizeStorage' | 'inventoryGrid'>> = ({
+    player, onTransferItem, onOrganizeStorage, inventoryGrid
 }) => {
     const [filter, setFilter] = useState('all');
 
@@ -477,7 +506,8 @@ const StorageSection: React.FC<Pick<SanctuaryPanelProps, 'player' | 'onTransferI
                 <div className="flex flex-col items-end gap-3.5">
                     <div className="text-[11px] font-mono text-amber-400 bg-amber-950/40 px-4 py-2 border border-amber-900/60 tech-clip-rev flex items-center gap-2 shadow-[inset_0_0_10px_rgba(245,158,11,0.1)]">
                         <span className="opacity-70">CAPACITY:</span>
-                        <span className="font-bold text-amber-300">{(player.sanctuary.storage || []).length}/{maxStorage}</span>
+                        <span className="font-bold text-amber-300">UNLIMITED</span>
+                        <span className="opacity-70">| STORED: {(player.sanctuary.storage || []).length}</span>
                     </div>
                     {onOrganizeStorage && (
                         <button onClick={() => { AudioService.playSfx('ui_click'); onOrganizeStorage(); }} className="text-[9px] font-mono text-amber-600 hover:text-amber-300 border-b border-dashed border-amber-900/60 hover:border-amber-400 transition-colors uppercase tracking-widest font-bold">
@@ -494,7 +524,7 @@ const StorageSection: React.FC<Pick<SanctuaryPanelProps, 'player' | 'onTransferI
                     <div className="px-5 py-3.5 bg-gray-900/80 border-b border-gray-800 flex justify-between items-center relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-1.5 h-full bg-gray-500"></div>
                         <span className="text-[11px] font-mono text-gray-300 uppercase tracking-[0.25em] font-bold ml-1">Local_Inv</span>
-                        <span className="text-[10px] font-mono text-gray-400 bg-black/80 px-2 py-0.5 border border-gray-700">{(player.dynamic.inventory || []).length}/10</span>
+                        <span className="text-[10px] font-mono text-gray-400 bg-black/80 px-2 py-0.5 border border-gray-700">{inventoryGrid.usedCells}/{inventoryGrid.totalCells} CELLS</span>
                     </div>
                     <div className="flex-1 overflow-y-auto cyber-scrollbar p-4">
                         {filteredInventory.length === 0 ? (
@@ -528,7 +558,7 @@ const StorageSection: React.FC<Pick<SanctuaryPanelProps, 'player' | 'onTransferI
                                 <span className="tracking-widest">VAULT_EMPTY</span>
                             </div>
                         ) : (
-                            filteredStorage.map(item => <ItemRow key={item.instanceId} item={item} actionLabel="<< TAKE" onClick={() => onTransferItem?.(item, 'inventory')} isStorage />)
+                            filteredStorage.map(item => <ItemRow key={item.instanceId} item={item} actionLabel="<< TAKE" onClick={() => onTransferItem?.(item, 'inventory')} />)
                         )}
                     </div>
                 </div>
@@ -563,26 +593,19 @@ const CompanionsSection: React.FC<Pick<SanctuaryPanelProps, 'player'>> = ({ play
 const FacilitiesSection: React.FC<Pick<SanctuaryPanelProps, 'facilities' | 'dailyProduction' | 'onFacilityUpgrade' | 'onFacilityUpgradePriced' | 'sanctuary'>> = ({ facilities, dailyProduction, onFacilityUpgrade, onFacilityUpgradePriced, sanctuary }) => {
     const list = facilities ?? sanctuary?.facility ?? [];
     const production = dailyProduction ?? {};
-    const scraps = sanctuary?.scraps ?? 0;
 
     const [pricingId, setPricingId] = useState<string | null>(null);
-    const [pendingCost, setPendingCost] = useState<{ facilityId: string; cost: number } | null>(null);
+    const [pendingCost, setPendingCost] = useState<{ facilityId: string; payment: FacilityUpgradePayment } | null>(null);
 
-    /** 触发升级：有 LLM 定价能力时先裁决消耗，玩家确认后再扣费。 */
-    const handleUpgradeClick = async (facilityId: string, formulaCost: number) => {
+    /** 触发升级：先由 LLM 裁决代价（服务内部自带引擎兜底），玩家确认后再扣费。 */
+    const handleUpgradeClick = async (facilityId: string) => {
         AudioService.playSfx('ui_click');
-        if (!onFacilityUpgradePriced) {
-            // 无定价能力（未接线）：直接按引擎公式升级。
-            onFacilityUpgrade?.(facilityId, formulaCost);
-            return;
-        }
+        if (!onFacilityUpgradePriced) return;
+
         setPricingId(facilityId);
         setPendingCost(null);
         try {
-            const cost = await onFacilityUpgradePriced(facilityId);
-            setPendingCost({ facilityId, cost });
-        } catch {
-            setPendingCost({ facilityId, cost: formulaCost });
+            setPendingCost({ facilityId, payment: await onFacilityUpgradePriced(facilityId) });
         } finally {
             setPricingId(null);
         }
@@ -615,7 +638,7 @@ const FacilitiesSection: React.FC<Pick<SanctuaryPanelProps, 'facilities' | 'dail
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 relative z-10">
                     {list.map(f => {
-                        const prodEntries = Object.entries(f.production ?? {});
+                        const prodEntries = Object.entries(f.function ?? {});
                         return (
                             <div key={f.id} className="border border-amber-900/40 bg-[#07080a]/90 p-5 tech-clip relative overflow-hidden group">
                                 <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-amber-500/60 to-transparent"></div>
@@ -647,13 +670,12 @@ const FacilitiesSection: React.FC<Pick<SanctuaryPanelProps, 'facilities' | 'dail
                                     ) : pendingCost?.facilityId === f.id ? (
                                         <div className="mt-4 w-full space-y-2">
                                             <p className="text-[9px] font-mono tracking-widest text-amber-400 uppercase text-center border border-amber-800/60 bg-amber-950/30 px-2 py-1.5 tech-clip">
-                                                LLM 裁决：升级消耗 <span className="text-amber-200 font-bold">{pendingCost.cost} SCRAPS</span>
+                                                LLM 裁决：升级消耗 <span className="text-amber-200 font-bold">{pendingCost.payment.amount} {getResourceName(sanctuary, pendingCost.payment.resourceId)}</span>
                                             </p>
                                             <div className="flex gap-2">
                                                 <button
-                                                    onClick={() => { AudioService.playSfx('ui_click'); onFacilityUpgrade(f.id, pendingCost.cost); setPendingCost(null); }}
-                                                    disabled={scraps < pendingCost.cost}
-                                                    className={`flex-1 py-2 text-[9px] font-mono tracking-[0.2em] uppercase font-bold border tech-clip transition-all ${scraps >= pendingCost.cost ? 'bg-amber-950/30 border-amber-700 text-amber-400 hover:bg-amber-900/60 hover:text-amber-200' : 'bg-black/60 border-gray-800 text-gray-600 cursor-not-allowed'}`}
+                                                    onClick={() => { AudioService.playSfx('ui_click'); onFacilityUpgrade(f.id, pendingCost.payment); setPendingCost(null); }}
+                                                    className="flex-1 py-2 text-[9px] font-mono tracking-[0.2em] uppercase font-bold border tech-clip transition-all bg-amber-950/30 border-amber-700 text-amber-400 hover:bg-amber-900/60 hover:text-amber-200"
                                                 >
                                                     确认升级
                                                 </button>
@@ -667,7 +689,7 @@ const FacilitiesSection: React.FC<Pick<SanctuaryPanelProps, 'facilities' | 'dail
                                         </div>
                                     ) : (
                                         <button
-                                            onClick={() => handleUpgradeClick(f.id, 20 + f.level * 15)}
+                                            onClick={() => handleUpgradeClick(f.id)}
                                             className="mt-4 w-full py-2.5 flex items-center justify-center gap-2 border font-mono text-[9px] tracking-[0.2em] uppercase transition-all tech-clip font-bold bg-amber-950/30 border-amber-700 text-amber-400 hover:bg-amber-900/60 hover:text-amber-200 shadow-[inset_0_0_15px_rgba(245,158,11,0.15)]"
                                         >
                                             <span>REQUEST_UPGRADE · LLM_PRICE</span>
@@ -911,7 +933,7 @@ const MapSection: React.FC<Pick<SanctuaryPanelProps, 'sanctuary'>> = ({ sanctuar
                             <h2 className="text-2xl font-black text-amber-500 mb-4 tracking-wider drop-shadow-[0_0_8px_rgba(245,158,11,0.3)]">{selectedNode.name}</h2>
                             <div className="flex flex-wrap gap-2.5">
                                 <span className="text-[9px] font-mono text-gray-400 bg-gray-900/90 px-2.5 py-1 border border-gray-700">UID: {selectedNodeId.slice(-8).toUpperCase()}</span>
-                                {(selectedNode.threatLevel || 0) > 0 ? (
+                                {isNodeDangerous(selectedNode) ? (
                                     <span className="text-[9px] font-mono text-red-400 bg-red-950/50 px-2.5 py-1 border border-red-900/60 shadow-[0_0_10px_rgba(220,38,38,0.2)] font-bold">THREAT_DETECTED</span>
                                 ) : (
                                     <span className="text-[9px] font-mono text-emerald-400 bg-emerald-950/40 px-2.5 py-1 border border-emerald-900/60 shadow-[0_0_10px_rgba(16,185,129,0.15)] font-bold">ZONE_SECURE</span>
@@ -958,7 +980,7 @@ const MapSection: React.FC<Pick<SanctuaryPanelProps, 'sanctuary'>> = ({ sanctuar
 // ==================== 主容器 ====================
 
 const SanctuaryPanel: React.FC<SanctuaryPanelProps> = ({
-    player, sanctuary, onRest, onUseMedicine, onOrganizeStorage, onTransferItem, onDepart, onClose, getStorageCapacity, getCustomRestConfig, morale = 0, isLowMorale = false, maxStorage,
+    player, sanctuary, onRest, onOrganizeStorage, onTransferItem, onDepart, onClose, getCustomRestConfig, inventoryGrid,
     facilities, dailyProduction, onFacilityUpgrade, onFacilityUpgradePriced, residents, sanctuaryEvent, isGeneratingEvent, onRequestEvent, onResolveEvent
 }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'map' | 'storage' | 'companion' | 'facility' | 'resident' | 'event'>('overview');
@@ -1040,9 +1062,9 @@ const SanctuaryPanel: React.FC<SanctuaryPanelProps> = ({
                 <div className="flex-1 overflow-hidden relative bg-[#030304]">
                     <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-amber-600/40 to-transparent z-20"></div>
 
-                    {activeTab === 'overview' && <OverviewSection player={player} sanctuary={sanctuary} morale={morale} isLowMorale={isLowMorale} onRest={onRest} onUseMedicine={onUseMedicine} onDepart={onDepart} getCustomRestConfig={getCustomRestConfig} />}
+                    {activeTab === 'overview' && <OverviewSection player={player} sanctuary={sanctuary} onRest={onRest} onDepart={onDepart} getCustomRestConfig={getCustomRestConfig} />}
                     {activeTab === 'map' && sanctuary && <MapSection sanctuary={sanctuary} />}
-                    {activeTab === 'storage' && <StorageSection player={player} onTransferItem={onTransferItem} onOrganizeStorage={onOrganizeStorage} maxStorage={maxStorage} />}
+                    {activeTab === 'storage' && <StorageSection player={player} onTransferItem={onTransferItem} onOrganizeStorage={onOrganizeStorage} inventoryGrid={inventoryGrid} />}
                     {activeTab === 'companion' && <CompanionsSection player={player} />}
                     {activeTab === 'facility' && <FacilitiesSection facilities={facilities} dailyProduction={dailyProduction} onFacilityUpgrade={onFacilityUpgrade} onFacilityUpgradePriced={onFacilityUpgradePriced} sanctuary={sanctuary} />}
                     {activeTab === 'resident' && <ResidentsSection residents={residents} sanctuary={sanctuary} />}

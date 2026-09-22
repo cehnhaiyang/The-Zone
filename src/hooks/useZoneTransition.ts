@@ -28,7 +28,7 @@ interface UseZoneTransitionParams {
      * 以及"返回庇护所 → SANCTUARY 状态"这一关键分支。
      * 缺失时区域装载只更新 zone/nodeId，location 恒指旧区域且庇护所 UI 无法恢复。
      */
-    updatePlayerStateAndPlot?: (zone: Zone) => void;
+    updatePlayerStateAndPlot?: (zone: Zone, explicitChainIndex?: number) => void;
 }
 
 interface UseZoneTransitionReturn {
@@ -135,15 +135,6 @@ export const useZoneTransition = ({
                         const result = await PersistenceService.loadArcZone(player.activeArc.id, nextIndex);
 
                         if (result.success && result.data) {
-                            // 更新 activeArc 的索引
-                            setPlayer((p: PlayerState) => ({
-                                ...p,
-                                activeArc: p.activeArc ? {
-                                    ...p.activeArc,
-                                    currentIndex: result.currentIndex ?? p.activeArc.currentIndex,
-                                } : undefined
-                            }));
-
                             let newZone = initializeZoneRuntime(result.data as Zone);
 
                             if (PersistenceService.isReady) {
@@ -176,7 +167,7 @@ export const useZoneTransition = ({
 
                             setLoadingStatus("FINALIZING_REALITY_MATRIX...");
                             if (updatePlayerStateAndPlot) {
-                                updatePlayerStateAndPlot(newZone);
+                                updatePlayerStateAndPlot(newZone, result.currentIndex ?? nextIndex);
                             } else {
                                 setCurrentZone(newZone);
                                 setCurrentNodeId(newZone.entrance);

@@ -1,6 +1,9 @@
 import type {
     Dialogue,
     GameStateData,
+    HorrorAesthetic,
+    HorrorAtom,
+    HorrorDomain,
     ItemTemplate,
     MemoryPyramid,
     NarrativeMode,
@@ -42,6 +45,18 @@ export interface NpcProfileMeta {
     turnsCount?: number;
 }
 
+/**
+ * 玩家自建叙事库。
+ *
+ * 与游戏存档解耦：作为全局用户资产持久化，任何存档、任何叙事链都可选用。
+ * 只承载自建内容，预设库始终来自常量，不写入本地文件。
+ */
+export interface NarrativeLibrary {
+    domains: HorrorDomain[];
+    atoms: HorrorAtom[];
+    aesthetics: HorrorAesthetic[];
+}
+
 export type PersistedDialogue = Dialogue | Dialogue[];
 
 export interface NpcMemoryRecord {
@@ -68,8 +83,9 @@ export interface ElectronFS {
     saveZone: (
         zone: ZoneTemplate,
         narrativeMode?: NarrativeMode,
-        arcId?: string
-    ) => Promise<PersistenceIpc>;
+        arcId?: string,
+        index?: number
+    ) => Promise<PersistenceIpc<{ index?: number }>>;
     listZones: () => Promise<PersistenceIpc<{ files: string[] }>>;
     loadRandomZone: () => Promise<PersistenceIpc<{ data?: ZoneTemplate }>>;
 
@@ -189,6 +205,10 @@ export interface ElectronFS {
         PersistenceIpc<{ dialogue?: unknown; memory?: unknown; meta?: NpcProfileMeta }>
     >;
     deleteNpcProfile: (npcName: string, profileId: string) => Promise<PersistenceIpc>;
+
+    // 叙事库
+    saveNarrativeLibrary: (library: NarrativeLibrary) => Promise<PersistenceIpc>;
+    loadNarrativeLibrary: () => Promise<PersistenceIpc<{ data?: NarrativeLibrary }>>;
 }
 
 export interface ElectronBridge {
@@ -333,9 +353,14 @@ export class PersistenceClient {
     async saveZone(
         zone: ZoneTemplate,
         narrativeMode?: NarrativeMode,
-        arcId?: string
-    ): Promise<boolean> {
-        return this.ok(`保存区域 (${zone.id})`, (fs) => fs.saveZone(zone, narrativeMode, arcId));
+        arcId?: string,
+        index?: number
+    ): Promise<PersistenceIpc<{ index?: number }>> {
+        return this.raw(
+            `保存区域 (${zone.id})`,
+            (fs) => fs.saveZone(zone, narrativeMode, arcId, index),
+            { index: undefined }
+        );
     }
 
     async listSavedZones(): Promise<string[]> {
@@ -682,6 +707,22 @@ export class PersistenceClient {
     async deleteNpcProfile(npcName: string, profileId: string): Promise<boolean> {
         return this.ok(`删除NPC人格记忆组 (${npcName}/${profileId})`, (fs) =>
             fs.deleteNpcProfile(npcName, profileId)
+        );
+    }
+
+    //=========================================================================
+    // 叙事库
+    //=========================================================================
+    async saveNarrativeLibrary(library: NarrativeLibrary): Promise<boolean> {
+        return this.ok('保存叙事库', (fs) => fs.saveNarrativeLibrary(library));
+    }
+
+    async loadNarrativeLibrary(): Promise<NarrativeLibrary | null> {
+        return this.pluck(
+            '加载叙事库',
+            (fs) => fs.loadNarrativeLibrary(),
+            'data',
+            null as NarrativeLibrary | null
         );
     }
 }

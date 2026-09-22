@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import {
     GameState,
     addItemToInventory,
+    applySanctuaryResourceDeltas,
     clamp,
     clampDynamicVitals,
     findItemInInventory,
+    findUniqueResource,
+    getSanctuaryResourceValue,
     generateInstanceId,
     removeItemFromInventory,
     safeDeepClone,
@@ -13,17 +16,16 @@ import {
 } from '../meta';
 import type {
     BaseDynamicState,
+    ChoiceImpact,
     Facility,
     FacilityTemplate,
     ItemInstance,
     LogType,
+    NecessaryResource,
     NeuralLinkState,
     PlayerState,
     Resident,
     Sanctuary,
-    SanctuaryEventChange,
-    SanctuaryEvent,
-    SanctuaryState,
     Vital,
     VitalRecord,
     ZoneDate,
@@ -31,21 +33,61 @@ import type {
 import { generateResidentName } from '../constants';
 import { AudioService } from '../services';
 
-const asSanctuaryResourceRecord = (
-    target: Sanctuary
-): Record<keyof SanctuaryState, number> =>
-    target as unknown as Record<keyof SanctuaryState, number>;
+/** 侵蚀度上限：契约中它是庇护所的顶层比例读数。 */
+const SANCTUARY_EROSION_MAX = 100;
+
+/**
+ * 必要资源（food / water）每人每天的消耗量。
+ *
+ * 契约中必要资源只声明数量、不携带 consumptionRate，故日常消耗速率由引擎配平。
+ */
+export const NECESSARY_RESOURCE_CONSUMPTION_PER_DAY: NecessaryResource = {
+    food: 0.2,
+    water: 0.3,
+};
+
+/** 必要资源的显示名：契约未给必要资源名称字段，由引擎固定。 */
+const NECESSARY_RESOURCE_LABELS: Record<keyof NecessaryResource, string> = {
+    food: '食物',
+    water: '饮水',
+};
+
+/**
+ * 结算一组「资源键 → 增量」变化（原地修改）。
+ *
+ * - `food` / `water` 落到 necessaryResource；
+ * - 其余键按 id 落到 uniqueResource，未声明的资源被忽略；
+ * - erosion 是契约中庇护所的顶层字段、不属于资源，故单独取出结算。
+ */
+const applySanctuaryChanges = (
+    sanctuary: Sanctuary,
+    changes: Record<string, number> | undefined
+): void => {
+    if (!changes) return;
+
+    const { erosion, ...resourceDeltas } = changes;
+    applySanctuaryResourceDeltas(sanctuary, resourceDeltas);
+
+    if (erosion !== undefined) {
+        sanctuary.erosion = clamp(
+            safeNumber(sanctuary.erosion) + safeNumber(erosion),
+            0,
+            SANCTUARY_EROSION_MAX
+        );
+    }
+};
 
 /**
  * 汇总单个设施的每日产出增量（含负产出）。
+ *
+ * 键为庇护所资源 id（或顶层字段 erosion）；庇护所未声明的 id 会在结算时被忽略。
  */
 const getFacilityDailyProduction = (
-    facility: Pick<FacilityTemplate, 'production'>
-): Partial<SanctuaryState> => {
-    const result: Partial<SanctuaryState> = {};
-    const source = facility.production ?? {};
-    for (const key of Object.keys(source) as Array<keyof SanctuaryState>) {
-        result[key] = safeNumber(source[key]);
+    facility: Pick<FacilityTemplate, 'function'>
+): Record<string, number> => {
+    const result: Record<string, number> = {};
+    for (const [key, value] of Object.entries(facility.function)) {
+        result[key] = safeNumber(value);
     }
     return result;
 };
@@ -55,12 +97,12 @@ const getFacilityDailyProduction = (
  */
 export const getSanctuaryDailyProduction = (
     sanctuary: Pick<Sanctuary, 'facility'>
-): Partial<SanctuaryState> => {
-    const result: Partial<SanctuaryState> = {};
-    for (const facility of sanctuary.facility ?? []) {
+): Record<string, number> => {
+    const result: Record<string, number> = {};
+    for (const facility of sanctuary.facility) {
         const daily = getFacilityDailyProduction(facility);
-        for (const key of Object.keys(daily) as Array<keyof SanctuaryState>) {
-            result[key] = safeNumber(result[key]) + safeNumber(daily[key]);
+        for (const [key, value] of Object.entries(daily)) {
+            result[key] = safeNumber(result[key]) + safeNumber(value);
         }
     }
     return result;
@@ -69,8 +111,8 @@ export const getSanctuaryDailyProduction = (
 /**
  * 应用设施每日产出（跨 days 天结算）。
  *
- * 产出会真实加减资源；侵蚀度/士气等软性指标被钳制在合法范围内，
- * 硬资源（食物/水/药/电/废料/人口）钳制在 [0, +∞)。
+ * 资源数量钳制在 [0, +∞)，侵蚀度钳制在 [0, 100]。
+ * 庇护所未声明的资源不受影响。
  */
 export const applyFacilityDailyProduction = (
     sanctuary: Sanctuary,
@@ -81,40 +123,47 @@ export const applyFacilityDailyProduction = (
 
     const daily = getSanctuaryDailyProduction(sanctuary);
     const next = safeDeepClone(sanctuary);
-    const record = asSanctuaryResourceRecord(next);
 
-    for (const key of Object.keys(daily) as Array<keyof SanctuaryState>) {
-        const delta = Math.floor(safeNumber(daily[key]) * safeDays);
+    const changes: Record<string, number> = {};
+    for (const [key, value] of Object.entries(daily)) {
+        const delta = Math.floor(safeNumber(value) * safeDays);
         if (delta === 0) continue;
-
-        if (key === 'morale' || key === 'erosion') {
-            record[key] = clamp(safeNumber(record[key]) + delta, 0, 100);
-        } else {
-            record[key] = Math.max(0, safeNumber(record[key]) + delta);
-        }
+        changes[key] = delta;
     }
 
+    applySanctuaryChanges(next, changes);
     return next;
 };
 
 /**
- * 设施升级：消耗 scraps、等级 +1。
+ * 设施升级的支付代价。
  *
- * 升级成本与成败判定由 LLM 决定（见 Facility 注释），
- * 本函数只负责状态应用：成功则扣废料并升级，失败则仅扣废料。
+ * 契约允许任意一种资源充当升级货币，故代价需同时给出资源键与数量。
+ */
+export interface FacilityUpgradePayment {
+    /** 资源键：`food` / `water` 或独特资源 id */
+    resourceId: string;
+    /** 支付数量 */
+    amount: number;
+}
+
+/**
+ * 设施升级：按代价扣除对应资源、设施等级 +1。
+ *
+ * 升级代价与成败判定由 LLM 决定（见 Facility 注释），
+ * 本函数只负责状态应用：成功则扣资源并升级，失败则仅扣资源。
  */
 export const applyFacilityLevelUp = (
     sanctuary: Sanctuary,
     facilityId: string,
-    scrapCost: number,
+    payment: FacilityUpgradePayment,
     success: boolean
 ): Sanctuary => {
-    const cost = Math.max(0, Math.floor(safeNumber(scrapCost, 0)));
-    if (cost <= 0) return sanctuary;
+    const amount = Math.max(0, Math.floor(safeNumber(payment.amount, 0)));
+    if (amount <= 0) return sanctuary;
 
     const next = safeDeepClone(sanctuary);
-    const record = asSanctuaryResourceRecord(next);
-    record.scraps = Math.max(0, safeNumber(record.scraps) - cost);
+    applySanctuaryResourceDeltas(next, { [payment.resourceId]: -amount });
 
     if (success) {
         const facility = next.facility?.find((f) => f.id === facilityId);
@@ -174,7 +223,7 @@ export const getResidentById = (
  */
 const applyResidentChange = (
     sanctuary: Sanctuary,
-    residents: SanctuaryEvent['choices'][number]['stateChange']['residents']
+    residents: ChoiceImpact['residents']
 ): Sanctuary => {
     if (residents === undefined) return sanctuary;
 
@@ -245,6 +294,8 @@ const applyResidentChange = (
     }
 
     next.residents = residentsPool;
+    // 人口与在册居民池绑定：人口即居民池规模。
+    next.population = residentsPool.length;
     return next;
 };
 
@@ -253,43 +304,29 @@ const applyResidentChange = (
 //=============================================================================
 
 /**
- * 应用一次庇护所事件抉择（stateChange）。
+ * 应用一次庇护所事件抉择（impact）。
  *
- * 返回更新后的庇护所与 spawnEnemy 标记（true 表示需要生成敌人突袭）。
+ * impact.resource 的键为庇护所资源 id，未声明的 id 会被忽略；
+ * impact.erosion 作用于庇护所顶层侵蚀度。
+ *
+ * @returns 更新后的庇护所，以及本次抉择需要抽取的敌人数量（0 表示不触发突袭）
  */
 export const applySanctuaryEventChoice = (
     sanctuary: Sanctuary,
-    stateChange: SanctuaryEventChange
-): { sanctuary: Sanctuary; spawnEnemy: boolean } => {
+    impact: ChoiceImpact
+): { sanctuary: Sanctuary; spawnEnemyCount: number } => {
     const next = safeDeepClone(sanctuary);
-    const record = asSanctuaryResourceRecord(next);
 
-    const resources: Array<keyof SanctuaryState> = [
-        'food',
-        'water',
-        'medicine',
-        'electricity',
-        'scraps',
-        'population',
-        'morale',
-        'erosion',
-    ];
-
-    for (const key of resources) {
-        const delta = safeNumber((stateChange as Record<string, unknown>)[key], 0);
-        if (delta === 0) continue;
-
-        if (key === 'morale' || key === 'erosion') {
-            record[key] = clamp(safeNumber(record[key]) + delta, 0, 100);
-        } else {
-            record[key] = Math.max(0, safeNumber(record[key]) + delta);
-        }
+    const changes: Record<string, number> = { ...impact.resource };
+    if (impact.erosion !== undefined) {
+        changes.erosion = impact.erosion;
     }
+    applySanctuaryChanges(next, changes);
 
-    const withResidents = applyResidentChange(next, stateChange.residents);
+    const withResidents = applyResidentChange(next, impact.residents);
     return {
         sanctuary: withResidents,
-        spawnEnemy: stateChange.spawnEnemy === true,
+        spawnEnemyCount: Math.max(0, Math.floor(safeNumber(impact.spawnEnemy))),
     };
 };
 
@@ -301,35 +338,11 @@ const TIME_CONFIG = {
 } as const;
 
 const SANCTUARY_CONFIG = {
-    BACKPACK_CAPACITY: 10,
-    BASE_STORAGE_CAPACITY: 20,
-    STORAGE_CAPACITY_PER_POPULATION: 5,
-    MEDICINE_HEAL_VALUE: 15,
     COMPANION_RECOVERY_RATE: 0.8,
-    MORALE_MAX: 100,
-    MORALE_THRESHOLD: {
-        CRITICAL_LOW: 20,
-        HIGH: 80,
-    },
 } as const;
 
-const RESOURCE_EXCHANGE_RATES = {
-    food: 2,
-    water: 2,
-    medicine: 4,
-    electricity: 3,
-} as const;
-
-type TradableResource = keyof typeof RESOURCE_EXCHANGE_RATES;
-
-const TRADABLE_RESOURCES = Object.keys(RESOURCE_EXCHANGE_RATES) as TradableResource[];
-
-const RESOURCE_LABELS: Record<TradableResource, string> = {
-    food: '食物',
-    water: '水',
-    medicine: '药品',
-    electricity: '电力',
-};
+/** 一天的小时数：资源消耗速率以「每人每天」为单位，休息按小时折算到天。 */
+const HOURS_PER_DAY = 24;
 
 const REST_CONFIG = {
     MIN_HOURS: 1,
@@ -341,13 +354,7 @@ const REST_CONFIG = {
         vigor: 0.08,
         battery: 2,
     },
-    CONSUMPTION: {
-        food: 0.1,
-        water: 0.15,
-        electricity: 0.05,
-    },
     NEURAL_DAMAGE_PER_HOUR: 1,
-    MORALE_GAIN_PER_HOUR: 0.5,
     EFFICIENCY_THRESHOLDS: {
         HIGH: 12,
         MEDIUM: 18,
@@ -362,11 +369,9 @@ export interface CustomRestConfig {
     staminaRecovery: number;
     vigorRecovery: number;
     batteryRecovery: number;
-    foodConsumption: number;
-    waterConsumption: number;
-    electricityConsumption: number;
+    /** 休息期间按人口消耗的庇护所资源，键为资源 id。 */
+    consumption: Record<string, number>;
     neuralDamage: number;
-    moraleGain: number;
     efficiency: number;
 }
 
@@ -378,27 +383,17 @@ interface UseSanctuaryParams {
 }
 
 interface UseSanctuaryReturn {
-    getStorageCapacity: () => number;
-    getBackpackCapacity: () => number;
     transferItem: (item: ItemInstance, toStorage: boolean, quantity?: number) => void;
     handleRest: (hours: number) => void;
-    handleResourceTrade: (target: keyof SanctuaryState, amount: number) => void;
-    handleUseMedicine: (amount?: number) => void;
-    handleFacilityUpgrade: (facilityId: string, scrapCost: number, success?: boolean) => void;
-    handleSanctuaryEvent: (stateChange: SanctuaryEventChange) => boolean;
+    handleFacilityUpgrade: (facilityId: string, payment: FacilityUpgradePayment, success?: boolean) => void;
+    handleSanctuaryEvent: (impact: ChoiceImpact) => number;
     getCustomRestConfig: (hours: number) => CustomRestConfig | null;
-    morale: number;
-    isLowMorale: boolean;
-    maxStorage: number;
-    backpackCapacity: number;
     facilities: Facility[];
-    dailyProduction: Partial<SanctuaryState>;
+    dailyProduction: Record<string, number>;
     residents: Resident[];
 }
 
 type StackableItemInstance = Extract<ItemInstance, { type: 'consumable' | 'material' }>;
-
-type RestResources = Pick<SanctuaryState, 'food' | 'water' | 'electricity'>;
 
 type PlanFailure = {
     ok: false;
@@ -422,24 +417,6 @@ type RestPlan =
         next: PlayerState;
         config: CustomRestConfig;
         daysPassed: number;
-    };
-
-type MedicinePlan =
-    | PlanFailure
-    | {
-        ok: true;
-        next: PlayerState;
-        amount: number;
-    };
-
-type TradePlan =
-    | PlanFailure
-    | {
-        ok: true;
-        next: PlayerState;
-        resource: TradableResource;
-        amount: number;
-        cost: number;
     };
 
 export const advanceZoneTime = (
@@ -476,73 +453,46 @@ const parsePositiveInt = (value: unknown): number | null => {
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };
 
-const asResourceRecord = (target: Sanctuary): Record<keyof SanctuaryState, number> =>
-    target as unknown as Record<keyof SanctuaryState, number>;
-
-const isTradableResource = (resource: keyof SanctuaryState): resource is TradableResource =>
-    (TRADABLE_RESOURCES as readonly string[]).includes(resource);
-
 const isStackableItem = (item: ItemInstance): item is StackableItemInstance =>
     item.type === 'consumable' || item.type === 'material';
 
 const getQuantity = (item: StackableItemInstance): number =>
     Math.max(1, Math.floor(safeNumber(item.quantity, 1)));
 
-const getPopulation = (source: Pick<SanctuaryState, 'population'>): number =>
+/** 读取庇护所人口（与在册居民池绑定的引擎读数）。 */
+const getPopulation = (source: Pick<Sanctuary, 'population'>): number =>
     Math.max(1, Math.floor(safeNumber(source.population, 1)));
 
 const getOccupantCount = (
-    source: Pick<SanctuaryState, 'population'>,
+    source: Pick<Sanctuary, 'population'>,
     companionCount: number
 ): number => {
     const partyCount = 1 + Math.max(0, Math.floor(safeNumber(companionCount)));
     return Math.max(partyCount, getPopulation(source));
 };
 
-const calculateStorageCapacity = (source: Pick<SanctuaryState, 'population'>): number => {
-    const population = getPopulation(source);
-    return (
-        SANCTUARY_CONFIG.BASE_STORAGE_CAPACITY +
-        (population - 1) * SANCTUARY_CONFIG.STORAGE_CAPACITY_PER_POPULATION
-    );
+/** 取资源显示名：必要资源用引擎标签，独特资源用其自身声明，未知键退回键名。 */
+const getResourceName = (sanctuary: Sanctuary, key: string): string => {
+    if (key === 'food' || key === 'water') return NECESSARY_RESOURCE_LABELS[key];
+    return findUniqueResource(sanctuary.uniqueResource, key)?.name ?? key;
 };
 
-const calculateBackpackCapacity = (
-    source: Pick<PlayerState['dynamic'], 'strength'>
-): number => {
-    const strength = Math.max(0, safeNumber(source.strength));
-    return SANCTUARY_CONFIG.BACKPACK_CAPACITY + Math.floor(strength / 10);
-};
-
-const getRestEfficiency = (hours: number, morale: number): number => {
-    let efficiency = 1;
-
-    if (hours >= REST_CONFIG.EFFICIENCY_THRESHOLDS.LOW) {
-        efficiency = 0.6;
-    } else if (hours >= REST_CONFIG.EFFICIENCY_THRESHOLDS.MEDIUM) {
-        efficiency = 0.8;
-    } else if (hours >= REST_CONFIG.EFFICIENCY_THRESHOLDS.HIGH) {
-        efficiency = 0.9;
-    }
-
-    const safeMorale = safeNumber(morale);
-    if (safeMorale >= SANCTUARY_CONFIG.MORALE_THRESHOLD.HIGH) {
-        efficiency += 0.1;
-    } else if (safeMorale < SANCTUARY_CONFIG.MORALE_THRESHOLD.CRITICAL_LOW) {
-        efficiency -= 0.2;
-    }
-
-    return clamp(efficiency, 0.1, 1);
+/** 休息效率：仅由休息时长决定，时间越长效率越低。 */
+const getRestEfficiency = (hours: number): number => {
+    if (hours >= REST_CONFIG.EFFICIENCY_THRESHOLDS.LOW) return 0.6;
+    if (hours >= REST_CONFIG.EFFICIENCY_THRESHOLDS.MEDIUM) return 0.8;
+    if (hours >= REST_CONFIG.EFFICIENCY_THRESHOLDS.HIGH) return 0.9;
+    return 1;
 };
 
 const calculateCustomRestConfig = (
     hours: number,
     population: number,
-    morale: number
+    sanctuary: Pick<Sanctuary, 'uniqueResource'>
 ): CustomRestConfig => {
     const safeHours = Math.max(0, Math.floor(safeNumber(hours)));
     const safePopulation = Math.max(1, Math.floor(safeNumber(population, 1)));
-    const efficiency = getRestEfficiency(safeHours, morale);
+    const efficiency = getRestEfficiency(safeHours);
 
     const hpRecovery = safeHours * REST_CONFIG.RECOVERY.hp * efficiency;
     const sanityRecovery = safeHours * REST_CONFIG.RECOVERY.sanity * efficiency;
@@ -550,13 +500,19 @@ const calculateCustomRestConfig = (
     const vigorRecovery = safeHours * REST_CONFIG.RECOVERY.vigor * efficiency;
     const batteryRecovery = safeHours * REST_CONFIG.RECOVERY.battery * efficiency;
 
-    const foodConsumption = safeHours * REST_CONFIG.CONSUMPTION.food * safePopulation;
-    const waterConsumption = safeHours * REST_CONFIG.CONSUMPTION.water * safePopulation;
-    const electricityConsumption =
-        safeHours * REST_CONFIG.CONSUMPTION.electricity * safePopulation;
+    // 消耗量按「每人每天」折算到本次休息时长：必要资源用引擎配平速率，独特资源用各自声明的速率。
+    const restDays = safeHours / HOURS_PER_DAY;
+    const consumption: Record<string, number> = {};
+    for (const [key, ratePerDay] of Object.entries(NECESSARY_RESOURCE_CONSUMPTION_PER_DAY)) {
+        consumption[key] = ratePerDay * safePopulation * restDays;
+    }
+    for (const entry of sanctuary.uniqueResource) {
+        const rate = safeNumber(entry.consumptionRate);
+        if (rate <= 0) continue;
+        consumption[entry.id] = rate * safePopulation * restDays;
+    }
 
     const neuralDamage = safeHours * REST_CONFIG.NEURAL_DAMAGE_PER_HOUR;
-    const moraleGain = Math.floor(safeHours * REST_CONFIG.MORALE_GAIN_PER_HOUR * efficiency);
 
     return {
         hours: safeHours,
@@ -565,31 +521,27 @@ const calculateCustomRestConfig = (
         staminaRecovery,
         vigorRecovery,
         batteryRecovery,
-        foodConsumption,
-        waterConsumption,
-        electricityConsumption,
+        consumption,
         neuralDamage,
-        moraleGain,
         efficiency,
     };
 };
 
+/**
+ * 校验休息所需资源是否充足。
+ *
+ * 只校验本庇护所声明过的资源：没有这项资源就不构成消耗，也不会阻塞休息。
+ */
 const validateRestResources = (
     config: CustomRestConfig,
-    resources: RestResources
+    sanctuary: Sanctuary
 ): { isValid: boolean; missingResources: string[] } => {
     const missingResources: string[] = [];
 
-    if (safeNumber(resources.food) < config.foodConsumption) {
-        missingResources.push(`食物 ${config.foodConsumption.toFixed(1)} 单位`);
-    }
-
-    if (safeNumber(resources.water) < config.waterConsumption) {
-        missingResources.push(`水 ${config.waterConsumption.toFixed(1)} 单位`);
-    }
-
-    if (safeNumber(resources.electricity) < config.electricityConsumption) {
-        missingResources.push(`电力 ${config.electricityConsumption.toFixed(1)} 单位`);
+    for (const [key, required] of Object.entries(config.consumption)) {
+        if (getSanctuaryResourceValue(sanctuary, key) < required) {
+            missingResources.push(`${getResourceName(sanctuary, key)} ${required.toFixed(1)} 单位`);
+        }
     }
 
     return {
@@ -627,19 +579,17 @@ const createNextVitalRecord = (
     };
 };
 
+/**
+ * 返回应用资源增量后的庇护所副本。
+ *
+ * 键为资源 id（erosion 为顶层字段），未在庇护所中声明的资源 id 会被忽略。
+ */
 const adjustSanctuaryResources = (
     sanctuary: Sanctuary,
-    deltas: Partial<Record<keyof SanctuaryState, number>>
+    changes: Record<string, number>
 ): Sanctuary => {
-    const next: Sanctuary = { ...sanctuary };
-    const record = asResourceRecord(next);
-
-    for (const key of Object.keys(deltas) as Array<keyof SanctuaryState>) {
-        const delta = deltas[key];
-        if (delta === undefined) continue;
-        record[key] = Math.max(0, safeNumber(record[key]) + safeNumber(delta));
-    }
-
+    const next = safeDeepClone(sanctuary);
+    applySanctuaryChanges(next, changes);
     return next;
 };
 
@@ -747,19 +697,8 @@ const createTransferPlan = (
     const movedItem = createTransferItem(sourceItem, amount, target);
     const nextTarget = addItemToInventory(target, movedItem);
 
-    const capacity = toStorage
-        ? calculateStorageCapacity(state.sanctuary)
-        : calculateBackpackCapacity(state.dynamic);
-
-    if (nextTarget.length > capacity) {
-        return {
-            ok: false,
-            message: toStorage
-                ? `仓库已满 (${nextTarget.length}/${capacity})。`
-                : `背包已满 (${nextTarget.length}/${capacity})。`,
-        };
-    }
-
+    // 仓库无容量上限，存入不设门槛；取出的背包容纳性由格子背包在组合层拦截
+    // （见 hooks/index.ts → transferItem），此处不做件数判定。
     const nextSource = removeItemFromInventory(source, sourceItem.instanceId, amount);
 
     if (toStorage) {
@@ -810,11 +749,7 @@ const createRestPlan = (state: PlayerState, hours: number): RestPlan => {
     }
 
     const occupantCount = getOccupantCount(state.sanctuary, state.companions?.length ?? 0);
-    const config = calculateCustomRestConfig(
-        safeHours,
-        occupantCount,
-        safeNumber(state.sanctuary.morale)
-    );
+    const config = calculateCustomRestConfig(safeHours, occupantCount, state.sanctuary);
 
     const validation = validateRestResources(config, state.sanctuary);
     if (!validation.isValid) {
@@ -851,21 +786,12 @@ const createRestPlan = (state: PlayerState, hours: number): RestPlan => {
         -config.neuralDamage
     );
 
-    const nextSanctuaryBase = adjustSanctuaryResources(state.sanctuary, {
-        food: -config.foodConsumption,
-        water: -config.waterConsumption,
-        electricity: -config.electricityConsumption,
-        morale: config.moraleGain,
-    });
+    const restChanges: Record<string, number> = {};
+    for (const [key, amount] of Object.entries(config.consumption)) {
+        restChanges[key] = -amount;
+    }
 
-    const nextSanctuary: Sanctuary = {
-        ...nextSanctuaryBase,
-        morale: clamp(
-            safeNumber(nextSanctuaryBase.morale),
-            0,
-            SANCTUARY_CONFIG.MORALE_MAX
-        ),
-    };
+    const nextSanctuary = adjustSanctuaryResources(state.sanctuary, restChanges);
 
     // 跨天结算：设施每日产出按经过的天数累加。
     const daysPassed = Math.max(0, nextZoneTime.day - safeNumber(state.currentZoneTime.day));
@@ -895,166 +821,12 @@ const createRestPlan = (state: PlayerState, hours: number): RestPlan => {
     };
 };
 
-const createMedicinePlan = (state: PlayerState, amount: number): MedicinePlan => {
-    const safeAmount = parsePositiveInt(amount);
-
-    if (safeAmount === null) {
-        return {
-            ok: false,
-            message: '药品数量必须为正整数。',
-        };
-    }
-
-    const missingHp = Math.max(
-        0,
-        safeNumber(state.dynamic.maxHp) - safeNumber(state.dynamic.hp)
-    );
-
-    if (missingHp <= 0) {
-        return {
-            ok: false,
-            message: '生命值已满，无需使用药品。',
-            info: true,
-        };
-    }
-
-    const effectiveAmount = Math.min(
-        safeAmount,
-        Math.ceil(missingHp / SANCTUARY_CONFIG.MEDICINE_HEAL_VALUE)
-    );
-
-    if (safeNumber(state.sanctuary.medicine) < effectiveAmount) {
-        return {
-            ok: false,
-            message: '庇护所药品储备不足。',
-        };
-    }
-
-    const nextDynamic = { ...state.dynamic };
-    nextDynamic.hp =
-        safeNumber(nextDynamic.hp) +
-        effectiveAmount * SANCTUARY_CONFIG.MEDICINE_HEAL_VALUE;
-    clampDynamicVitals(nextDynamic);
-
-    const nextSanctuary = adjustSanctuaryResources(state.sanctuary, {
-        medicine: -effectiveAmount,
-    });
-
-    return {
-        ok: true,
-        next: {
-            ...state,
-            dynamic: nextDynamic,
-            sanctuary: nextSanctuary,
-        },
-        amount: effectiveAmount,
-    };
-};
-
-const createTradePlan = (
-    state: PlayerState,
-    target: keyof SanctuaryState,
-    amount: number
-): TradePlan => {
-    if (!isTradableResource(target)) {
-        return {
-            ok: false,
-            message: '该目标不支持物资兑换。',
-        };
-    }
-
-    const safeAmount = parsePositiveInt(amount);
-    if (safeAmount === null) {
-        return {
-            ok: false,
-            message: '兑换数量必须为正整数。',
-        };
-    }
-
-    const rate = RESOURCE_EXCHANGE_RATES[target];
-    const cost = safeAmount * rate;
-
-    if (safeNumber(state.sanctuary.scraps) < cost) {
-        return {
-            ok: false,
-            message: `碎片不足，无法兑换 ${safeAmount} 单位${RESOURCE_LABELS[target]}。`,
-        };
-    }
-
-    const deltas: Partial<Record<keyof SanctuaryState, number>> = {
-        scraps: -cost,
-    };
-    deltas[target] = safeAmount;
-
-    return {
-        ok: true,
-        next: {
-            ...state,
-            sanctuary: adjustSanctuaryResources(state.sanctuary, deltas),
-        },
-        resource: target,
-        amount: safeAmount,
-        cost,
-    };
-};
-
 export const useSanctuary = ({
     player,
     setPlayer,
     addLog,
     gameState,
 }: UseSanctuaryParams): UseSanctuaryReturn => {
-    const lastMoraleStateRef = useRef<'low' | 'high' | null>(null);
-
-    const morale = useMemo(() => safeNumber(player.sanctuary.morale), [
-        player.sanctuary.morale,
-    ]);
-
-    const isLowMorale = useMemo(
-        () => morale < SANCTUARY_CONFIG.MORALE_THRESHOLD.CRITICAL_LOW,
-        [morale]
-    );
-
-    const storageCapacity = useMemo(
-        () => calculateStorageCapacity(player.sanctuary),
-        [player.sanctuary.population]
-    );
-
-    const backpackCapacity = useMemo(
-        () => calculateBackpackCapacity(player.dynamic),
-        [player.dynamic.strength]
-    );
-
-    useEffect(() => {
-        if (gameState !== GameState.SANCTUARY) {
-            lastMoraleStateRef.current = null;
-            return;
-        }
-
-        const nextState =
-            morale < SANCTUARY_CONFIG.MORALE_THRESHOLD.CRITICAL_LOW
-                ? 'low'
-                : morale > SANCTUARY_CONFIG.MORALE_THRESHOLD.HIGH
-                    ? 'high'
-                    : null;
-
-        if (nextState === lastMoraleStateRef.current) return;
-
-        lastMoraleStateRef.current = nextState;
-
-        if (nextState === 'low') {
-            addLog('警告：庇护所士气极低，同伴可能会离开。', 'warning');
-        } else if (nextState === 'high') {
-            addLog('庇护所士气高昂，各项效率提升。', 'success');
-        }
-    }, [gameState, morale, addLog]);
-
-    const getStorageCapacity = useCallback((): number => storageCapacity, [storageCapacity]);
-
-    const getBackpackCapacity = useCallback((): number => backpackCapacity, [
-        backpackCapacity,
-    ]);
-
     const transferItem = useCallback(
         (item: ItemInstance, toStorage: boolean, quantity?: number) => {
             if (gameState !== GameState.SANCTUARY) {
@@ -1134,73 +906,19 @@ export const useSanctuary = ({
                 ? `，设施结算 ${plan.daysPassed} 天产出`
                 : '';
 
+            const consumptionText = Object.entries(plan.config.consumption)
+                .map(
+                    ([key, amount]) =>
+                        `${getResourceName(player.sanctuary, key)} ${amount.toFixed(1)}`
+                )
+                .join('、');
+
             addLog(
-                `完成 ${plan.config.hours} 小时休息，消耗食物 ${plan.config.foodConsumption.toFixed(
-                    1
-                )}、水 ${plan.config.waterConsumption.toFixed(
-                    1
-                )}、电力 ${plan.config.electricityConsumption.toFixed(1)}${productionText}。`,
+                `完成 ${plan.config.hours} 小时休息${consumptionText ? `，消耗 ${consumptionText}` : ''
+                }${productionText}。`,
                 'event'
             );
             AudioService.playSfx('success');
-        },
-        [gameState, player, addLog, setPlayer]
-    );
-
-    const handleUseMedicine = useCallback(
-        (amount: number = 1) => {
-            if (gameState !== GameState.SANCTUARY) {
-                addLog('只能在庇护所中使用药品。', 'warning');
-                AudioService.playSfx('error');
-                return;
-            }
-
-            const plan = createMedicinePlan(player, amount);
-
-            if (!plan.ok) {
-                addLog(plan.message, plan.info ? 'info' : 'warning');
-                AudioService.playSfx(plan.info ? 'ui_click' : 'error');
-                return;
-            }
-
-            setPlayer((prev) => {
-                const replan = createMedicinePlan(prev, amount);
-                return replan.ok ? replan.next : prev;
-            });
-
-            addLog(`消耗 ${plan.amount} 单位药品。生命体征已部分修复。`, 'success');
-            AudioService.playSfx('success');
-        },
-        [gameState, player, addLog, setPlayer]
-    );
-
-    const handleResourceTrade = useCallback(
-        (target: keyof SanctuaryState, amount: number) => {
-            if (gameState !== GameState.SANCTUARY) {
-                addLog('只能在庇护所中进行物资兑换。', 'warning');
-                AudioService.playSfx('error');
-                return;
-            }
-
-            const plan = createTradePlan(player, target, amount);
-
-            if (!plan.ok) {
-                addLog(plan.message, 'warning');
-                AudioService.playSfx('error');
-                return;
-            }
-
-            setPlayer((prev) => {
-                const replan = createTradePlan(prev, target, amount);
-                return replan.ok ? replan.next : prev;
-            });
-
-            addLog(
-                `消耗 ${plan.cost} 碎片兑换了 ${plan.amount} 单位${RESOURCE_LABELS[plan.resource]
-                }。`,
-                'info'
-            );
-            AudioService.playSfx('ui_click');
         },
         [gameState, player, addLog, setPlayer]
     );
@@ -1218,9 +936,9 @@ export const useSanctuary = ({
                 player.companions?.length ?? 0
             );
 
-            return calculateCustomRestConfig(safeHours, occupantCount, morale);
+            return calculateCustomRestConfig(safeHours, occupantCount, player.sanctuary);
         },
-        [player.sanctuary, player.companions?.length, morale]
+        [player.sanctuary, player.companions?.length]
     );
 
     const facilities = useMemo(
@@ -1239,13 +957,13 @@ export const useSanctuary = ({
     );
 
     /**
-     * 设施升级：扣 scraps、设施等级 +1。
+     * 设施升级：按代价扣除任意一种资源、设施等级 +1。
      *
-     * - scrapCost 由调用方（LLM 定价）传入；
+     * - payment 由调用方（LLM 定价）传入；
      * - success 缺省按 90% 基础成功率判定；其余交给引擎/UI 预案。
      */
     const handleFacilityUpgrade = useCallback(
-        (facilityId: string, scrapCost: number, success?: boolean) => {
+        (facilityId: string, payment: FacilityUpgradePayment, success?: boolean) => {
             if (gameState !== GameState.SANCTUARY) {
                 addLog('只能在庇护所中升级设施。', 'warning');
                 AudioService.playSfx('error');
@@ -1259,15 +977,16 @@ export const useSanctuary = ({
                 return;
             }
 
-            const cost = Math.max(0, Math.floor(safeNumber(scrapCost, 0)));
-            if (cost <= 0) {
+            const amount = Math.max(0, Math.floor(safeNumber(payment.amount, 0)));
+            if (amount <= 0) {
                 addLog('升级消耗必须为正数。', 'warning');
                 AudioService.playSfx('error');
                 return;
             }
 
-            if (safeNumber(player.sanctuary.scraps) < cost) {
-                addLog('废料不足，无法升级设施。', 'warning');
+            const resourceName = getResourceName(player.sanctuary, payment.resourceId);
+            if (getSanctuaryResourceValue(player.sanctuary, payment.resourceId) < amount) {
+                addLog(`${resourceName}不足，无法升级设施。`, 'warning');
                 AudioService.playSfx('error');
                 return;
             }
@@ -1279,15 +998,15 @@ export const useSanctuary = ({
                 sanctuary: applyFacilityLevelUp(
                     prev.sanctuary,
                     facilityId,
-                    cost,
+                    payment,
                     successFlag
                 ),
             }));
 
             addLog(
                 successFlag
-                    ? `设施 [${facility.name}] 升级成功！当前等级 ${facility.level + 1}，消耗 ${cost} 废料。`
-                    : `设施 [${facility.name}] 升级失败，消耗了 ${cost} 废料。`,
+                    ? `设施 [${facility.name}] 升级成功！当前等级 ${facility.level + 1}，消耗 ${amount} ${resourceName}。`
+                    : `设施 [${facility.name}] 升级失败，消耗了 ${amount} ${resourceName}。`,
                 successFlag ? 'success' : 'warning'
             );
             AudioService.playSfx(successFlag ? 'success' : 'error');
@@ -1296,21 +1015,20 @@ export const useSanctuary = ({
     );
 
     /**
-     * 应用一次庇护所事件抉择（stateChange）。
+     * 应用一次庇护所事件抉择（impact）。
      *
-     * 返回 true 表示该抉择触发了敌人突袭（spawnEnemy），
-     * 由上层决定如何生成敌人。
+     * @returns 需要抽取的敌人数量（0 表示不触发突袭），由上层决定如何生成敌人。
      */
     const handleSanctuaryEvent = useCallback(
-        (stateChange: SanctuaryEventChange): boolean => {
+        (impact: ChoiceImpact): number => {
             if (gameState !== GameState.SANCTUARY) {
                 addLog('只能在庇护所中处理事件。', 'warning');
-                return false;
+                return 0;
             }
 
-            const { sanctuary: nextSanctuary, spawnEnemy } = applySanctuaryEventChoice(
+            const { sanctuary: nextSanctuary, spawnEnemyCount } = applySanctuaryEventChoice(
                 player.sanctuary,
-                stateChange
+                impact
             );
 
             setPlayer((prev) => ({
@@ -1318,25 +1036,17 @@ export const useSanctuary = ({
                 sanctuary: nextSanctuary,
             }));
 
-            return spawnEnemy;
+            return spawnEnemyCount;
         },
         [gameState, player.sanctuary, addLog, setPlayer]
     );
 
     return {
-        getStorageCapacity,
-        getBackpackCapacity,
         transferItem,
         handleRest,
-        handleResourceTrade,
-        handleUseMedicine,
         handleFacilityUpgrade,
         handleSanctuaryEvent,
         getCustomRestConfig,
-        morale,
-        isLowMorale,
-        maxStorage: storageCapacity,
-        backpackCapacity,
         facilities,
         dailyProduction,
         residents,

@@ -1,8 +1,25 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { PlayerState, StoryConfig, PlotPoint } from '../../meta';
-import { NarrativeMode, NarrativePacing } from '../../meta/type';
+import type {
+    ChainNarrative,
+    HorrorAesthetic,
+    HorrorAtom,
+    HorrorDomain,
+    NarrativeMode,
+    NarrativePacing,
+    PlayerState,
+    PlotPoint,
+    StoryConfig,
+} from '../../meta';
+import {
+    AXIS_PRESETS,
+    HORROR_AESTHETICS,
+    MODES_DEF,
+    MOTIF_PRESETS,
+    NARRATIVE_PACING,
+} from '../../constants';
+import type { NarrativeMutationResult } from '../../hooks';
 import { AudioService } from '../../services';
-import { NARRATIVE_PACING, PRESET_THEMES, MOTIF_PRESETS, AXIS_PRESETS, MODES_DEF } from './narratives';
+import AestheticStudio from './AestheticStudio';
 
 // ==========================================
 // 1. 系统级色彩方案与主题字典
@@ -17,7 +34,24 @@ const COLOR_SCHEME_MAP: Record<ColorScheme, { gradient: string; bg: string; bord
     red: { gradient: '#7f1d1d40', bg: 'bg-red-950/20', border: 'border-red-900/50', text: 'text-red-500', borderHover: 'border-red-500/80' },
     slate: { gradient: '#0f172a40', bg: 'bg-slate-950/20', border: 'border-slate-800/50', text: 'text-slate-400', borderHover: 'border-slate-500/80' },
     cyan: { gradient: '#164e6340', bg: 'bg-cyan-950/20', border: 'border-cyan-900/50', text: 'text-cyan-400', borderHover: 'border-cyan-500/80' },
-    rose: { gradient: '#88133740', bg: 'bg-rose-950/20', border: 'border-rose-900/50', text: 'text-rose-400', borderHover: 'border-rose-500/80' }
+    rose: { gradient: '#88133740', bg: 'bg-rose-950/20', border: 'border-rose-900/50', text: 'text-rose-400', borderHover: 'border-rose-500/80' },
+};
+
+/**
+ * 美学卡片配色。
+ *
+ * 元契约的 _Nar 只声明 id / name / desc / prompt，不含任何视觉字段，
+ * 因此配色必须由表现层自行决定。此处按 id 哈希取色，保证同一美学
+ * 在任何一次渲染中颜色恒定，且预设与自建美学共用同一套色板。
+ */
+const AESTHETIC_PALETTE: ColorScheme[] = ['emerald', 'cyan', 'purple', 'rose', 'amber', 'blue', 'slate'];
+
+const pickAestheticScheme = (id: string): ColorScheme => {
+    let hash = 0;
+    for (let i = 0; i < id.length; i += 1) {
+        hash = (hash * 31 + id.charCodeAt(i)) % 9973;
+    }
+    return AESTHETIC_PALETTE[hash % AESTHETIC_PALETTE.length];
 };
 
 interface BaseModalProps {
@@ -104,7 +138,7 @@ const ModePanel: React.FC<ModePanelProps> = ({ onConfirm, onCancel, onOpenLibrar
                     return (
                         <button
                             key={mode.id}
-                            onClick={() => { setSelectedMode(mode.id as NarrativeMode); AudioService.playSfx('ui_click'); }}
+                            onClick={() => { setSelectedMode(mode.id); AudioService.playSfx('ui_click'); }}
                             className={`relative p-10 border text-left transition-all duration-500 ease-out group overflow-hidden flex flex-col min-h-[240px] ${isSelected ? 'bg-blue-900/20 border-blue-400/80 shadow-[inset_0_0_40px_rgba(59,130,246,0.15),0_0_30px_rgba(59,130,246,0.2)] -translate-y-1' : 'bg-black/40 border-blue-900/40 hover:border-blue-500/60 hover:bg-blue-900/10 hover:-translate-y-0.5'}`}
                         >
                             <div className={`absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 transition-colors duration-300 ${isSelected ? 'border-blue-400' : 'border-blue-900/50 group-hover:border-blue-500/80'}`} />
@@ -117,10 +151,10 @@ const ModePanel: React.FC<ModePanelProps> = ({ onConfirm, onCancel, onOpenLibrar
                                 {isSelected && <div className="h-px flex-1 bg-gradient-to-r from-blue-500/50 to-transparent" />}
                             </div>
 
-                            <span className={`text-3xl font-bold tracking-tight transition-colors mb-4 ${isSelected ? 'text-blue-200 drop-shadow-[0_0_10px_rgba(59,130,246,0.8)]' : 'text-blue-500/80 group-hover:text-blue-300'}`}>{mode.sub}</span>
+                            <span className={`text-3xl font-bold tracking-tight transition-colors mb-4 ${isSelected ? 'text-blue-200 drop-shadow-[0_0_10px_rgba(59,130,246,0.8)]' : 'text-blue-500/80 group-hover:text-blue-300'}`}>{mode.name}</span>
 
                             <div className={`text-sm leading-relaxed font-mono mt-auto border-l-2 pl-4 transition-colors ${isSelected ? 'border-blue-500 text-blue-300/90' : 'border-blue-900/50 text-blue-700/60 group-hover:border-blue-600/80 group-hover:text-blue-400/80'}`}>
-                                {mode.prompt}
+                                {mode.desc}
                             </div>
 
                             <div className={`absolute bottom-0 left-0 right-0 h-[2px] transition-all duration-500 ${isSelected ? 'bg-blue-400 shadow-[0_0_15px_rgba(59,130,246,1)]' : 'bg-transparent'}`} />
@@ -167,8 +201,8 @@ const PacingPanel: React.FC<PacingPanelProps> = ({ player, onConfirm, onCancel }
                     {hasSuspendedArc ? (
                         <div className="p-8 border border-amber-600/40 bg-amber-950/20 relative group overflow-hidden h-full shadow-[inset_0_0_30px_rgba(245,158,11,0.05)]">
                             <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-600 shadow-[0_0_10px_rgba(245,158,11,0.8)]" />
-                            <h3 className="text-xl font-bold text-amber-400 tracking-wide">{activeArc?.config.theme.id || 'UNKNOWN_ARC'}</h3>
-                            <button onClick={() => activeArc?.config.pacing && onConfirm(activeArc.config.pacing.id as NarrativePacing)} className="mt-6 w-full py-4 bg-amber-600/10 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 hover:border-amber-400 transition-all uppercase font-bold text-sm tracking-widest hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]">
+                            <h3 className="text-xl font-bold text-amber-400 tracking-wide">{activeArc?.config.aesthetic.id || 'UNKNOWN_ARC'}</h3>
+                            <button onClick={() => activeArc?.config.pacing && onConfirm(activeArc.config.pacing.id)} className="mt-6 w-full py-4 bg-amber-600/10 border border-amber-500/40 text-amber-300 hover:bg-amber-600/30 hover:border-amber-400 transition-all uppercase font-bold text-sm tracking-widest hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]">
                                 恢复神经链接 [RESUME]
                             </button>
                             <div className="mt-6 p-5 bg-red-950/30 border-l-4 border-red-800/60 text-xs text-red-400/90 leading-relaxed font-mono shadow-[inset_0_0_10px_rgba(239,68,68,0.05)]">
@@ -195,7 +229,7 @@ const PacingPanel: React.FC<PacingPanelProps> = ({ player, onConfirm, onCancel }
                         return (
                             <button
                                 key={mode.id}
-                                onClick={() => { setSelectedPacing(mode.id as NarrativePacing); AudioService.playSfx('ui_hover'); }}
+                                onClick={() => { setSelectedPacing(mode.id); AudioService.playSfx('ui_hover'); }}
                                 className={`relative flex flex-col p-8 text-left transition-all duration-500 ease-out overflow-hidden border min-h-[180px] ${isSelected ? 'bg-amber-900/20 border-amber-400/80 shadow-[inset_0_0_25px_rgba(245,158,11,0.2),0_0_30px_rgba(245,158,11,0.2)] z-10 -translate-y-1' : 'bg-black/50 border-amber-900/40 hover:border-amber-500/60 hover:bg-amber-900/10 hover:-translate-y-0.5'}`}
                             >
                                 <div className="flex items-center justify-between mb-6">
@@ -203,7 +237,7 @@ const PacingPanel: React.FC<PacingPanelProps> = ({ player, onConfirm, onCancel }
                                     {isSelected && <div className="w-2.5 h-2.5 bg-amber-400 rounded-full shadow-[0_0_10px_rgba(245,158,11,1)] animate-pulse" />}
                                 </div>
                                 <div className={`h-px w-full mb-4 transition-colors ${isSelected ? 'bg-gradient-to-r from-amber-500/80 to-transparent' : 'bg-amber-900/30'}`} />
-                                <p className={`text-sm mt-auto leading-relaxed font-mono ${isSelected ? 'text-amber-300' : 'text-amber-700/60 group-hover:text-amber-500/80'}`}>{mode.sub}</p>
+                                <p className={`text-sm mt-auto leading-relaxed font-mono ${isSelected ? 'text-amber-300' : 'text-amber-700/60 group-hover:text-amber-500/80'}`}>{mode.name}</p>
                             </button>
                         );
                     })}
@@ -213,29 +247,50 @@ const PacingPanel: React.FC<PacingPanelProps> = ({ player, onConfirm, onCancel }
     );
 };
 
-interface ThemePanelProps {
-    onConfirm: (theme: string) => void;
+interface AestheticPanelProps {
+    aesthetics: HorrorAesthetic[];
+    isLoading: boolean;
+    onConfirm: (aesthetic: StoryConfig['aesthetic']) => void;
+    onOpenStudio: () => void;
     onCancel?: () => void;
 }
 
-const ThemePanel: React.FC<ThemePanelProps> = ({ onConfirm, onCancel }) => {
-    const [themeMode, setThemeMode] = useState<'preset' | 'custom' | 'auto'>('preset');
-    const [selectedThemeId, setSelectedThemeId] = useState<string>(PRESET_THEMES[0].id);
-    const [customTheme, setCustomTheme] = useState('');
+const AestheticPanel: React.FC<AestheticPanelProps> = ({ aesthetics, isLoading, onConfirm, onOpenStudio, onCancel }) => {
+    const [aestheticMode, setAestheticMode] = useState<'preset' | 'custom' | 'auto'>('preset');
+    const [selectedAestheticId, setSelectedAestheticId] = useState<string>(aesthetics[0]?.id ?? '');
+    const [customAesthetic, setCustomAesthetic] = useState('');
+
+    // 库异步载入，首帧可能为空；载入完成后补一次默认选中，避免空选提交。
+    useEffect(() => {
+        if (!selectedAestheticId && aesthetics.length > 0) {
+            setSelectedAestheticId(aesthetics[0].id);
+        }
+    }, [aesthetics, selectedAestheticId]);
 
     const handleConfirm = () => {
         AudioService.playSfx('success');
+
+        if (aestheticMode === 'custom') {
+            // 自建美学：prompt 用玩家原文，id 由文本派生为 slug
+            // （叙事链 id 会拼接该值，故不能直接塞入含空格与中文的原文）。
+            const text = customAesthetic.trim();
+            const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 32);
+            onConfirm({ id: slug || 'custom', prompt: text });
+            return;
+        }
+
         // auto 模式：历史实现提交空字符串，导致 buildStoryConfigFromPending
-        // 因 theme.id 为空返回 undefined、叙事流程静默卡死。
-        // 现从预设主题随机取一（保证 id 非空，流程可继续）。
-        onConfirm(
-            themeMode === 'custom'
-                ? customTheme
-                : themeMode === 'preset'
-                    ? selectedThemeId
-                    : PRESET_THEMES[Math.floor(Math.random() * PRESET_THEMES.length)].id
-        );
+        // 因 aesthetic.id 为空返回 undefined、叙事流程静默卡死。
+        // 现从库中随机取一（保证 id 非空，流程可继续）。
+        const picked = aestheticMode === 'preset'
+            ? (aesthetics.find(item => item.id === selectedAestheticId) ?? aesthetics[0])
+            : aesthetics[Math.floor(Math.random() * aesthetics.length)];
+
+        if (!picked) return;
+        onConfirm({ id: picked.id, prompt: picked.prompt });
     };
+
+    const selected = aesthetics.find(item => item.id === selectedAestheticId) ?? null;
 
     return (
         <BaseModal
@@ -245,6 +300,7 @@ const ThemePanel: React.FC<ThemePanelProps> = ({ onConfirm, onCancel }) => {
             footerContent={
                 <>
                     {onCancel && <button onClick={onCancel} className="px-6 py-2.5 border border-emerald-900/50 text-emerald-600 hover:text-emerald-400 font-mono text-xs tracking-widest uppercase transition-colors bg-black/30 hover:bg-emerald-900/20">返回</button>}
+                    <button onClick={onOpenStudio} className="px-6 py-2.5 border border-purple-900/50 text-purple-500 hover:text-purple-300 font-mono text-xs tracking-widest uppercase transition-all duration-300 hover:bg-purple-900/20 shadow-[0_0_15px_rgba(168,85,247,0.1)]">美学工作台</button>
                     <button onClick={handleConfirm} className="min-w-[160px] px-8 py-2.5 border bg-emerald-950/30 border-emerald-500/60 hover:border-emerald-400 text-emerald-300 font-mono text-sm tracking-widest uppercase transition-all shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:shadow-[0_0_25px_rgba(16,185,129,0.3)]">核准</button>
                 </>
             }
@@ -254,31 +310,52 @@ const ThemePanel: React.FC<ThemePanelProps> = ({ onConfirm, onCancel }) => {
                     <h3 className="text-sm font-bold text-emerald-500 font-mono tracking-widest uppercase drop-shadow-[0_0_5px_rgba(16,185,129,0.4)]">空间主题 / Spatial Theme</h3>
                     <div className="flex bg-black/50 border border-emerald-900/40 rounded-sm p-1">
                         {(['preset', 'custom', 'auto'] as const).map(mode => (
-                            <button key={mode} onClick={() => { setThemeMode(mode); AudioService.playSfx('ui_click'); }} className={`text-xs px-5 py-2 font-mono tracking-widest transition-all rounded-sm ${themeMode === mode ? 'bg-emerald-900/60 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'text-emerald-700/60 hover:text-emerald-500 hover:bg-emerald-900/20'}`}>{mode.toUpperCase()}</button>
+                            <button key={mode} onClick={() => { setAestheticMode(mode); AudioService.playSfx('ui_click'); }} className={`text-xs px-5 py-2 font-mono tracking-widest transition-all rounded-sm ${aestheticMode === mode ? 'bg-emerald-900/60 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'text-emerald-700/60 hover:text-emerald-500 hover:bg-emerald-900/20'}`}>{mode.toUpperCase()}</button>
                         ))}
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-emerald-900/50 scrollbar-track-transparent pb-4">
-                    {themeMode === 'preset' && (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
-                            {PRESET_THEMES.map(theme => {
-                                const isSelected = selectedThemeId === theme.id;
-                                return (
-                                    <button
-                                        key={theme.id}
-                                        onClick={() => { setSelectedThemeId(theme.id); AudioService.playSfx('ui_click'); }}
-                                        className={`p-5 border text-left transition-all duration-300 relative overflow-hidden group flex flex-col min-h-[120px] ${isSelected ? 'bg-gray-800/90 border-gray-500 shadow-[0_0_25px_rgba(255,255,255,0.1)] -translate-y-1' : 'border-gray-800/50 bg-black/40 hover:border-gray-600/80 hover:bg-gray-900/40 hover:-translate-y-0.5'}`}
-                                    >
-                                        {isSelected && <div className={`absolute top-0 left-0 w-full h-[2px] shadow-[0_0_10px_currentColor] bg-current ${theme.mainColor}`} />}
-                                        <div className={`font-bold text-sm tracking-widest uppercase transition-colors mb-3 ${isSelected ? theme.mainColor : 'text-gray-400 group-hover:text-gray-200'}`}>{theme.id}</div>
-                                        <div className={`text-xs font-mono mt-auto leading-relaxed transition-colors ${isSelected ? 'text-gray-300' : 'text-gray-600 group-hover:text-gray-400'}`}>{theme.sub}</div>
-                                    </button>
-                                );
-                            })}
+                    {aestheticMode === 'preset' && (
+                        <div className="space-y-5">
+                            {selected && (
+                                <div className="p-6 border border-emerald-900/40 bg-black/50 space-y-3">
+                                    <div className="flex flex-wrap items-center gap-4">
+                                        <span className="text-lg font-bold text-emerald-300">{selected.name}</span>
+                                        <span className="text-[11px] font-mono text-emerald-700">[{selected.id}]</span>
+                                        <span className="ml-auto text-[11px] font-mono text-slate-500">
+                                            主控域 {selected.primaryDomain}
+                                            {(selected.interferingDomains ?? []).length > 0 && ` · 渗透 ${(selected.interferingDomains ?? []).join(' / ')}`}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-emerald-400/80 leading-relaxed font-mono border-l-2 border-emerald-700/50 pl-4">{selected.desc}</p>
+                                </div>
+                            )}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+                                {aesthetics.map(item => {
+                                    const isSelected = selectedAestheticId === item.id;
+                                    const colors = COLOR_SCHEME_MAP[pickAestheticScheme(item.id)];
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => { setSelectedAestheticId(item.id); AudioService.playSfx('ui_click'); }}
+                                            className={`p-5 border text-left transition-all duration-300 relative overflow-hidden group flex flex-col min-h-[120px] ${isSelected ? 'bg-gray-800/90 border-gray-500 shadow-[0_0_25px_rgba(255,255,255,0.1)] -translate-y-1' : 'border-gray-800/50 bg-black/40 hover:border-gray-600/80 hover:bg-gray-900/40 hover:-translate-y-0.5'}`}
+                                        >
+                                            {isSelected && <div className={`absolute top-0 left-0 w-full h-[2px] shadow-[0_0_10px_currentColor] bg-current ${colors.text}`} />}
+                                            <div className={`font-bold text-sm tracking-widest uppercase transition-colors mb-3 ${isSelected ? colors.text : 'text-gray-400 group-hover:text-gray-200'}`}>{item.id}</div>
+                                            <div className={`text-xs font-mono mt-auto leading-relaxed transition-colors ${isSelected ? 'text-gray-300' : 'text-gray-600 group-hover:text-gray-400'}`}>{item.name}</div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {aesthetics.length === 0 && !isLoading && (
+                                <div className="p-12 bg-emerald-950/20 border border-emerald-900/40 text-sm text-emerald-500/80 font-mono text-center">
+                                    美学库空载 · 请通过「美学工作台」自建
+                                </div>
+                            )}
                         </div>
                     )}
-                    {themeMode === 'custom' && <textarea value={customTheme} onChange={e => setCustomTheme(e.target.value)} placeholder="[输入序列] 声明场景视觉与物理规则的强制限定符..." className="w-full h-full min-h-[250px] bg-black/60 border border-emerald-900/50 text-emerald-200 p-6 font-mono text-sm focus:outline-none focus:border-emerald-400/80 focus:shadow-[inset_0_0_20px_rgba(16,185,129,0.1)] resize-none transition-all placeholder:text-emerald-900/60" />}
-                    {themeMode === 'auto' && <div className="p-12 bg-emerald-950/20 border border-emerald-900/40 text-sm text-emerald-500/80 font-mono text-center flex flex-col items-center justify-center h-full gap-4">
+                    {aestheticMode === 'custom' && <textarea value={customAesthetic} onChange={e => setCustomAesthetic(e.target.value)} placeholder="[输入序列] 声明场景视觉与物理规则的强制限定符..." className="w-full h-full min-h-[250px] bg-black/60 border border-emerald-900/50 text-emerald-200 p-6 font-mono text-sm focus:outline-none focus:border-emerald-400/80 focus:shadow-[inset_0_0_20px_rgba(16,185,129,0.1)] resize-none transition-all placeholder:text-emerald-900/60" />}
+                    {aestheticMode === 'auto' && <div className="p-12 bg-emerald-950/20 border border-emerald-900/40 text-sm text-emerald-500/80 font-mono text-center flex flex-col items-center justify-center h-full gap-4">
                         <svg className="w-12 h-12 opacity-50 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
                         <span>[系统接管] 神经引擎将根据上下文执行自适应场景推演</span>
                     </div>}
@@ -335,7 +412,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfirm, onCancel }) => {
                     {motifMode === 'preset' && (
                         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-4">
                             {MOTIF_PRESETS.map(motif => (
-                                <button key={motif.id} onClick={() => { setSelectedMotif(motif.id); AudioService.playSfx('ui_click'); }} className={`p-4 border text-center text-sm font-mono tracking-wider transition-all duration-300 hover:-translate-y-0.5 ${selectedMotif === motif.id ? 'border-purple-400/80 text-purple-200 bg-purple-900/40 shadow-[inset_0_0_15px_rgba(168,85,247,0.2),0_0_20px_rgba(168,85,247,0.2)]' : 'border-purple-900/40 text-purple-600/80 bg-black/40 hover:bg-purple-900/20 hover:border-purple-600/60 hover:text-purple-400'}`}>{motif.id}</button>
+                                <button key={motif.id} onClick={() => { setSelectedMotif(motif.id); AudioService.playSfx('ui_click'); }} className={`p-4 border text-center text-sm font-mono tracking-wider transition-all duration-300 hover:-translate-y-0.5 ${selectedMotif === motif.id ? 'border-purple-400/80 text-purple-200 bg-purple-900/40 shadow-[inset_0_0_15px_rgba(168,85,247,0.2),0_0_20px_rgba(168,85,247,0.2)]' : 'border-purple-900/40 text-purple-600/80 bg-black/40 hover:bg-purple-900/20 hover:border-purple-600/60 hover:text-purple-400'}`}>{motif.name}</button>
                             ))}
                         </div>
                     )}
@@ -355,7 +432,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfirm, onCancel }) => {
                     {axisMode === 'preset' && (
                         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-4">
                             {AXIS_PRESETS.map(axis => (
-                                <button key={axis.id} onClick={() => { setSelectedAxis(axis.id); AudioService.playSfx('ui_click'); }} className={`p-4 border text-center text-sm font-mono tracking-wider transition-all duration-300 hover:-translate-y-0.5 ${selectedAxis === axis.id ? 'border-amber-400/80 text-amber-200 bg-amber-900/40 shadow-[inset_0_0_15px_rgba(245,158,11,0.2),0_0_20px_rgba(245,158,11,0.2)]' : 'border-amber-900/40 text-amber-600/80 bg-black/40 hover:bg-amber-900/20 hover:border-amber-600/60 hover:text-amber-400'}`}>{axis.id}</button>
+                                <button key={axis.id} onClick={() => { setSelectedAxis(axis.id); AudioService.playSfx('ui_click'); }} className={`p-4 border text-center text-sm font-mono tracking-wider transition-all duration-300 hover:-translate-y-0.5 ${selectedAxis === axis.id ? 'border-amber-400/80 text-amber-200 bg-amber-900/40 shadow-[inset_0_0_15px_rgba(245,158,11,0.2),0_0_20px_rgba(245,158,11,0.2)]' : 'border-amber-900/40 text-amber-600/80 bg-black/40 hover:bg-amber-900/20 hover:border-amber-600/60 hover:text-amber-400'}`}>{axis.name}</button>
                             ))}
                         </div>
                     )}
@@ -449,7 +526,8 @@ interface PreviewPanelProps {
     pendingConfig: Partial<StoryConfig>;
     episodicTension: number;
     episodicNodeCount: number;
-    narrativePreview: { params?: StoryConfig; activePlots: PlotPoint[]; mainPlots: PlotPoint[]; sidePlots: PlotPoint[]; expectedPlotsText: string; analysis?: any; };
+    aesthetics: HorrorAesthetic[];
+    narrativePreview: { params?: StoryConfig; activePlots: PlotPoint[]; mainPlots: PlotPoint[]; sidePlots: PlotPoint[]; expectedPlotsText: string; analysis?: ChainNarrative['analysis']; };
     onConfirm: (autoGenOptions?: { images?: boolean; videos?: boolean; audios?: boolean }) => void;
     onCancel?: () => void;
 }
@@ -477,7 +555,7 @@ const DataItem: React.FC<{ label: string; value: React.ReactNode; colorClass: st
     </div>
 );
 
-const PreviewPanel: React.FC<PreviewPanelProps> = ({ player, pendingConfig, episodicTension, episodicNodeCount, narrativePreview, onConfirm, onCancel }) => {
+const PreviewPanel: React.FC<PreviewPanelProps> = ({ player, pendingConfig, episodicTension, episodicNodeCount, aesthetics, narrativePreview, onConfirm, onCancel }) => {
     const { params, activePlots, mainPlots, sidePlots, expectedPlotsText, analysis } = narrativePreview;
     const [assetsGen, setAssetsGen] = useState({ images: false, videos: false, audios: false });
     const [showPrompt, setShowPrompt] = useState(false);
@@ -497,16 +575,23 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ player, pendingConfig, epis
 
     const modeDef = MODES_DEF.find(m => m.id === pendingConfig.mode?.id) || MODES_DEF[0];
     const pacingDef = NARRATIVE_PACING.find(p => p.id === pendingConfig.pacing?.id) || NARRATIVE_PACING[1];
-    const themeDef = PRESET_THEMES.find(t => t.id === pendingConfig.theme?.id) || null;
+    const aestheticDef = aesthetics.find(a => a.id === pendingConfig.aesthetic?.id) || null;
     const motifDef = pendingConfig.motif?.id ? MOTIF_PRESETS.find(m => m.id === pendingConfig.motif?.id) : null;
     const axisDef = pendingConfig.mainAxis?.id ? AXIS_PRESETS.find(a => a.id === pendingConfig.mainAxis?.id) : null;
+
+    // _Nar 不含视觉字段，配色由表现层按 id 取，替代历史上的 mainColor。
+    const modeColor = 'text-emerald-400';
+    const pacingColor = 'text-amber-500';
+    const aestheticColor = aestheticDef ? COLOR_SCHEME_MAP[pickAestheticScheme(aestheticDef.id)].text : 'text-cyan-400';
+    const axisColor = 'text-amber-400';
+    const motifColor = 'text-purple-400';
 
     const handleExportPrompt = () => {
         // 构建完整的提示词导出
         const isChain = pendingConfig.mode?.id === 'chain';
         const modeDef = MODES_DEF.find(m => m.id === pendingConfig.mode?.id);
         const pacingDef = NARRATIVE_PACING.find(p => p.id === pendingConfig.pacing?.id);
-        const themeDef = PRESET_THEMES.find(t => t.id === pendingConfig.theme?.id);
+        const aestheticExport = aesthetics.find(a => a.id === pendingConfig.aesthetic?.id);
         const motifDef = pendingConfig.motif?.id ? MOTIF_PRESETS.find(m => m.id === pendingConfig.motif?.id) : null;
         const axisDef = pendingConfig.mainAxis?.id ? AXIS_PRESETS.find(a => a.id === pendingConfig.mainAxis?.id) : null;
 
@@ -515,7 +600,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ player, pendingConfig, epis
         exportText += '[NARRATIVE MODE]\n';
         exportText += `ID: ${pendingConfig.mode?.id || 'unknown'}\n`;
         if (modeDef) {
-            exportText += `Description: ${modeDef.sub}\n`;
+            exportText += `Description: ${modeDef.name}\n`;
             exportText += `Prompt: ${modeDef.prompt}\n`;
         }
         exportText += '\n';
@@ -524,18 +609,21 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ player, pendingConfig, epis
             exportText += '[PACING]\n';
             exportText += `ID: ${pendingConfig.pacing.id}\n`;
             if (pacingDef) {
-                exportText += `Description: ${pacingDef.sub}\n`;
+                exportText += `Description: ${pacingDef.name}\n`;
                 exportText += `Prompt: ${pacingDef.prompt}\n`;
             }
             exportText += '\n';
         }
 
-        exportText += '[THEME]\n';
-        exportText += `ID: ${pendingConfig.theme?.id || 'auto'}\n`;
-        if (themeDef) {
-            exportText += `Description: ${themeDef.sub}\n`;
-            exportText += `Category: ${themeDef.belong}\n`;
-            exportText += `Prompt: ${themeDef.prompt}\n`;
+        exportText += '[AESTHETIC]\n';
+        exportText += `ID: ${pendingConfig.aesthetic?.id || 'auto'}\n`;
+        if (aestheticExport) {
+            exportText += `Description: ${aestheticExport.desc}\n`;
+            exportText += `Primary Domain: ${aestheticExport.primaryDomain}\n`;
+            exportText += `Interfering Domains: ${(aestheticExport.interferingDomains ?? []).join(', ') || 'none'}\n`;
+            exportText += `Skeleton: ${aestheticExport.structure.skeleton.map(s => `${s.atomId}(${s.dominance})`).join(', ')}\n`;
+            exportText += `Flesh: ${(aestheticExport.structure.flesh ?? []).map(f => `${f.atomId}${f.revealPhase ? `@${f.revealPhase}` : ''}`).join(', ') || 'none'}\n`;
+            exportText += `Prompt: ${aestheticExport.prompt}\n`;
         }
         exportText += '\n';
 
@@ -544,7 +632,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ player, pendingConfig, epis
                 exportText += '[MOTIF]\n';
                 exportText += `ID: ${pendingConfig.motif.id}\n`;
                 if (motifDef) {
-                    exportText += `Description: ${motifDef.sub}\n`;
+                    exportText += `Description: ${motifDef.name}\n`;
                     exportText += `Prompt: ${motifDef.prompt}\n`;
                 }
                 exportText += '\n';
@@ -554,7 +642,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ player, pendingConfig, epis
                 exportText += '[MAIN AXIS]\n';
                 exportText += `ID: ${pendingConfig.mainAxis.id}\n`;
                 if (axisDef) {
-                    exportText += `Description: ${axisDef.sub}\n`;
+                    exportText += `Description: ${axisDef.name}\n`;
                     exportText += `Prompt: ${axisDef.prompt}\n`;
                 }
                 exportText += '\n';
@@ -611,11 +699,11 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ player, pendingConfig, epis
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
                     <PreviewSection title="静态组态 | CONFIG" colorScheme="emerald">
                         <div className="grid grid-cols-2 gap-5">
-                            <DataItem label="运算拓扑" value={isChain ? '长线递归' : '孤立沙盒'} colorClass={modeDef.mainColor} valueClass={modeDef.mainColor} />
-                            {isChain && <DataItem label="步长节律" value={pendingConfig.pacing?.id?.toUpperCase() || 'AUTO'} colorClass={pacingDef.mainColor} valueClass={pacingDef.mainColor} />}
-                            <DataItem label="基准主题" value={pendingConfig.theme?.id || '自发生成'} colorClass={themeDef?.mainColor || 'text-emerald-400'} valueClass={themeDef?.mainColor || 'text-emerald-400'} />
-                            {isChain && <DataItem label="逻辑主轴" value={pendingConfig.mainAxis?.id || '自发生成'} colorClass={axisDef?.mainColor || 'text-amber-400'} valueClass={axisDef?.mainColor || 'text-amber-400'} />}
-                            {isChain && <DataItem label="内核主旨" value={pendingConfig.motif?.id || '自发生成'} colorClass={motifDef?.mainColor || 'text-purple-400'} valueClass={motifDef?.mainColor || 'text-purple-400'} />}
+                            <DataItem label="运算拓扑" value={isChain ? '长线递归' : '孤立沙盒'} colorClass={modeColor} valueClass={modeColor} />
+                            {isChain && <DataItem label="步长节律" value={pendingConfig.pacing?.id?.toUpperCase() || 'AUTO'} colorClass={pacingColor} valueClass={pacingColor} />}
+                            <DataItem label="基准主题" value={pendingConfig.aesthetic?.id || '自发生成'} colorClass={aestheticColor} valueClass={aestheticColor} />
+                            {isChain && <DataItem label="逻辑主轴" value={pendingConfig.mainAxis?.id || '自发生成'} colorClass={axisColor} valueClass={axisColor} />}
+                            {isChain && <DataItem label="内核主旨" value={pendingConfig.motif?.id || '自发生成'} colorClass={motifColor} valueClass={motifColor} />}
                         </div>
                     </PreviewSection>
                     <PreviewSection title="运行时评估 | ENGINE" colorScheme="purple">
@@ -664,7 +752,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ player, pendingConfig, epis
                         <div className="space-y-4 max-h-96 overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-rose-900/50 scrollbar-track-transparent">
                             {activePlots.map(plot => (
                                 <div key={plot.id} className="text-base p-6 bg-black/40 border border-rose-900/30 flex items-start gap-6 transition-colors hover:bg-rose-950/20 hover:border-rose-900/60">
-                                    <span className="shrink-0 text-sm px-4 py-2 border border-rose-500/50 text-rose-400 font-mono">{plot.type === 'main' ? '主干' : '支流'}</span>
+                                    <span className="shrink-0 text-sm px-4 py-2 border border-rose-500/50 text-rose-400 font-mono">{plot.type === 'M' ? '主干' : '支流'}</span>
                                     <div className="flex-1 space-y-3">
                                         <div className="text-rose-200 leading-relaxed">{plot.content}</div>
                                         <div className="text-xs text-rose-800/80 font-mono">UID: {plot.id.slice(0, 8)}</div>
@@ -812,24 +900,47 @@ interface NarrativePanelProps {
     loadNarrativeLibrary: () => Promise<void>;
     deleteNarrativeArc: (arcId: string) => Promise<boolean>;
     deleteEpisodicZone: (zoneId: string) => Promise<boolean>;
-    narrativePreview: { params?: StoryConfig; activePlots: PlotPoint[]; mainPlots: PlotPoint[]; sidePlots: PlotPoint[]; expectedPlotsText: string; analysis?: any; };
+    narrativePreview: {
+        params?: StoryConfig;
+        activePlots: PlotPoint[];
+        mainPlots: PlotPoint[];
+        sidePlots: PlotPoint[];
+        expectedPlotsText: string;
+        analysis?: ChainNarrative['analysis'];
+    };
     onComplete: (config: StoryConfig) => void;
     onCancel?: () => void;
     onLoadLibrary?: (type: 'chain' | 'episodic', identifier: string) => void;
-    narrativeFlowStep: 'mode' | 'pacing' | 'theme' | 'config' | 'details' | 'preview' | 'library' | 'closed';
+
+    // 自建叙事库（恐怖域 / 元 / 美学）
+    narrativeDomains: HorrorDomain[];
+    narrativeAtoms: HorrorAtom[];
+    narrativeAesthetics: HorrorAesthetic[];
+    customNarrativeDomains: HorrorDomain[];
+    customNarrativeAtoms: HorrorAtom[];
+    customNarrativeAesthetics: HorrorAesthetic[];
+    isNarrativeLibraryLoading: boolean;
+    isNarrativeLibrarySaving: boolean;
+    upsertNarrativeDomain: (draft: HorrorDomain, isNew: boolean) => Promise<NarrativeMutationResult>;
+    upsertNarrativeAtom: (draft: HorrorAtom, isNew: boolean) => Promise<NarrativeMutationResult>;
+    upsertNarrativeAesthetic: (draft: HorrorAesthetic, isNew: boolean) => Promise<NarrativeMutationResult>;
+    removeNarrativeDomain: (id: string) => Promise<NarrativeMutationResult>;
+    removeNarrativeAtom: (id: string) => Promise<NarrativeMutationResult>;
+    removeNarrativeAesthetic: (id: string) => Promise<NarrativeMutationResult>;
+
+    narrativeFlowStep: 'mode' | 'pacing' | 'aesthetic' | 'config' | 'details' | 'preview' | 'library' | 'closed';
     narrativeFlowPendingConfig: Partial<StoryConfig>;
     narrativeFlowEpisodicTension: number;
     narrativeFlowEpisodicNodeCount: number;
     narrativeFlowHasSuspendedArc: boolean;
-    setNarrativeFlowStep: React.Dispatch<React.SetStateAction<'mode' | 'pacing' | 'theme' | 'config' | 'details' | 'preview' | 'library' | 'closed'>>;
+    setNarrativeFlowStep: React.Dispatch<React.SetStateAction<'mode' | 'pacing' | 'aesthetic' | 'config' | 'details' | 'preview' | 'library' | 'closed'>>;
     setNarrativeFlowEpisodicTension: React.Dispatch<React.SetStateAction<number>>;
     setNarrativeFlowEpisodicNodeCount: React.Dispatch<React.SetStateAction<number>>;
-    setNarrativeFlowPendingConfig: React.Dispatch<React.SetStateAction<Partial<StoryConfig>>>;
     handleNarrativeFlowOpenLibrary: () => void;
     handleNarrativeFlowLoadFromLibrary: (type: 'chain' | 'episodic', identifier: string) => void;
     handleNarrativeFlowModeConfirm: (mode: NarrativeMode) => void;
     handleNarrativeFlowPacingConfirm: (pacing: NarrativePacing) => void;
-    handleNarrativeFlowThemeConfirm: (theme: string) => void;
+    handleNarrativeFlowAestheticConfirm: (aesthetic: StoryConfig['aesthetic']) => void;
     handleNarrativeFlowConfigConfirm: (themeConfig: { motif: string; mainAxis: string }) => void;
     handleNarrativeFlowDetailsConfirm: () => void;
     handleNarrativeFlowPreviewConfirm: () => void;
@@ -837,21 +948,112 @@ interface NarrativePanelProps {
     handleNarrativeFlowCancel: () => void;
 }
 
-const NarrativePanel: React.FC<NarrativePanelProps> = ({ player, narrativeLibrary, loadNarrativeLibrary, deleteNarrativeArc, deleteEpisodicZone, narrativePreview, narrativeFlowStep, narrativeFlowPendingConfig, narrativeFlowEpisodicTension, narrativeFlowEpisodicNodeCount, narrativeFlowHasSuspendedArc, setNarrativeFlowStep, setNarrativeFlowEpisodicTension, setNarrativeFlowEpisodicNodeCount, handleNarrativeFlowOpenLibrary, handleNarrativeFlowLoadFromLibrary, handleNarrativeFlowModeConfirm, handleNarrativeFlowPacingConfirm, handleNarrativeFlowThemeConfirm, handleNarrativeFlowConfigConfirm, handleNarrativeFlowDetailsConfirm, handleNarrativeFlowPreviewConfirm, handleNarrativeFlowBack, handleNarrativeFlowCancel }) => {
+const NarrativePanel: React.FC<NarrativePanelProps> = ({
+    player,
+    narrativeLibrary,
+    loadNarrativeLibrary,
+    deleteNarrativeArc,
+    deleteEpisodicZone,
+    narrativePreview,
+    narrativeDomains,
+    narrativeAtoms,
+    narrativeAesthetics,
+    customNarrativeDomains,
+    customNarrativeAtoms,
+    customNarrativeAesthetics,
+    isNarrativeLibraryLoading,
+    isNarrativeLibrarySaving,
+    upsertNarrativeDomain,
+    upsertNarrativeAtom,
+    upsertNarrativeAesthetic,
+    removeNarrativeDomain,
+    removeNarrativeAtom,
+    removeNarrativeAesthetic,
+    narrativeFlowStep,
+    narrativeFlowPendingConfig,
+    narrativeFlowEpisodicTension,
+    narrativeFlowEpisodicNodeCount,
+    setNarrativeFlowStep,
+    setNarrativeFlowEpisodicTension,
+    setNarrativeFlowEpisodicNodeCount,
+    handleNarrativeFlowOpenLibrary,
+    handleNarrativeFlowLoadFromLibrary,
+    handleNarrativeFlowModeConfirm,
+    handleNarrativeFlowPacingConfirm,
+    handleNarrativeFlowAestheticConfirm,
+    handleNarrativeFlowConfigConfirm,
+    handleNarrativeFlowDetailsConfirm,
+    handleNarrativeFlowPreviewConfirm,
+    handleNarrativeFlowBack,
+    handleNarrativeFlowCancel,
+}) => {
+    // 工作台是覆盖在流程之上的独立层：打开时保留当前步骤，关闭后回到原处。
+    const [showStudio, setShowStudio] = useState(false);
+
     // 挂起弧线的玩家仍应能看到叙事面板（ModePanel 提供流程入口，
     // PacingPanel 会显示"恢复神经链接"路径）。历史实现此处 return null
     // 导致挂起后叙事面板整体不可见、恢复按钮成为死代码。
 
-    switch (narrativeFlowStep) {
-        case 'mode': return <ModePanel onConfirm={handleNarrativeFlowModeConfirm} onCancel={handleNarrativeFlowCancel} onOpenLibrary={handleNarrativeFlowOpenLibrary} />;
-        case 'pacing': return <PacingPanel player={player} onConfirm={handleNarrativeFlowPacingConfirm} onCancel={handleNarrativeFlowBack} />;
-        case 'theme': return <ThemePanel onConfirm={handleNarrativeFlowThemeConfirm} onCancel={handleNarrativeFlowBack} />;
-        case 'config': return <ConfigPanel onConfirm={handleNarrativeFlowConfigConfirm} onCancel={handleNarrativeFlowBack} />;
-        case 'details': return <DetailsPanel tension={narrativeFlowEpisodicTension} nodeCount={narrativeFlowEpisodicNodeCount} onTensionChange={setNarrativeFlowEpisodicTension} onNodeCountChange={setNarrativeFlowEpisodicNodeCount} onConfirm={handleNarrativeFlowDetailsConfirm} onCancel={handleNarrativeFlowBack} />;
-        case 'preview': return <PreviewPanel player={player} pendingConfig={narrativeFlowPendingConfig} episodicTension={narrativeFlowEpisodicTension} episodicNodeCount={narrativeFlowEpisodicNodeCount} narrativePreview={narrativePreview} onConfirm={handleNarrativeFlowPreviewConfirm} onCancel={handleNarrativeFlowBack} />;
-        case 'library': return <LibraryPanel narrativeLibrary={narrativeLibrary} loadNarrativeLibrary={loadNarrativeLibrary} deleteNarrativeArc={deleteNarrativeArc} deleteEpisodicZone={deleteEpisodicZone} onLoadArc={(arcId) => handleNarrativeFlowLoadFromLibrary('chain', arcId)} onLoadEpisodic={(zoneId) => handleNarrativeFlowLoadFromLibrary('episodic', zoneId || '')} onBack={() => setNarrativeFlowStep('mode')} />;
-        default: return null;
-    }
+    const openStudio = () => {
+        AudioService.playSfx('ui_click');
+        setShowStudio(true);
+    };
+
+    const renderStep = () => {
+        switch (narrativeFlowStep) {
+            case 'mode': return <ModePanel onConfirm={handleNarrativeFlowModeConfirm} onCancel={handleNarrativeFlowCancel} onOpenLibrary={handleNarrativeFlowOpenLibrary} />;
+            case 'pacing': return <PacingPanel player={player} onConfirm={handleNarrativeFlowPacingConfirm} onCancel={handleNarrativeFlowBack} />;
+            case 'aesthetic': return (
+                <AestheticPanel
+                    aesthetics={narrativeAesthetics}
+                    isLoading={isNarrativeLibraryLoading}
+                    onConfirm={handleNarrativeFlowAestheticConfirm}
+                    onOpenStudio={openStudio}
+                    onCancel={handleNarrativeFlowBack}
+                />
+            );
+            case 'config': return <ConfigPanel onConfirm={handleNarrativeFlowConfigConfirm} onCancel={handleNarrativeFlowBack} />;
+            case 'details': return <DetailsPanel tension={narrativeFlowEpisodicTension} nodeCount={narrativeFlowEpisodicNodeCount} onTensionChange={setNarrativeFlowEpisodicTension} onNodeCountChange={setNarrativeFlowEpisodicNodeCount} onConfirm={handleNarrativeFlowDetailsConfirm} onCancel={handleNarrativeFlowBack} />;
+            case 'preview': return (
+                <PreviewPanel
+                    player={player}
+                    pendingConfig={narrativeFlowPendingConfig}
+                    episodicTension={narrativeFlowEpisodicTension}
+                    episodicNodeCount={narrativeFlowEpisodicNodeCount}
+                    aesthetics={narrativeAesthetics}
+                    narrativePreview={narrativePreview}
+                    onConfirm={handleNarrativeFlowPreviewConfirm}
+                    onCancel={handleNarrativeFlowBack}
+                />
+            );
+            case 'library': return <LibraryPanel narrativeLibrary={narrativeLibrary} loadNarrativeLibrary={loadNarrativeLibrary} deleteNarrativeArc={deleteNarrativeArc} deleteEpisodicZone={deleteEpisodicZone} onLoadArc={(arcId) => handleNarrativeFlowLoadFromLibrary('chain', arcId)} onLoadEpisodic={(zoneId) => handleNarrativeFlowLoadFromLibrary('episodic', zoneId || '')} onBack={() => setNarrativeFlowStep('mode')} />;
+            default: return null;
+        }
+    };
+
+    return (
+        <>
+            {renderStep()}
+            {showStudio && (
+                <AestheticStudio
+                    domains={narrativeDomains}
+                    atoms={narrativeAtoms}
+                    aesthetics={narrativeAesthetics}
+                    customDomains={customNarrativeDomains}
+                    customAtoms={customNarrativeAtoms}
+                    customAesthetics={customNarrativeAesthetics}
+                    isSaving={isNarrativeLibrarySaving}
+                    onUpsertDomain={upsertNarrativeDomain}
+                    onUpsertAtom={upsertNarrativeAtom}
+                    onUpsertAesthetic={upsertNarrativeAesthetic}
+                    onRemoveDomain={removeNarrativeDomain}
+                    onRemoveAtom={removeNarrativeAtom}
+                    onRemoveAesthetic={removeNarrativeAesthetic}
+                    onClose={() => setShowStudio(false)}
+                />
+            )}
+        </>
+    );
 };
 
 export default NarrativePanel;

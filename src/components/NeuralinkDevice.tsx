@@ -32,13 +32,15 @@ import {
   Zone,
   Node as GameNode,
   clamp,
+  getNodeThreatLevel,
   getPercent,
   Tactic,
   ItemInstance,
   Entity,
-  NpcTemplate,
-  NpcDynamicState,
+  CompanionTemplate,
+  CompanionDynamicState,
 } from '../meta';
+import type { InventoryGridApi } from '../hooks';
 import { AudioService } from '../services';
 import VisualPanel from './VisualPanel';
 import StatusPanel from './StatusPanel';
@@ -111,6 +113,8 @@ export interface NeuralinkDeviceProps {
   // ---- 物品 / 同伴交互 ----
   onUseItem?: (instanceId: string) => void;
   onDiscardItem?: (instanceId: string) => void;
+  /** 背包网格契约：格子背包的落位结果与编辑动作 */
+  inventoryGrid: InventoryGridApi;
   /**
    * 卸下已装备物品。
    *
@@ -287,6 +291,7 @@ const NeuralinkDeviceBase: React.FC<NeuralinkDeviceProps> = ({
   onAction,
   onUseItem,
   onDiscardItem,
+  inventoryGrid,
   onUnequipItem,
   onInteractWithCompanion,
   isSanctuary = false,
@@ -487,7 +492,7 @@ const NeuralinkDeviceBase: React.FC<NeuralinkDeviceProps> = ({
   }, [onUnequipItem]);
 
   const handleInteractWithCompanion = useCallback(
-    (npc: Entity<NpcTemplate, NpcDynamicState>) => {
+    (npc: Entity<CompanionTemplate, CompanionDynamicState>) => {
       onInteractWithCompanion?.(npc.static.id);
     },
     [onInteractWithCompanion],
@@ -613,6 +618,7 @@ const NeuralinkDeviceBase: React.FC<NeuralinkDeviceProps> = ({
         return (
           <InventoryPanel
             player={player}
+            grid={inventoryGrid}
             onUseItem={handleUseItem}
             onDiscardItem={handleDiscardItem}
             gameActive
@@ -674,7 +680,7 @@ const NeuralinkDeviceBase: React.FC<NeuralinkDeviceProps> = ({
                 zoneName={currentZone.name}
                 nodeName={currentNode.name}
                 nodedesc={currentNode.desc ?? ''}
-                threatLevel={currentNode.threatLevel ?? 0}
+                threatLevel={getNodeThreatLevel(currentNode)}
                 interactions={currentNode.interactions}
                 sanity={player.dynamic.sanity}
                 onToggleMode={handleToggleMode}

@@ -22,7 +22,7 @@
  * - 左右面板与一切可能为空的容器，统一铺设网格纹理 + 顶光晕 + 角标，
  *   使剩余空间成为有质感的 HUD 表面，而非死黑留白。
  * - 敌对卡片 flex-1 均分铺满整行；队友卡片 flex-1 拉伸铺满左列；
- *   右列战术列表 flex-1 + 战斗遥测条，主动吃掉所有留白。
+ *   右列战术列表 flex-1 + 战斗地图，主动吃掉所有留白。
  *
  * 响应式：
  * < lg：flex-col 单列纵向滚动，块间 gap-px 贴合，舞台肖像区 min-h 撑起。
@@ -34,19 +34,34 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import type { CounterAdvanceRequest } from '../hooks/useCombat';
+import type {
+    AnyTactic,
+    AttackForecast,
+    AttackForecastSource,
+    CombatPosition,
+    CounterAdvanceRequest,
+    InsertActionWindow,
+    MoveDirection,
+    WeaponTraitState,
+} from '../hooks';
+import { getBattleDistance, getCoverAtCell, getSteppedCell, isCellWalkable } from '../hooks';
 import {
-    ActionEffectType,
+    AccumulateCounter,
     AttackResult,
     AttributeType,
+    BattleMap,
     CombatAlly,
     CombatDynamicState,
     CombatEnemy,
     CombatIntent,
+    CounterType,
+    Cover,
     DefenseResult,
     DynamicVitalType,
+    EquipState,
     IntentType,
     Tactic,
+    TacticEffectType,
     Target,
     VitalType,
     WeaponType,
@@ -88,7 +103,7 @@ const combatPanelCss = `
 .tabular { font-variant-numeric: tabular-nums; }
 
 /* ---------- 分舱装甲表面 ---------- */
-/* 纵深：顶缘高光 + 顶弧受光 + 底缘内投影，读作「抬起的分舱装甲板」而非平面色块 */
+/* 纵深：顶缘高光 + 顶弧受光 + 底缘内投影 + 外缘接触阴影，读作「抬起的分舱装甲板」而非平面色块 */
 .surf-panel {
   background:
     radial-gradient(ellipse 120% 60% at 50% 0%, rgba(168, 202, 226, 0.07), transparent 62%),
@@ -96,7 +111,10 @@ const combatPanelCss = `
   box-shadow:
     inset 0 1px 0 rgba(233, 242, 248, 0.07),
     inset 0 -26px 36px -24px rgba(0, 0, 0, 0.92),
-    inset 0 0 64px rgba(0, 0, 0, 0.45);
+    inset 0 0 64px rgba(0, 0, 0, 0.45),
+    0 1px 0 rgba(0, 0, 0, 0.75);
+  /* 布局/样式隔离：面板内部变化不触达外层，减少整屏重排重绘范围 */
+  contain: layout style;
 }
 .surf-card { background: linear-gradient(180deg, rgba(14, 22, 34, 0.94), rgba(5, 9, 15, 0.95)); }
 .surf-card--focus { background: linear-gradient(180deg, rgba(11, 33, 47, 0.95), rgba(4, 12, 20, 0.96)); }
@@ -185,14 +203,75 @@ const combatPanelCss = `
 }
 .stage-enter { animation: stage-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
-/* 卡片抬升：悬停时浮起并投下环境遮蔽阴影 */
+/* 卡片抬升：悬停时浮起并投下「接触阴影 + 环境遮蔽」双层投影，读作离舱壁更近的一层板 */
 .card-lift {
   transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s ease, border-color 0.28s ease;
+  /* 绘制隔离：卡片内部状态变化（血条、浮动数字）不触发面板级重绘 */
+  contain: layout paint style;
 }
 .card-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 16px 28px -18px rgba(0, 0, 0, 0.95), inset 0 1px 0 rgba(233, 242, 248, 0.06);
+  box-shadow:
+    0 2px 4px -1px rgba(0, 0, 0, 0.85),
+    0 18px 30px -20px rgba(0, 0, 0, 0.98),
+    0 30px 60px -40px rgba(0, 0, 0, 1),
+    inset 0 1px 0 rgba(233, 242, 248, 0.07);
 }
+
+/* ---------- 视差景深层（指针驱动的三层纵深，仅改 transform，无重排） ---------- */
+.parallax-layer {
+  transition: transform 0.22s cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+.parallax-far { transform: translate3d(calc(var(--par-x, 0) * 5px), calc(var(--par-y, 0) * 4px), 0); }
+.parallax-mid { transform: translate3d(calc(var(--par-x, 0) * 13px), calc(var(--par-y, 0) * 10px), 0); }
+.parallax-near { transform: translate3d(calc(var(--par-x, 0) * -7px), calc(var(--par-y, 0) * -5px), 0); }
+
+/* ---------- 舞台地面与反射：把肖像从「贴在平面上」推向「站在舱室里」 ---------- */
+.stage-floor {
+  background:
+    linear-gradient(to top, rgba(4, 7, 13, 0.96), rgba(4, 7, 13, 0.55) 18%, transparent 46%),
+    linear-gradient(to right, rgba(255, 125, 94, 0.09), transparent 16%, transparent 84%, rgba(255, 125, 94, 0.09));
+}
+.stage-reflect {
+  background: linear-gradient(to top, rgba(255, 125, 94, 0.14), rgba(255, 125, 94, 0.02) 42%, transparent 66%);
+  mix-blend-mode: screen;
+}
+/* 地平线：一条极细的收束高光，给出「地面」的透视参照 */
+.stage-horizon {
+  background: linear-gradient(to right, transparent, rgba(255, 171, 147, 0.4) 26%, rgba(255, 171, 147, 0.55) 50%, rgba(255, 171, 147, 0.4) 74%, transparent);
+}
+
+/* ---------- 受击震屏（一次性，合成层位移；带 1.2% 放大以免位移时露出屏幕边缘） ---------- */
+@keyframes screen-shake {
+  0% { transform: translate3d(0, 0, 0) scale(1.012); }
+  14% { transform: translate3d(-6px, 3px, 0) scale(1.012); }
+  28% { transform: translate3d(5px, -4px, 0) scale(1.012); }
+  42% { transform: translate3d(-4px, -2px, 0) scale(1.012); }
+  58% { transform: translate3d(3px, 3px, 0) scale(1.012); }
+  76% { transform: translate3d(-2px, -1px, 0) scale(1.012); }
+  100% { transform: translate3d(0, 0, 0) scale(1.012); }
+}
+.screen-shake { animation: screen-shake 0.44s cubic-bezier(0.36, 0.07, 0.19, 0.97); will-change: transform; }
+
+/* ---------- 行动点增长脉冲：+1 AP 时该格「重新点亮」 ---------- */
+@keyframes ap-gain {
+  0% { transform: rotate(45deg) scale(0.55); opacity: 0.25; }
+  55% { transform: rotate(45deg) scale(1.22); opacity: 1; }
+  100% { transform: rotate(45deg) scale(1); opacity: 1; }
+}
+.ap-gain { animation: ap-gain 0.42s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* ---------- 蓄反槽就绪（≥5 可发起询问）：外环呼吸提示 ---------- */
+.counter-ready { position: relative; }
+.counter-ready::after {
+  content: ''; position: absolute; inset: -3px; pointer-events: none;
+  border: 1px solid rgba(194, 141, 245, 0.9);
+  animation: counter-ready-pulse 1.7s ease-in-out infinite;
+  will-change: opacity;
+}
+@keyframes counter-ready-pulse { 0%, 100% { opacity: 0.18; } 50% { opacity: 0.85; } }
 
 /* 相位切换：横贯 HUD 的一次性光刃 */
 @keyframes phase-sweep {
@@ -202,12 +281,15 @@ const combatPanelCss = `
 }
 .phase-sweep { animation: phase-sweep 0.95s cubic-bezier(0.4, 0, 0.2, 1) both; }
 
-/* 濒死敌人肖像：色差收紧 + 搏动内描边 */
-@keyframes critical-rim {
-  0%, 100% { box-shadow: inset 0 0 0 1px rgba(255, 125, 94, 0.35), inset 0 0 60px rgba(255, 60, 40, 0.12); }
-  50% { box-shadow: inset 0 0 0 1px rgba(255, 125, 94, 0.8), inset 0 0 120px rgba(255, 60, 40, 0.3); }
+/* 濒死敌人肖像：搏动内描边。
+   把发光放在伪元素上只呼吸 opacity，避免逐帧重绘整块肖像的 box-shadow。 */
+@keyframes critical-rim { 0%, 100% { opacity: 0.32; } 50% { opacity: 1; } }
+.portrait-critical::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 125, 94, 0.8), inset 0 0 120px rgba(255, 60, 40, 0.3);
+  animation: critical-rim 1.5s ease-in-out infinite;
+  will-change: opacity;
 }
-.portrait-critical { animation: critical-rim 1.5s ease-in-out infinite; }
 
 /* 全屏欣赏层 */
 @keyframes fs-enter { 0% { opacity: 0; } 100% { opacity: 1; } }
@@ -236,7 +318,7 @@ const combatPanelCss = `
   -webkit-mask-image: linear-gradient(to right, black 96%, transparent 100%);
 }
 
-/* ---------- 降载：用户偏好减弱动效时关闭一切循环动画 ---------- */
+/* ---------- 降载：用户偏好减弱动效时关闭一切循环动画与视差 ---------- */
 @media (prefers-reduced-motion: reduce) {
   .combat-panel-root *,
   .combat-panel-root *::before,
@@ -245,6 +327,10 @@ const combatPanelCss = `
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  .parallax-far,
+  .parallax-mid,
+  .parallax-near { transform: none !important; }
+  .parallax-layer { will-change: auto; }
 }
 /* ---------- 切角 / 菱形几何 ---------- */
 .clip-notch { clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px); }
@@ -271,18 +357,17 @@ const combatPanelCss = `
     linear-gradient(to right, rgba(143, 214, 247, 0.045) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(143, 214, 247, 0.045) 1px, transparent 1px);
 }
-.bg-grid-fade {
-  background-size: 40px 40px;
+/* 远景合并层：技术网格 + 侵蚀脉络（贴底缘有机渗色）+ 底缘灰烬。
+   三者在同一元素上用多重背景绘制 —— 减少整屏合成层数量与显存占用。 */
+.ambience-deep {
   background-image:
-    linear-gradient(to right, rgba(143, 214, 247, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(143, 214, 247, 0.05) 1px, transparent 1px);
-  mask-image: radial-gradient(circle at center, black, transparent 86%);
-}
-/* 侵蚀脉络：贴屏幕底缘的有机渗色 */
-.erosion-bloom {
-  background:
+    linear-gradient(to right, rgba(143, 214, 247, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(143, 214, 247, 0.045) 1px, transparent 1px),
     radial-gradient(ellipse 70% 26% at 50% 104%, rgba(194, 141, 245, 0.16), transparent 70%),
     radial-gradient(ellipse 34% 18% at 14% 100%, rgba(217, 72, 58, 0.12), transparent 72%);
+  background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%;
+  mask-image: radial-gradient(ellipse 94% 90% at 50% 46%, black 36%, transparent 92%);
+  -webkit-mask-image: radial-gradient(ellipse 94% 90% at 50% 46%, black 36%, transparent 92%);
 }
 .noise-overlay {
   background-image:
@@ -327,13 +412,19 @@ const combatPanelCss = `
   80% { clip-path: inset(54% 0 7% 0); transform: translate(-2px, 3px); }
   100% { clip-path: inset(58% 0 43% 0); transform: translate(1px, -2px); }
 }
-.animate-glitch { animation: glitch 0.4s infinite linear alternate-reverse; }
+/* 故障残影：clip-path 无法合成，故用 steps 把重绘频率从 60fps 降到 ~4fps（观感更「卡帧」） */
+.animate-glitch { animation: glitch 1.8s steps(9) infinite; }
 @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .animate-spin-slow { animation: spin-slow 26s linear infinite; }
 @keyframes bounce-slow { 0%, 100% { transform: translateY(-4px); } 50% { transform: translateY(4px); } }
 .animate-bounce-slow { animation: bounce-slow 3.4s infinite ease-in-out; }
-@keyframes pulse-glow { 0%, 100% { opacity: 0.6; filter: drop-shadow(0 0 5px currentColor); } 50% { opacity: 1; filter: drop-shadow(0 0 18px currentColor); } }
-.animate-pulse-glow { animation: pulse-glow 2.2s infinite ease-in-out; }
+/* 脉动：只动 opacity（合成层），发光用静态 drop-shadow —— 避免逐帧重绘 filter */
+@keyframes pulse-glow { 0%, 100% { opacity: 0.62; } 50% { opacity: 1; } }
+.animate-pulse-glow {
+  animation: pulse-glow 2.2s infinite ease-in-out;
+  filter: drop-shadow(0 0 11px currentColor);
+  will-change: opacity;
+}
 @keyframes phase-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 .animate-phase-blink { animation: phase-blink 1.1s steps(2) infinite; }
 @keyframes soft-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
@@ -346,12 +437,32 @@ const combatPanelCss = `
 }
 @keyframes sweep-x { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
 .animate-sweep-x { animation: sweep-x 3.6s linear infinite; }
-/* 受击闪光：一次性内发光，以 key 重挂载重放 */
-@keyframes damage-hit {
-  0% { opacity: 1; box-shadow: inset 0 0 0 1px rgba(255, 125, 94, 0.95), inset 0 0 46px rgba(255, 125, 94, 0.5); }
-  100% { opacity: 0; box-shadow: inset 0 0 0 1px rgba(255, 125, 94, 0), inset 0 0 46px rgba(255, 125, 94, 0); }
+/* 受击闪光：一次性内发光，以 key 重挂载重放。
+   内发光恒定、只淡出 opacity —— 把每帧 box-shadow 重绘降为合成层淡出。 */
+@keyframes damage-hit { 0% { opacity: 1; } 100% { opacity: 0; } }
+.animate-damage-hit {
+  animation: damage-hit 0.62s ease-out forwards;
+  box-shadow: inset 0 0 0 1px rgba(255, 125, 94, 0.95), inset 0 0 46px rgba(255, 125, 94, 0.5);
+  will-change: opacity;
 }
-.animate-damage-hit { animation: damage-hit 0.62s ease-out forwards; }
+
+/* 战术条目：悬停抬升 + 接触阴影（绘制隔离，内部动画不外溢） */
+.tactic-lift {
+  contain: layout paint style;
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s ease, border-color 0.3s ease, background-color 0.3s ease;
+}
+.tactic-lift:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px -16px rgba(0, 0, 0, 1), inset 0 1px 0 rgba(233, 242, 248, 0.05);
+}
+
+/* ---------- 主网格内投影：让整块 HUD 沉进框架里（画在内容之下，不影响可读性） ---------- */
+.main-vignette {
+  box-shadow:
+    inset 0 0 90px rgba(2, 4, 8, 0.55),
+    inset 0 1px 0 rgba(233, 242, 248, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.85);
+}
 
 /* ---------- 滚动条 ---------- */
 .custom-scrollbar { scrollbar-width: thin; scrollbar-color: rgba(63, 169, 214, 0.75) rgba(126, 156, 182, 0.08); }
@@ -369,14 +480,22 @@ interface CombatPanelProps {
     setActiveAllyId: Dispatch<SetStateAction<string>>;
     isPlayerPhase: boolean;
     isBusy: boolean;
-    getTacticsFor: (ownerId: string) => Tactic[];
-    canUseTactic: (tactic: Tactic, casterId: string) => boolean;
+    getTacticsFor: (ownerId: string) => AnyTactic[];
+    canUseTactic: (tactic: AnyTactic, casterId: string) => boolean;
     executeTactic: (tacticId: string, casterId?: string, manualTargetId?: string) => Promise<void>;
     endPlayerPhase: () => Promise<void>;
-    getVisibleResultSequence?: (targetId: string) => {
-        attackResult: AttackResult[];
-        defenseResult: DefenseResult[];
-    };
+    getVisibleResultSequence?: (targetId: string) => CombatAlly['resultSequence'];
+    /**
+     * 该单位的序列预测深度 n（契约 `CombatAlly.resultSequence`）：
+     * will 为 50 时 n 为 1，此后每 5 点 will 额外 +1；will 小于 50 时 n 为 0。
+     * 敌人恒为 0。
+     */
+    getPredictionDepthFor?: (targetId: string) => number;
+    /**
+     * 战前预测：指定单位攻击指定目标的命中档位、伤害区间与每一处减益的来源。
+     * 返回 null 表示不可预测（序列不可见 / 已耗尽 / 目标已阵亡）。
+     */
+    getAttackForecast?: (attackerId: string, targetId: string) => AttackForecast | null;
     pendingDefense?: Record<string, DefenseResult[]>;
     /**
      * 敌人肖像生成。
@@ -389,33 +508,47 @@ interface CombatPanelProps {
     /** 按资产键查询该敌人的肖像是否正在生成。 */
     isEnemyVisualGenerating?: (enemyAssetId: string) => boolean;
     /** 战场位置表：key 为我方 targetId（player / 同伴 id）或敌方 instanceId。 */
-    positions?: Record<string, number>;
-    /** 战线坐标下限（小地图渲染用）。 */
-    battleLineMin?: number;
-    /** 战线坐标上限（小地图渲染用）。 */
-    battleLineMax?: number;
+    positions?: Record<string, CombatPosition>;
+    /** 当前战场地图：纵深范围、轨道数、掩体落点与环境修正。 */
+    battleMap?: BattleMap;
+    /** 运行时掩体（契约 Cover：覆盖率 / 通行性 / 耐久；落点见 battleMap.covers）。 */
+    covers?: Cover[];
     /** 单位攻击距离查询：我方取主手武器 range，敌方取模板 range；0 = 无限距离。 */
     getUnitRange?: (unitId: string) => number;
-    /** 我方单位前进 / 后退一步。dir：1 前进（靠近敌方），-1 后退（远离敌方）。 */
-    onMoveAlly?: (allyId: string, dir: 1 | -1) => Promise<void>;
+    /** 单次位移的行动点消耗（基础值 + 环境移动修正）。 */
+    getMoveCost?: () => number;
+    /** 我方单位四向位移一步（纵深推进 / 撤离、换轨）。 */
+    onMoveAlly?: (allyId: string, dir: MoveDirection) => Promise<void>;
     /** 蓄反 / 差反预支询问；非空时在底部通栏弹出询问条（不遮挡主界面）。 */
     counterPrompt?: CounterAdvanceRequest | null;
-    /** 回应预支询问：true = 预支，false = 保留 / 放弃。 */
-    onResolveCounterPrompt?: (approve: boolean) => void;
+    /**
+     * 回应预支询问：false = 保留 / 放弃；
+     * true 且给出 advancePoints 时按该档位预支（仅差反的 2n），否则采用默认档位。
+     */
+    onResolveCounterPrompt?: (approve: boolean, advancePoints?: number) => void;
     /** 每单位预支询问跳过开关（player / 同伴 id → 蓄反 / 差反）。 */
-    counterSkip?: Record<string, Partial<Record<CounterAdvanceRequest['kind'], boolean>>>;
+    counterSkip?: Record<string, Partial<Record<CounterAdvanceRequest['type'], boolean>>>;
     /** 切换某单位的跳过开关。 */
-    onToggleCounterSkip?: (unitId: string, kind: CounterAdvanceRequest['kind'], skip: boolean) => void;
-    /** 「立即行动」窗口：非空时锁定该单位并允许立即操作（预支的后续行为）。 */
-    insertAction?: { unitId: string; chancesLeft: number } | null;
+    onToggleCounterSkip?: (unitId: string, type: CounterType, skip: boolean) => void;
+    /**
+     * 我方单位的武器特性回合状态（瞄准 / 待装填 / 本回合移动 / 免费攻击已用）。
+     * 用于在单位卡片上提示「已瞄准」「待装填」等契约武器特性。
+     */
+    weaponStates?: Record<string, WeaponTraitState>;
+    /**
+     * 「立即行动」窗口：非空时锁定该单位并允许立即操作（预支的后续行为）。
+     * 每次行动按其自身行动点成本消耗窗口行动点；行动点耗尽即窗口结束，可随时手动结束。
+     */
+    insertAction?: InsertActionWindow | null;
     /** 手动结束「立即行动」窗口。 */
     onEndInsertAction?: () => void;
 }
 
-type ManualTargetMode = 'single_ally' | 'single_teammate' | 'enemy' | null;
-type AnyTacticEffect =
-    | [Target, AttributeType | DynamicVitalType, number]
-    | [Target, AttributeType, number, number];
+
+/** 契约战术效果恒为四元组 [目标, 效果类型, 效果值, 持续回合]。 */
+type TacticEffectTuple = NonNullable<AnyTactic['tacticEffect']>[number];
+
+type ManualTargetMode = Extract<Target, `single_${string}`> | null;
 
 // =====================
 // 图标（内联 SVG，无 emoji）
@@ -461,7 +594,7 @@ const Icon: React.FC<{ name: IconName; className?: string; strokeWidth?: number 
 // 标签与格式化
 // =====================
 const ATTR_LABEL: Record<AttributeType, string> = {
-    strength: '力量', agility: '敏捷', wisdom: '智慧', perception: '感知', spiritual: '灵性',
+    strength: '力量', agility: '敏捷', wisdom: '智慧', awareness: '感知', will: '意志', cthulhu: '不可知',
 };
 const DYNAMIC_VITAL_LABEL: Record<DynamicVitalType, string> = {
     hp: '生命', sanity: '理智', stamina: '体力', vigor: '精力',
@@ -471,7 +604,7 @@ const VITAL_LABEL: Record<VitalType, string> = {
 };
 const TARGET_LABEL: Record<Target, string> = {
     self: '自身', single_teammate: '单个队友', all_teammates: '所有队友', single_ally: '单个友方',
-    all_allies: '所有友方', enemy: '敌方目标', all_enemies: '所有敌方', none: '无目标',
+    all_allies: '所有友方', single_enemy: '敌方目标', all_enemies: '所有敌方', none: '无目标',
 };
 const RESULT_LABEL: Record<string, string> = {
     miss: '未中', graze: '擦伤', hit: '命中', crit: '暴击', dodge: '闪避', fail: '失效', partial: '部分',
@@ -489,6 +622,17 @@ const WEAPON_LABEL: Record<WeaponType, string> = {
     magic: '法术', sniper_rifle: '狙击步枪', assault_rifle: '突击步枪', smg: '冲锋枪',
     pistol: '手枪', shotgun: '霰弹枪', sawed_off: '短管霰弹枪', crossbow: '弩',
     throw: '投掷', bow: '弓', wave: '挥动', both_wave: '双手挥动', prick: '刺击', both_prick: '双手刺击',
+    shield: '盾牌', both_shield: '双手盾牌',
+};
+/** 战术大类展示元数据（契约 TacticType：A 攻击 / D 防御 / U 辅助）。 */
+const TACTIC_KIND_META: Record<Tactic['type'], { label: string; className: string }> = {
+    A: { label: '攻击', className: 'border-[#ff7d5e]/60 text-[#ffc4b0] bg-[#3a0f0b]/50' },
+    D: { label: '防御', className: 'border-[#8fd6f7]/60 text-[#cdeeff] bg-[#0a2735]/50' },
+    U: { label: '辅助', className: 'border-[#f0c05a]/60 text-[#ffe6b0] bg-[#3d2a06]/50' },
+};
+/** 无附带效果收益时的战术说明文案。 */
+const TACTIC_KIND_FALLBACK: Record<Tactic['type'], string> = {
+    A: '执行武器攻击', D: '布设防御判定', U: '调整自身状态',
 };
 const INTENT_META: Record<IntentType, { icon: IconName; label: string; en: string; className: string }> = {
     attack: { icon: 'sword', label: '攻击', en: '强攻', className: 'border-[#ff7d5e]/70 text-[#ffc4b0] bg-[#43100b]/60' },
@@ -505,23 +649,24 @@ const APPROACH_META: { icon: IconName; label: string; en: string; className: str
 const resolveIntentMeta = (intent: CombatIntent) =>
     intent.approach ? APPROACH_META : INTENT_META[intent.type];
 const SPECIAL_EFFECT_LABEL: Record<string, string> = {
-    sheild: '偏转矩阵', heal_hp: '生命恢复', heal_sanity: '理智恢复', heal_stamina: '体力恢复',
-    heal_vigor: '精力恢复', restore_battery: '电池修复', repair_integrity: '完整性修复', ap_reduce: '行动点削减',
+    shield: '偏转矩阵', battery: '电池修复', integrity: '完整性修复',
+    ap: '行动点增减', speed: '速度', damage: '攻击力', defense: '防御力', evasion: '闪避力',
 };
-const STATUS_META: Partial<Record<ActionEffectType, { icon: IconName; label: string; tone: 'buff' | 'debuff' | 'neutral' }>> = {
+const STATUS_META: Partial<Record<TacticEffectType, { icon: IconName; label: string; tone: 'buff' | 'debuff' | 'neutral' }>> = {
     shield: { icon: 'shield', label: '偏转矩阵', tone: 'buff' },
-    heal_hp: { icon: 'heart', label: '生命再生', tone: 'buff' },
-    heal_sanity: { icon: 'brain', label: '理智再生', tone: 'buff' },
-    heal_stamina: { icon: 'drop', label: '体力再生', tone: 'buff' },
-    heal_vigor: { icon: 'bolt', label: '精力再生', tone: 'buff' },
-    restore_battery: { icon: 'power', label: '电池修复', tone: 'buff' },
-    repair_integrity: { icon: 'repair', label: '完整性修复', tone: 'buff' },
-    ap_reduce: { icon: 'gauge', label: '行动点削减', tone: 'debuff' },
+    hp: { icon: 'heart', label: '生命再生', tone: 'buff' },
+    sanity: { icon: 'brain', label: '理智再生', tone: 'buff' },
+    stamina: { icon: 'drop', label: '体力再生', tone: 'buff' },
+    vigor: { icon: 'bolt', label: '精力再生', tone: 'buff' },
+    battery: { icon: 'power', label: '电池修复', tone: 'buff' },
+    integrity: { icon: 'repair', label: '完整性修复', tone: 'buff' },
+    ap: { icon: 'gauge', label: '行动点增减', tone: 'debuff' },
     strength: { icon: 'power', label: '力量', tone: 'neutral' },
     agility: { icon: 'wind', label: '敏捷', tone: 'neutral' },
     wisdom: { icon: 'brain', label: '智慧', tone: 'neutral' },
-    perception: { icon: 'target', label: '感知', tone: 'neutral' },
-    spiritual: { icon: 'spark', label: '灵性', tone: 'neutral' },
+    awareness: { icon: 'target', label: '感知', tone: 'neutral' },
+    will: { icon: 'spark', label: '意志', tone: 'neutral' },
+    cthulhu: { icon: 'eye', label: '不可知', tone: 'neutral' },
     maxHp: { icon: 'heart', label: '生命上限', tone: 'neutral' },
     maxSanity: { icon: 'brain', label: '理智上限', tone: 'neutral' },
     maxStamina: { icon: 'drop', label: '体力上限', tone: 'neutral' },
@@ -543,21 +688,51 @@ const effectTypeLabel = (type: string): string => {
     if (isVitalType(type)) return VITAL_LABEL[type];
     return SPECIAL_EFFECT_LABEL[type] ?? type;
 };
-const getTacticEffects = (tactic: Tactic): AnyTacticEffect[] => (tactic.tacticEffect ?? []) as AnyTacticEffect[];
-const formatTacticEffect = (effect: AnyTacticEffect): string => {
-    const target = effect[0];
-    const type = effect[1];
-    const value = safeNumber(effect[2]);
-    const duration = effect.length === 4 ? (effect as [Target, AttributeType, number, number])[3] : undefined;
+const getTacticEffects = (tactic: AnyTactic): TacticEffectTuple[] => tactic.tacticEffect ?? [];
+const formatTacticEffect = (effect: TacticEffectTuple): string => {
+    const [target, type, rawValue, duration] = effect;
+    const value = safeNumber(rawValue);
     const sign = value >= 0 ? '+' : '';
-    const durationText = duration && duration > 0 ? `/${duration}T` : '';
+    const durationText = duration > 0 ? `/${duration}T` : '';
     return `${TARGET_LABEL[target]} · ${effectTypeLabel(type)} ${sign}${formatNumber(value)}${durationText}`;
 };
-const getManualTargetMode = (tactic: Tactic): ManualTargetMode => {
-    if (tactic.type === 'attack') return 'enemy';
+/** 战术声明的武器类型需求：武器专属战术取 weaponOwn，常规战术取 requireWeapon。 */
+const getTacticWeaponType = (tactic: AnyTactic): WeaponType | undefined =>
+    'weaponOwn' in tactic ? tactic.weaponOwn : tactic.requireWeapon;
+/**
+ * 武器特性动作的战术 id（与引擎 WEAPON_TRAIT_ACTIONS 同源）。
+ *
+ * 「瞄准」与「装填」在契约里是武器类型特性，在 constants/tactic/weapon.ts 里
+ * 以武器专属战术的形式提供给玩家操作；界面据此给出「已瞄准」「待装填」等针对性提示。
+ */
+const WEAPON_TRAIT_ACTION_IDS = {
+    aim: 'weapon_sniper_rifle_steady_aim',
+    reload: 'weapon_crossbow_rearm',
+} as const;
+/** 指定武器类型是否已挂在主手或副手任一槽位上。 */
+const hasEquippedWeaponType = (equipment: EquipState, weaponType: WeaponType): boolean => {
+    const weapons = equipment?.weapons;
+    return weapons?.main?.weaponType === weaponType || weapons?.side?.weaponType === weaponType;
+};
+/**
+ * 结果序列的最小槽位长度（与引擎同口径）：
+ * 任一存在的攻击槽或防御槽为 0，即视为序列耗尽、实体无法行动。
+ */
+const sequenceMinLength = (sequence?: CombatAlly['resultSequence']): number => {
+    if (!sequence) return 0;
+    const lengths = [sequence.defense.length];
+    ([sequence.main, sequence.side, sequence.attack] as Array<AttackResult[] | undefined>).forEach(
+        (list) => {
+            if (list) lengths.push(list.length);
+        }
+    );
+    return Math.min(...lengths);
+};
+const getManualTargetMode = (tactic: AnyTactic): ManualTargetMode => {
+    if (tactic.type === 'A') return 'single_enemy';
     for (const effect of getTacticEffects(tactic)) {
         const target = effect[0];
-        if (target === 'enemy' || target === 'all_enemies') return 'enemy';
+        if (target === 'single_enemy' || target === 'all_enemies') return 'single_enemy';
         if (target === 'single_ally') return 'single_ally';
         if (target === 'single_teammate') return 'single_teammate';
     }
@@ -695,7 +870,7 @@ const PendingDefenseBar: React.FC<{ list: DefenseResult[] }> = ({ list }) => {
             <span className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#8fd6f7]/60" />
             <div className="flex items-center justify-between pl-1.5">
                 <span className="text-[8.5px] font-mono font-bold text-[#9fdcf7] tracking-[0.24em]">已布防</span>
-                <span className="text-[10px] font-mono text-[#c3d3e0] tabular">{list.length}<span className="text-[#5f6e7e]">/3</span></span>
+                <span className="text-[10px] font-mono text-[#c3d3e0] tabular">{list.length}<span className="text-[#5f6e7e]"> 层</span></span>
             </div>
             <div className="flex flex-wrap gap-1 pl-1.5">
                 {list.map(([type, value], i) => {
@@ -716,16 +891,34 @@ const ApPips: React.FC<{ current: number; base: number; advanced: number; sizeCl
     current, base, advanced, sizeClass = 'w-3 h-3',
 }) => {
     const pipCount = Math.max(1, Math.ceil(Math.max(base, current)));
+    /**
+     * 行动点回升时，新点亮的格子播一次「点亮」脉冲：
+     * 仅以 key 重挂载这些极小的 span（不重渲染整卡），动画结束即静止。
+     */
+    const prevCurrent = useRef(current);
+    const [gainTick, setGainTick] = useState(0);
+    const [gainFrom, setGainFrom] = useState(current);
+    useEffect(() => {
+        if (current > prevCurrent.current) {
+            setGainFrom(Math.max(0, prevCurrent.current));
+            setGainTick((tick) => tick + 1);
+        }
+        prevCurrent.current = current;
+    }, [current]);
     return (
         <div className="flex items-center gap-1.5">
             <span className="text-[8.5px] font-mono font-bold text-[#77879a] tracking-[0.18em]">行动</span>
             <div className="flex gap-1">
-                {Array.from({ length: pipCount }, (_, i) => (
-                    <span key={i}
-                        className={`${sizeClass} rotate-45 border transition-all duration-300 ${i < current
-                            ? 'bg-[#8fd6f7] border-[#d6f1ff] shadow-[0_0_9px_rgba(143,214,247,0.95)]'
-                            : 'bg-[#0a1119] border-[#39485a]'}`} />
-                ))}
+                {Array.from({ length: pipCount }, (_, i) => {
+                    const lit = i < current;
+                    const gained = lit && gainTick > 0 && i >= gainFrom;
+                    return (
+                        <span key={gained ? `${i}-g${gainTick}` : i}
+                            className={`${sizeClass} rotate-45 border transition-all duration-300 ${lit
+                                ? 'bg-[#8fd6f7] border-[#d6f1ff] shadow-[0_0_9px_rgba(143,214,247,0.95)]'
+                                : 'bg-[#0a1119] border-[#39485a]'} ${gained ? 'ap-gain' : ''}`} />
+                    );
+                })}
             </div>
             {advanced > 0 && <span className="text-[9px] font-mono font-bold text-[#ff9b7d] tabular">-{formatNumber(advanced)}</span>}
         </div>
@@ -733,7 +926,7 @@ const ApPips: React.FC<{ current: number; base: number; advanced: number; sizeCl
 };
 
 /** 单个蓄反槽（「owner × trigger」对）的展示数据：槽与槽独立结算，不跨槽合并。 */
-interface CounterSlot { triggerId: string; value: number; triggerName?: string }
+type CounterSlot = Pick<AccumulateCounter, 'triggerId' | 'value'> & { triggerName?: string };
 
 /** 汇总某单位持有的全部蓄反槽（按 owner 过滤，槽值互不合并）。 */
 const getCounterSlots = (
@@ -749,14 +942,14 @@ const getCounterSlots = (
             triggerName: nameOf(entry.triggerId),
         }));
 
-/** 单槽计量：每 5 点一个实心格，余数按比例半填。 */
+/** 单槽计量：每 5 点一个实心格，余数按比例半填。整槽 ≥5（可发起询问）时外环呼吸提示。 */
 const CounterSlotGauge: React.FC<{ slot: CounterSlot }> = ({ slot }) => {
     const value = Math.max(0, slot.value);
     const charges = Math.floor(value / 5);
     const remainder = (value % 5) / 5;
     const label = slot.triggerName ?? slot.triggerId;
     return (
-        <div className="flex items-center gap-1.5" title={`对「${label}」的蓄反值 ${formatNumber(value)}｜槽独立：每 5 点可预支 1 行动点`}>
+        <div className={`flex items-center gap-1.5 ${charges > 0 ? 'counter-ready' : ''}`} title={`对「${label}」的蓄反值 ${formatNumber(value)}｜槽独立：达 5n 可预支 n 点行动力（受共享预支额度限制），换得可用 n 点行动点的立即行动窗口`}>
             <span className="text-[8.5px] font-mono font-bold text-[#d3b0fa] tracking-[0.18em]">蓄反</span>
             <div className="flex gap-0.5">
                 {Array.from({ length: Math.max(1, charges + (remainder > 0 ? 1 : 0)) }, (_, i) => (
@@ -822,6 +1015,77 @@ const useValueFloat = (hp: number, shield: number): { items: FloatingItem[]; dam
 };
 
 /**
+ * 指针视差：把指针位置归一化到 ±1 写入根元素的 CSS 变量（--par-x / --par-y），
+ * 由 .parallax-far / .parallax-mid / .parallax-near 各自以不同系数读取。
+ *
+ * 性能约定：只在 rAF 内写 CSS 变量、不触碰 React 状态 —— 不触发重渲染，
+ * 景深位移全部落在合成层（transform），不产生重排，也不产生逐帧重绘。
+ * 触控设备与「减少动态效果」偏好下直接不启用。
+ */
+const useParallax = (ref: React.RefObject<HTMLElement | null>): void => {
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+        if (window.matchMedia?.('(hover: none)').matches) return;
+        let frame = 0;
+        let nx = 0;
+        let ny = 0;
+        const flush = () => {
+            frame = 0;
+            el.style.setProperty('--par-x', nx.toFixed(3));
+            el.style.setProperty('--par-y', ny.toFixed(3));
+        };
+        const schedule = () => {
+            if (frame === 0) frame = window.requestAnimationFrame(flush);
+        };
+        const onMove = (event: PointerEvent) => {
+            nx = (event.clientX / window.innerWidth) * 2 - 1;
+            ny = (event.clientY / window.innerHeight) * 2 - 1;
+            schedule();
+        };
+        const onLeave = () => {
+            nx = 0;
+            ny = 0;
+            schedule();
+        };
+        window.addEventListener('pointermove', onMove, { passive: true });
+        window.addEventListener('pointerout', onLeave, { passive: true });
+        return () => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerout', onLeave);
+            if (frame) window.cancelAnimationFrame(frame);
+        };
+    }, [ref]);
+};
+
+/**
+ * 受击震屏：我方生命下降时给根节点播一次一次性抖动。
+ * 直接操作 classList（配合强制回流重放），不经过 React 状态，避免整棵面板重渲染。
+ */
+const useDamageShake = (hp: number, ref: React.RefObject<HTMLElement | null>): void => {
+    const prev = useRef<number | null>(null);
+    useEffect(() => {
+        const dropped = prev.current !== null && hp < prev.current;
+        prev.current = hp;
+        if (!dropped) return;
+        const el = ref.current;
+        if (!el) return;
+        if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+        el.classList.remove('screen-shake');
+        void el.offsetWidth; // 仅在受击瞬间强制一次回流以重放动画
+        el.classList.add('screen-shake');
+    }, [hp, ref]);
+};
+
+/** 一次性动画结束后清理 class，避免长期占用合成层。 */
+const clearShakeOnAnimationEnd = (event: React.AnimationEvent<HTMLElement>): void => {
+    if (event.animationName === 'screen-shake') {
+        (event.currentTarget as HTMLElement).classList.remove('screen-shake');
+    }
+};
+
+/**
  * 检测滚动容器在两个轴向上的溢出，用于给出「还有内容」的渐隐提示。
  * signal 变化时重新测量并重新挂载子元素观察（内容增删后仍准确）。
  */
@@ -877,9 +1141,13 @@ const StatusBadges: React.FC<{ status?: CombatDynamicState['status']; size?: 'sm
                 else if (val < 0) tone = 'debuff';
                 const tooltip = `${meta?.label ?? effectTypeLabel(item.type)}｜数值 ${formatNumber(val)}｜剩余 ${item.duration ?? 0}T${item.sourceName ? `｜来源 ${item.sourceName}` : ''}`;
                 return (
+                    // 不用 backdrop-filter：徽章数量多，毛玻璃会逐个建立昂贵的取样层；
+                    // 改用实底半透明 + 内缘高光，观感一致但绘制成本恒定。
                     <div key={`${item.type}_${index}`} title={tooltip}
-                        className={`${box} clip-notch flex items-center justify-center border backdrop-blur-sm cursor-help transition-transform duration-200 hover:scale-110 ${toneClass(tone)}`}>
-                        <Icon name={meta?.icon ?? 'alert'} className={icon} />
+                        className={`${box} relative clip-notch flex items-center justify-center border cursor-help transition-transform duration-200 hover:scale-110 ${toneClass(tone)}`}>
+                        <span className="absolute inset-0 pointer-events-none opacity-60"
+                            style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.09), transparent 55%)' }} />
+                        <Icon name={meta?.icon ?? 'alert'} className={`relative ${icon}`} />
                     </div>
                 );
             })}
@@ -888,66 +1156,101 @@ const StatusBadges: React.FC<{ status?: CombatDynamicState['status']; size?: 'sm
 };
 
 // =====================
-// 战场小地图：横向网格战线，单位以标记落在格子里（纯展示，交互仍走卡片）
+// 战场小地图：多轨二维网格，掩体与单位标记落在格子里（纯展示，交互仍走卡片）
 // =====================
 interface BattleGridUnit {
     id: string;
     label: string;
-    pos: number;
+    pos: CombatPosition;
     alive: boolean;
     /** 我方：是否当前行动单位；敌方：是否落在当前行动者射程内。 */
     highlighted: boolean;
 }
 const BattleGrid: React.FC<{
-    lineMin: number;
-    lineMax: number;
+    battleMap: BattleMap;
+    covers?: Cover[];
     allies: BattleGridUnit[];
     enemies: BattleGridUnit[];
-    /** 当前行动者射程覆盖的格子区间（含端点），用于铺一条“适宜距离”光带。 */
-    rangeBand?: { from: number; to: number };
-}> = ({ lineMin, lineMax, allies, enemies, rangeBand }) => (
-    <div className="flex flex-col gap-1.5">
-        <div className="flex items-center gap-2 px-0.5">
-            <span className="text-[8.5px] font-mono font-bold text-[#9fdcf7] tracking-[0.24em] whitespace-nowrap">战线</span>
-            <span className="text-[8px] font-mono text-[#5f6e7e] tracking-[0.14em] whitespace-nowrap">我方 ← | → 敌对</span>
-            <span className="flex-1 h-px hud-hairline opacity-25" />
-            {rangeBand && rangeBand.from === lineMin && rangeBand.to === lineMax && (
-                <span className="text-[8px] font-mono text-[#4bd6a5] tracking-[0.14em] whitespace-nowrap">射程 · 无限</span>
-            )}
-        </div>
-        <div className="flex gap-px">
-            {Array.from({ length: lineMax - lineMin + 1 }, (_, k) => {
-                const i = lineMin + k;
-                const here = [
-                    ...allies.filter((u) => u.pos === i).map((u) => ({ ...u, side: 'ally' as const })),
-                    ...enemies.filter((u) => u.pos === i).map((u) => ({ ...u, side: 'enemy' as const })),
-                ];
-                const inBand = rangeBand ? i >= rangeBand.from && i <= rangeBand.to : false;
-                return (
-                    <div key={i}
-                        className={`relative flex-1 min-w-0 h-8 border ${inBand
-                            ? 'border-[#4bd6a5]/40 bg-[#071b17]'
-                            : i <= 0
-                                ? 'border-[#3fa9d6]/25 bg-[#071019]'
-                                : 'border-[#ff7d5e]/20 bg-[#140708]'}`}>
-                        {i % 6 === 0 && (
-                            <span className="absolute top-px left-px text-[6px] leading-none font-mono text-[#4d5b6a] tabular">{i}</span>
-                        )}
-                        <div className="absolute inset-x-0 bottom-0.5 flex flex-wrap items-center justify-center gap-px px-px">
-                            {here.map((u) => (
-                                <span key={u.id} title={u.label}
-                                    className={`w-[5px] h-[5px] shrink-0 ${u.side === 'ally'
-                                        ? u.highlighted ? 'bg-[#a5e6ff] ring-1 ring-[#8fd6f7]' : 'bg-[#3fa9d6]/85'
-                                        : u.highlighted ? 'bg-[#ff9b7d] ring-1 ring-[#ff7d5e]' : 'bg-[#d9483a]/75'
-                                        } ${u.alive ? '' : 'opacity-25'}`} />
-                            ))}
-                        </div>
+    /** 当前行动单位的位置与射程（0 = 无限），用于铺射程覆盖高亮。 */
+    activePos?: CombatPosition;
+    activeRange?: number;
+}> = ({ battleMap, covers = [], allies, enemies, activePos, activeRange }) => {
+    const [minX, maxX] = battleMap.depthRange;
+    const lanes = Array.from({ length: Math.max(1, battleMap.laneCount) }, (_, k) => k);
+    const columns = Array.from({ length: Math.max(1, maxX - minX + 1) }, (_, k) => minX + k);
+    /** 格上掩体：落点取契约 battleMap.covers，实例属性取 covers。 */
+    const coverAt = (x: number, y: number) => getCoverAtCell(battleMap, covers, { x, y });
+    const isInRange = (x: number, y: number): boolean => {
+        if (!activePos || typeof activeRange !== 'number') return false;
+        if (activeRange === 0) return true;
+        return getBattleDistance(activePos, { x, y }) <= activeRange;
+    };
+    return (
+        <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 px-0.5">
+                <span className="text-[8.5px] font-mono font-bold text-[#9fdcf7] tracking-[0.24em] whitespace-nowrap">战场</span>
+                <span className="text-[8px] font-mono text-[#5f6e7e] tracking-[0.14em] whitespace-nowrap">我方 ← 纵深 → 敌对</span>
+                <span className="flex-1 h-px hud-hairline opacity-25" />
+                <span className="text-[8px] font-mono text-[#5f6e7e] tracking-[0.14em] whitespace-nowrap">{lanes.length} 轨</span>
+                {activeRange === 0 && (
+                    <span className="text-[8px] font-mono text-[#4bd6a5] tracking-[0.14em] whitespace-nowrap">射程 · 无限</span>
+                )}
+            </div>
+            <div className="flex flex-col gap-px">
+                {lanes.map((lane) => (
+                    <div key={lane} className="flex items-center gap-px">
+                        <span className="w-3 shrink-0 text-center text-[6.5px] leading-none font-mono text-[#4d5b6a] tabular">{lane + 1}</span>
+                        {columns.map((x) => {
+                            const cover = coverAt(x, lane);
+                            const here = [
+                                ...allies.filter((u) => u.pos.x === x && u.pos.y === lane).map((u) => ({ ...u, side: 'ally' as const })),
+                                ...enemies.filter((u) => u.pos.x === x && u.pos.y === lane).map((u) => ({ ...u, side: 'enemy' as const })),
+                            ];
+                            const highlightedCell = isInRange(x, lane);
+                            const cellTitle = cover
+                                ? `${cover.name}（覆盖率 ${Math.round(safeNumber(cover.coverRate) * 100)}%${
+                                    cover.hp !== undefined
+                                        ? ` · 耐久 ${Math.round(safeNumber(cover.hp))}/${Math.round(safeNumber(cover.canBeDestoryed ?? cover.hp))}`
+                                        : ' · 不可摧毁'
+                                }）`
+                                : `纵深 ${x} · ${lane + 1} 轨`;
+                            return (
+                                <div key={x} title={cellTitle}
+                                    className={`relative flex-1 min-w-0 h-7 border ${cover
+                                        ? cover.passable !== undefined
+                                            ? 'border-[#c9a24b]/40 bg-[#1a1508]'
+                                            : 'border-[#c9a24b]/70 bg-[#241c08]'
+                                        : highlightedCell
+                                            ? 'border-[#4bd6a5]/40 bg-[#071b17]'
+                                            : x <= 0
+                                                ? 'border-[#3fa9d6]/25 bg-[#071019]'
+                                                : 'border-[#ff7d5e]/20 bg-[#140708]'}`}>
+                                    {cover && (
+                                        <span className="absolute inset-x-0 top-[1px] text-center text-[6px] leading-none font-mono text-[#e0b95e]">
+                                            {cover.passable !== undefined ? '▤' : '▮'}
+                                        </span>
+                                    )}
+                                    {x % 4 === 0 && (
+                                        <span className="absolute bottom-px left-px text-[5.5px] leading-none font-mono text-[#4d5b6a] tabular">{x}</span>
+                                    )}
+                                    <div className="absolute inset-x-0 bottom-0.5 flex flex-wrap items-center justify-center gap-px px-px">
+                                        {here.map((u) => (
+                                            <span key={u.id} title={`${u.label} · 纵深 ${x} / ${lane + 1} 轨`}
+                                                className={`w-[5px] h-[5px] shrink-0 ${u.side === 'ally'
+                                                    ? u.highlighted ? 'bg-[#a5e6ff] ring-1 ring-[#8fd6f7]' : 'bg-[#3fa9d6]/85'
+                                                    : u.highlighted ? 'bg-[#ff9b7d] ring-1 ring-[#ff7d5e]' : 'bg-[#d9483a]/75'
+                                                    } ${u.alive ? '' : 'opacity-25'}`} />
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
-                );
-            })}
+                ))}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
 // =====================
 // 敌方：迷你卡片（轨道，flex-1 均分铺满整行，直角紧贴）
@@ -962,7 +1265,10 @@ const EnemyMiniCard: React.FC<{
     range?: number;
     /** 选中攻击战术且目标超距时置亮「超距」标记。 */
     outOfRange?: boolean;
-}> = ({ enemy, index, intent, isFocused, isSelectable, guardCount, counterSlots, onClick, distance, range, outOfRange }) => {
+    /** 悬停：意图栏与战术预测跟随鼠标所指的敌人（点下去就是开火，改成指哪看哪）。 */
+    onHoverStart?: () => void;
+    onHoverEnd?: () => void;
+}> = ({ enemy, index, intent, isFocused, isSelectable, guardCount, counterSlots, onClick, distance, range, outOfRange, onHoverStart, onHoverEnd }) => {
     const hp = safeNumber(enemy.hp);
     const maxHp = Math.max(1, safeNumber(enemy.maxHp));
     const shield = safeNumber(enemy.shield);
@@ -977,7 +1283,8 @@ const EnemyMiniCard: React.FC<{
                 ? 'surf-card--focus border-[#8fd6f7]/80 shadow-[inset_0_0_22px_rgba(63,169,214,0.22)] cursor-pointer'
                 : 'surf-card border-[rgba(126,156,182,0.2)] hover:border-[#8fd6f7]/60 cursor-pointer';
     return (
-        <div onClick={onClick} className={`group card-lift relative flex-1 min-w-[178px] overflow-hidden border ${cardClass}`}>
+        <div onClick={onClick} onMouseEnter={onHoverStart} onMouseLeave={onHoverEnd}
+            className={`group card-lift relative flex-1 min-w-[178px] overflow-hidden border ${cardClass}`}>
             <div className="absolute inset-0 hud-hatch opacity-50 pointer-events-none" />
             {/* 聚焦指示：底缘常驻扫描线，让「当前锁定目标」在静帧下也一眼可辨 */}
             {isFocused && !isDead && (
@@ -1008,7 +1315,7 @@ const EnemyMiniCard: React.FC<{
                         <div className="mt-1.5 flex items-center gap-1.5 flex-wrap font-mono text-[9.5px] text-[#96a7b8] tabular">
                             <span><span className="text-[#5f6e7e]">速度</span> {formatNumber(enemy.speed)}</span>
                             <span className="w-px h-2.5 bg-[rgba(126,156,182,0.3)]" />
-                            <span><span className="text-[#5f6e7e]">攻击</span> {formatNumber(enemy.baseAttack)}</span>
+                            <span><span className="text-[#5f6e7e]">攻击</span> {formatNumber(enemy.attack)}</span>
                             <span className="w-px h-2.5 bg-[rgba(126,156,182,0.3)]" />
                             <span title="行动点：当前 / 基础"><span className="text-[#5f6e7e]">行动</span> {formatNumber(Math.max(0, enemy.actionPoint.current))}<span className="text-[#5f6e7e]">/{formatNumber(enemy.actionPoint.base)}</span></span>
                             {typeof distance === 'number' && (<>
@@ -1061,7 +1368,7 @@ const EnemyMiniCard: React.FC<{
                             activeCounterSlots.map((slot) => (
                                 <span key={slot.triggerId}
                                     className="px-1 py-px border font-mono text-[8.5px] font-bold tabular border-[#c28df5]/60 bg-[#2a1240]/70 text-[#e6cffb]"
-                                    title={`对「${slot.triggerName ?? slot.triggerId}」的蓄反值 ${formatNumber(slot.value)}｜槽独立：每 5 点可预支 1 行动点`}>
+                                    title={`对「${slot.triggerName ?? slot.triggerId}」的蓄反值 ${formatNumber(slot.value)}｜槽独立：达 5n 可预支 n 点行动力（受共享预支额度限制），换得可用 n 点行动点的立即行动窗口`}>
                                     蓄反×{formatNumber(slot.value)}
                                 </span>
                             ))
@@ -1131,18 +1438,28 @@ const EnemyStageView: React.FC<{
 
                 {hasVisual ? (
                     <>
-                        {/* 悬浮伸展：父层负责 hover 缩放，子层负责常驻镜头晃动，两层 transform 叠加 */}
-                        <div className="absolute inset-0 transition-transform duration-[900ms] ease-out group-hover/stage:scale-[1.06]">
-                            <img src={enemy.imageUrl} alt={enemy.name} onError={() => setImageBroken(true)}
-                                className={`absolute inset-0 w-full h-full object-cover ${isDead
-                                    ? 'grayscale opacity-30 animate-glitch'
-                                    : 'opacity-90 contrast-[1.06] saturate-[0.95] portrait-drift'}`} />
+                        {/* 景深近层：肖像与 HUD 反向微移，读作「隔着一层玻璃看舱内」。
+                            外扩 12px 供视差位移（避免边缘露出），同时把 object-cover 的额外裁切压到最小。 */}
+                        <div className="parallax-layer parallax-near absolute -inset-3 pointer-events-none">
+                            {/* 悬浮伸展：父层负责 hover 缩放，子层负责常驻镜头晃动，两层 transform 叠加 */}
+                            <div className="absolute inset-0 transition-transform duration-[900ms] ease-out group-hover/stage:scale-[1.06]">
+                                <img src={enemy.imageUrl} alt={enemy.name} onError={() => setImageBroken(true)}
+                                    className={`absolute inset-0 w-full h-full object-cover ${isDead
+                                        ? 'grayscale opacity-30 animate-glitch'
+                                        : 'opacity-90 contrast-[1.06] saturate-[0.95] portrait-drift'}`} />
+                            </div>
                         </div>
                         <div className="absolute inset-0 bg-gradient-to-t from-[#04070d] via-[#04070d]/15 to-[#04070d]/50 pointer-events-none" />
                         <div className="absolute inset-0 bg-gradient-to-r from-[#04070d]/70 via-transparent to-[#04070d]/70 pointer-events-none" />
                         <div className="absolute inset-0 bg-[radial-gradient(ellipse_62%_52%_at_50%_44%,transparent,rgba(4,7,13,0.55))] pointer-events-none" />
                         {/* 收容场染色：把肖像压进舱体色温，避免「贴图感」 */}
                         <div className="absolute inset-0 bg-[#ff7d5e] opacity-[0.05] mix-blend-overlay pointer-events-none" />
+                        {/* 地面与反射：地平线 + 地面压暗 + 底部反光，把肖像从「贴在平面上」推到「站在舱室里」 */}
+                        <div className="absolute inset-x-0 bottom-0 h-[46%] stage-floor pointer-events-none z-10" />
+                        {!isDead && (
+                            <div className="absolute inset-x-0 bottom-0 h-[30%] stage-reflect opacity-60 pointer-events-none z-10" />
+                        )}
+                        <div className="absolute inset-x-0 bottom-[44%] h-px stage-horizon opacity-35 pointer-events-none z-10" />
                     </>
                 ) : (
                     <>
@@ -1267,7 +1584,7 @@ const EnemyStageView: React.FC<{
                             <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 font-mono text-[11px] tabular">
                                 <span className="text-[#5f6e7e]">速度</span><span className="text-[#dbe8f2]">{formatNumber(enemy.speed)}</span>
                                 <span className="w-px h-3 bg-[rgba(126,156,182,0.3)]" />
-                                <span className="text-[#5f6e7e]">攻击</span><span className="text-[#dbe8f2]">{formatNumber(enemy.baseAttack)}</span>
+                                <span className="text-[#5f6e7e]">攻击</span><span className="text-[#dbe8f2]">{formatNumber(enemy.attack)}</span>
                                 {typeof distance === 'number' && (<>
                                     <span className="w-px h-3 bg-[rgba(126,156,182,0.3)]" />
                                     <span className="text-[#5f6e7e]">距离</span>
@@ -1308,7 +1625,6 @@ const EnemyStageView: React.FC<{
                                 <Icon name="expand" className="w-3 h-3" />点击全屏
                             </span>
                         )}
-                        <span className="font-mono text-[10px] text-[#5f6e7e] tabular tracking-[0.18em]">完整度 {hpPct}%</span>
                     </div>
                 </div>
             </div>
@@ -1316,8 +1632,141 @@ const EnemyStageView: React.FC<{
     );
 };
 
-/** 意图模块：紧贴焦点肖像下缘，铺满中心列宽，直角。defense 不显示预测值。 */
-const IntentModule: React.FC<{ enemy: CombatEnemy; intent: CombatIntent | null; targetName?: string }> = ({ enemy, intent, targetName }) => {
+/** 战前预测的来源配色与分类名：掩体（余烬金）/ 全局修正（腐紫）/ 武器类型（冰蓝）。 */
+const FORECAST_SOURCE_TONE: Record<AttackForecastSource['kind'], string> = {
+    cover: 'border-[#e0b95e]/55 bg-[#1a1508]/85 text-[#e0b95e]',
+    environment: 'border-[#c28df5]/55 bg-[#1b0f2b]/85 text-[#e6cffb]',
+    weapon: 'border-[#8fd6f7]/55 bg-[#071a24]/85 text-[#cdeeff]',
+};
+const FORECAST_SOURCE_KIND: Record<AttackForecastSource['kind'], string> = {
+    cover: '掩体',
+    environment: '全局',
+    weapon: '武器',
+};
+
+/**
+ * 战术预测面板（XCOM 式）：打这个敌人的命中概率分布、伤害读数与每一处减益的来源。
+ *
+ * 概率取自与序列生成同源的权重表（感知 + 疲劳），给的是「概率」而非下一次掷骰结果，
+ * 因此不受意志预测深度限制——意志不足也能看到预测。
+ * 档位偏移按引擎的两段判定做概率卷积：
+ * - 修正判定：全局环境与武器类型的命中修正合计为一次（面板上逐条标注来源）；
+ * - 掩体判定：线路上第一个掩体按覆盖率独立再降 1 档，并按同比例吸收伤害。
+ * 伤害已含武器乘区与掩体吸收：期望值 = Σ（档位概率 × 档位代表伤害）。
+ */
+const ForecastPanel: React.FC<{
+    forecast: AttackForecast;
+    attackerName?: string;
+    enemyName: string;
+}> = ({ forecast, attackerName, enemyName }) => {
+    /** 来源展示名：武器来源换成武器类型的中文名，便于识别。 */
+    const sourceName = (source: AttackForecastSource) =>
+        source.kind === 'weapon' && forecast.weaponType
+            ? WEAPON_LABEL[forecast.weaponType]
+            : source.label;
+    const pct = (value: number) => Math.round(value * 100);
+    /** 修正判定的来源（环境 / 武器）；掩体是独立判定，单独展示。 */
+    const modifierSources = forecast.sources.filter((source) => source.kind !== 'cover');
+    const modifierTone = modifierSources.some((source) => source.kind === 'environment')
+        ? FORECAST_SOURCE_TONE.environment
+        : FORECAST_SOURCE_TONE.weapon;
+    const coverSource = forecast.sources.find((source) => source.kind === 'cover');
+    const damageSources = forecast.sources.filter((source) => source.damageMultiplier !== 1);
+    const modifierRoll = forecast.modifierRoll;
+    /** 伤害读数由档位表就地推导：期望 = Σ(概率 × 档位代表伤害)，擦伤 / 暴击取对应档位。 */
+    const expectedDamage = forecast.odds.reduce((sum, entry) => sum + entry.chance * entry.damage, 0);
+    const damageAt = (ladder: AttackResult[0]) =>
+        forecast.odds.find((entry) => entry.ladder === ladder)?.damage ?? 0;
+    /** 目标是否超出武器射程（射程 0 = 无限，永远可及）。 */
+    const outOfRange =
+        typeof forecast.range === 'number' &&
+        forecast.range !== 0 &&
+        forecast.distance > forecast.range;
+    return (
+        <div className="relative mt-2.5 pt-2.5 border-t border-[rgba(126,156,182,0.22)]">
+            <div className="flex items-center gap-2 mb-1.5">
+                <span className="shrink-0 text-[9px] font-display font-bold text-[#9fdcf7] tracking-[0.24em]">战术预测</span>
+                <span className="flex-1 min-w-0 truncate text-[9px] font-mono text-[#77879a]">{attackerName ?? '我方'} → {enemyName}</span>
+                <span className={`shrink-0 text-[9px] font-mono tabular whitespace-nowrap ${outOfRange ? 'text-[#ff9b7d]' : 'text-[#5f6e7e]'}`}>
+                    {outOfRange && '超距 · '}距 {formatNumber(forecast.distance)}{typeof forecast.range === 'number' ? ` / ${forecast.range === 0 ? '∞' : formatNumber(forecast.range)}` : ''}
+                </span>
+            </div>
+            {forecast.instant ? (
+                <div className="text-[10px] font-mono text-[#c28df5] tracking-[0.08em]">
+                    瞬时真实伤害：不判定命中、无视护盾与免伤，也不吃掩体与全局修正。
+                </div>
+            ) : (
+                <div className="flex flex-col gap-1">
+                    {/* 命中：档位概率分布（落空 / 擦伤 / 命中 / 暴击，已含全部命中偏移） */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="shrink-0 w-7 text-[9px] font-mono text-[#5f6e7e] tracking-[0.16em]">命中</span>
+                        {forecast.odds.map((entry) => (
+                            <span key={entry.ladder}
+                                title={`${RESULT_LABEL[entry.ladder] ?? entry.ladder}：概率 ${pct(entry.chance)}%，代表伤害 ${formatNumber(entry.damage)}`}
+                                className={`shrink-0 border px-1.5 py-px font-mono text-[9.5px] font-bold ${RESULT_COLOR[entry.ladder] ?? ''}`}>
+                                {RESULT_LABEL[entry.ladder] ?? entry.ladder} {pct(entry.chance)}%
+                            </span>
+                        ))}
+                    </div>
+                    {/* 减益来源：掩体（余烬金）/ 全局（腐紫）/ 武器（冰蓝），逐条标明出处 */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="shrink-0 w-7 text-[9px] font-mono text-[#5f6e7e] tracking-[0.16em]">修正</span>
+                        {modifierSources.length === 0 || modifierRoll.chance <= 0 ? (
+                            <span className="shrink-0 border border-[#4bd6a5]/45 bg-[#04180f]/80 px-1.5 py-px font-mono text-[9px] text-[#4bd6a5]">无命中修正</span>
+                        ) : (
+                            <span className={`shrink-0 border px-1.5 py-px font-mono text-[9px] ${modifierTone}`}
+                                title={`${modifierSources.map((source) => `${FORECAST_SOURCE_KIND[source.kind]} ${sourceName(source)} ${source.steps < 0 ? '降' : '升'}档 ${pct(source.chance)}%`).join('；')}（环境与武器合计为一次判定）`}>
+                                {modifierSources.map((source) => `${FORECAST_SOURCE_KIND[source.kind]}·${sourceName(source)}`).join('＋')}
+                                <span className="opacity-80"> 合计{modifierRoll.steps < 0 ? '↓' : '↑'}{pct(modifierRoll.chance)}%</span>
+                            </span>
+                        )}
+                        {coverSource && (
+                            <span className={`shrink-0 border px-1.5 py-px font-mono text-[9px] ${FORECAST_SOURCE_TONE.cover}`}
+                                title={`掩体来源 · ${coverSource.label}：覆盖率 ${pct(coverSource.chance)}%，触发时命中降 1 档，并按同比例吸收伤害（损掩体耐久）`}>
+                                掩体·{coverSource.label} ↓{pct(coverSource.chance)}%
+                            </span>
+                        )}
+                        {damageSources.map((source) => (
+                            <span key={`dmg-${source.kind}`}
+                                title={`${FORECAST_SOURCE_KIND[source.kind]}来源 · ${sourceName(source)}`}
+                                className={`shrink-0 border px-1.5 py-px font-mono text-[9px] ${FORECAST_SOURCE_TONE[source.kind]}`}>
+                                {FORECAST_SOURCE_KIND[source.kind]}·{sourceName(source)}
+                                {source.kind === 'cover' ? ` 吸收 ${pct(1 - source.damageMultiplier)}%` : ` ×${pct(source.damageMultiplier)}%`}
+                            </span>
+                        ))}
+                    </div>
+                    {/* 伤害：期望值 + 擦伤档 ~ 暴击档（均已含武器乘区与掩体吸收） */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="shrink-0 w-7 text-[9px] font-mono text-[#5f6e7e] tracking-[0.16em]">伤害</span>
+                        <span className="font-mono text-[10px] text-[#96a7b8] tabular">期望</span>
+                        <span className="font-mono text-[11px] font-bold text-[#ffd9cd] tabular">{formatNumber(expectedDamage)}</span>
+                        <span className="text-[#5f6e7e]">·</span>
+                        <span className="font-mono text-[10px] text-[#ff9b7d] tabular">
+                            擦伤 {formatNumber(damageAt('graze'))} ~ 暴击 {formatNumber(damageAt('crit'))}
+                        </span>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+/**
+ * 意图模块：紧贴焦点肖像下缘，铺满中心列宽，直角。defense 不显示预测值。
+ *
+ * 展示对象跟随鼠标悬停的敌人（无悬停时回落焦点敌人），因此「选目标时指哪看哪」。
+ * 追加「战术预测」（XCOM 式）：当前行动单位打这个敌人的命中概率、伤害读数，
+ * 以及每一处减益的来源——掩体拦截、全局环境修正、武器类型修正分别标注。
+ */
+const IntentModule: React.FC<{
+    enemy: CombatEnemy;
+    intent: CombatIntent | null;
+    targetName?: string;
+    /** 攻击方名称（预测标题）。 */
+    attackerName?: string;
+    /** 战前预测；为空时不显示预测区。 */
+    forecast?: AttackForecast | null;
+}> = ({ enemy, intent, targetName, attackerName, forecast }) => {
     const meta = intent ? resolveIntentMeta(intent) : undefined;
     return (
         <div className="relative w-full surf-panel border-t border-[rgba(255,125,94,0.3)] p-3 sm:p-3.5 overflow-hidden">
@@ -1358,6 +1807,9 @@ const IntentModule: React.FC<{ enemy: CombatEnemy; intent: CombatIntent | null; 
             ) : (
                 <div className="relative text-[#5f6e7e] text-xs font-mono tracking-wider">意图数据缺失</div>
             )}
+            {forecast && (
+                <ForecastPanel forecast={forecast} attackerName={attackerName} enemyName={enemy.name} />
+            )}
         </div>
     );
 };
@@ -1365,16 +1817,48 @@ const IntentModule: React.FC<{ enemy: CombatEnemy; intent: CombatIntent | null; 
 // =====================
 // 友方卡片（直角，拉伸铺满左列，头像随高度铺满左侧）
 // =====================
+const MOVE_LABEL: Record<MoveDirection, string> = {
+    forward: '前进',
+    backward: '后退',
+    lane_left: '左移轨',
+    lane_right: '右移轨',
+};
+const MOVE_TITLE: Record<MoveDirection, string> = {
+    forward: '沿纵深向前推进一步（消耗行动点）',
+    backward: '沿纵深向后撤离一步（消耗行动点）',
+    lane_left: '向左换一条轨道（消耗行动点）',
+    lane_right: '向右换一条轨道（消耗行动点）',
+};
+/** 战场机动按钮：纵深推进 / 撤离为余烬色，换轨为冰蓝色。 */
+const MoveButton: React.FC<{
+    dir: MoveDirection;
+    enabled: boolean;
+    onMove: (dir: MoveDirection) => void;
+}> = ({ dir, enabled, onMove }) => {
+    const isDepthMove = dir === 'forward' || dir === 'backward';
+    return (
+        <button type="button" disabled={!enabled}
+            onClick={(e) => { e.stopPropagation(); onMove(dir); }}
+            title={MOVE_TITLE[dir]}
+            className={`flex-1 h-[22px] border font-mono text-[9px] font-bold tracking-[0.1em] flex items-center justify-center transition-all ${enabled
+                ? isDepthMove
+                    ? 'border-[#ff7d5e]/45 text-[#ffd9cd] bg-[#2a0d06]/55 hover:border-[#ff7d5e] hover:text-white active:scale-95'
+                    : 'border-[#8fd6f7]/45 text-[#cdeeff] bg-[#0a2735]/55 hover:border-[#8fd6f7] hover:text-white active:scale-95'
+                : 'border-[rgba(126,156,182,0.2)] text-[#4d5b6a] cursor-not-allowed'}`}>
+            {MOVE_LABEL[dir]}
+        </button>
+    );
+};
+
 const AllyCard: React.FC<{
     ally: CombatAlly; targetId: string; isActive: boolean; isSelectable: boolean; isTargeted: boolean; onClick: () => void;
-    /** 该单位在战线上的坐标。 */
-    position?: number;
+    /** 该单位在战场上的坐标（纵深 / 轨道）。 */
+    position?: CombatPosition;
     /** 距离最近的存活敌人有多远。 */
     nearestEnemyDistance?: number;
-    /** 移动按钮可用性；onMove 未提供时（未接入空间系统）不渲染移动行。 */
-    canMoveForward?: boolean;
-    canMoveBackward?: boolean;
-    onMove?: (dir: 1 | -1) => void;
+    /** 四向位移可用性；onMove 未提供时（未接入空间系统）不渲染移动行。 */
+    moveAvailability?: Record<MoveDirection, boolean>;
+    onMove?: (dir: MoveDirection) => void;
     /** 跳过蓄反询问开关状态。 */
     skipAccumulateCounter?: boolean;
     /** 跳过差反询问开关状态。 */
@@ -1383,7 +1867,9 @@ const AllyCard: React.FC<{
     onToggleCounterSkip?: (kind: 'accumulate' | 'differential') => void;
     /** 蓄反槽（owner × trigger，槽与槽独立结算）。 */
     counterSlots: CounterSlot[];
-}> = ({ ally, targetId, isActive, isSelectable, isTargeted, counterSlots, onClick, position, nearestEnemyDistance, canMoveForward = false, canMoveBackward = false, onMove, skipAccumulateCounter = false, skipDifferentialCounter = false, onToggleCounterSkip }) => {
+    /** 武器特性回合状态：已瞄准 / 待装填。 */
+    weaponState?: WeaponTraitState;
+}> = ({ ally, targetId, isActive, isSelectable, isTargeted, counterSlots, onClick, position, nearestEnemyDistance, moveAvailability, onMove, skipAccumulateCounter = false, skipDifferentialCounter = false, onToggleCounterSkip, weaponState }) => {
     const hp = safeNumber(ally.hp);
     const maxHp = Math.max(1, safeNumber(ally.maxHp));
     const shield = safeNumber(ally.shield);
@@ -1439,7 +1925,7 @@ const AllyCard: React.FC<{
                         </div>
                         <span className="text-[9.5px] font-mono text-[#77879a] tabular shrink-0">
                             速度 {formatNumber(ally.speed)}
-                            {typeof position === 'number' && <span className="text-[#5f6e7e]"> · 位 {position}</span>}
+                            {position && <span className="text-[#5f6e7e]"> · 纵深 {position.x} / {position.y + 1} 轨</span>}
                         </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1462,6 +1948,15 @@ const AllyCard: React.FC<{
                         <ApPips current={Math.max(0, safeNumber(ally.actionPoint.current))} base={Math.max(1, safeNumber(ally.actionPoint.base))} advanced={safeNumber(ally.actionPoint.advanced)} />
                         <div className="flex items-center gap-2">
                             {shield > 0 && <span className="flex items-center gap-0.5 text-[10px] font-mono font-bold text-[#cdeeff] tabular"><Icon name="shield" className="w-3 h-3" />{formatNumber(shield)}</span>}
+                            {/* 武器特性状态：弩待装填是硬约束（未装填无法攻击），必须显式提示 */}
+                            {weaponState?.needsReload && hasEquippedWeaponType(ally.equipment, 'crossbow') && (
+                                <span className="px-1 py-px border border-[#ff9b7d]/60 bg-[#2a0d06]/70 text-[#ff9b7d] font-mono text-[8.5px] font-bold tracking-wider animate-soft-blink"
+                                    title="弩每次攻击后必须消耗 1 AP 装填，否则无法再次攻击">待装填</span>
+                            )}
+                            {weaponState?.aimed && (
+                                <span className="px-1 py-px border border-[#4bd6a5]/60 bg-[#04241b]/70 text-[#b6f5dd] font-mono text-[8.5px] font-bold tracking-wider"
+                                    title="已瞄准：下一次攻击判定提升 1 档（原为暴击则伤害翻倍）">已瞄准</span>
+                            )}
                             <CounterGauge slots={counterSlots} />
                         </div>
                     </div>
@@ -1472,25 +1967,15 @@ const AllyCard: React.FC<{
             </div>
             {/* 机动控制条：固定在卡片底部（不参与内容区压缩），保证移动按钮永远可见 */}
             {onMove && !isDead && (
-                <div className="relative shrink-0 flex items-center gap-1.5 px-3 pb-3 pt-2 border-t border-[rgba(126,156,182,0.16)]">
-                    <button type="button" disabled={!canMoveBackward}
-                        onClick={(e) => { e.stopPropagation(); onMove(-1); }}
-                        title="向后撤离一步（消耗 1 行动点）"
-                        className={`flex-1 h-[22px] border font-mono text-[9px] font-bold tracking-[0.14em] flex items-center justify-center gap-0.5 transition-all ${canMoveBackward
-                            ? 'border-[#8fd6f7]/45 text-[#cdeeff] bg-[#0a2735]/55 hover:border-[#8fd6f7] hover:text-white active:scale-95'
-                            : 'border-[rgba(126,156,182,0.2)] text-[#4d5b6a] cursor-not-allowed'}`}>
-                        <Icon name="chevronLeft" className="w-3 h-3" />后退
-                    </button>
-                    <button type="button" disabled={!canMoveForward}
-                        onClick={(e) => { e.stopPropagation(); onMove(1); }}
-                        title="向前推进一步（消耗 1 行动点）"
-                        className={`flex-1 h-[22px] border font-mono text-[9px] font-bold tracking-[0.14em] flex items-center justify-center gap-0.5 transition-all ${canMoveForward
-                            ? 'border-[#ff7d5e]/45 text-[#ffd9cd] bg-[#2a0d06]/55 hover:border-[#ff7d5e] hover:text-white active:scale-95'
-                            : 'border-[rgba(126,156,182,0.2)] text-[#4d5b6a] cursor-not-allowed'}`}>
-                        前进<Icon name="chevronRight" className="w-3 h-3" />
-                    </button>
+                <div className="relative shrink-0 flex flex-col gap-1.5 px-3 pb-3 pt-2 border-t border-[rgba(126,156,182,0.16)]">
+                    <div className="flex items-center gap-1.5">
+                        <MoveButton dir="lane_left" enabled={moveAvailability?.lane_left === true} onMove={onMove} />
+                        <MoveButton dir="backward" enabled={moveAvailability?.backward === true} onMove={onMove} />
+                        <MoveButton dir="forward" enabled={moveAvailability?.forward === true} onMove={onMove} />
+                        <MoveButton dir="lane_right" enabled={moveAvailability?.lane_right === true} onMove={onMove} />
+                    </div>
                     {typeof nearestEnemyDistance === 'number' && (
-                        <span className="shrink-0 font-mono text-[9px] text-[#77879a] tabular">距敌 <span className="text-[#96a7b8]">{formatNumber(nearestEnemyDistance)}</span></span>
+                        <span className="font-mono text-[9px] text-[#77879a] tabular">最近敌对实体距离 <span className="text-[#96a7b8]">{formatNumber(nearestEnemyDistance)}</span></span>
                     )}
                 </div>
             )}
@@ -1498,7 +1983,7 @@ const AllyCard: React.FC<{
                 <div className="flex items-center gap-1.5">
                     <button type="button"
                         onClick={(e) => { e.stopPropagation(); onToggleCounterSkip('accumulate'); }}
-                        title="跳过蓄反询问：自动拒绝预支反击机会"
+                        title="跳过蓄反询问：自动拒绝预支立即行动窗口"
                         className={`flex-1 h-[20px] border font-mono text-[8.5px] font-bold tracking-[0.12em] whitespace-nowrap transition-all ${skipAccumulateCounter
                             ? 'border-[#c28df5]/70 bg-[#2a1240]/70 text-[#e6cffb]'
                             : 'border-[rgba(126,156,182,0.2)] text-[#4d5b6a] hover:border-[#8ea3b8] hover:text-[#96a7b8]'}`}>
@@ -1506,7 +1991,7 @@ const AllyCard: React.FC<{
                     </button>
                     <button type="button"
                         onClick={(e) => { e.stopPropagation(); onToggleCounterSkip('differential'); }}
-                        title="跳过差反询问：自动拒绝预支反击机会"
+                        title="跳过差反询问：自动拒绝预支立即行动窗口"
                         className={`flex-1 h-[20px] border font-mono text-[8.5px] font-bold tracking-[0.12em] whitespace-nowrap transition-all ${skipDifferentialCounter
                             ? 'border-[#c28df5]/70 bg-[#2a1240]/70 text-[#e6cffb]'
                             : 'border-[rgba(126,156,182,0.2)] text-[#4d5b6a] hover:border-[#8ea3b8] hover:text-[#96a7b8]'}`}>
@@ -1522,19 +2007,21 @@ const AllyCard: React.FC<{
 // 战术按钮（直角）
 // =====================
 const TacticButton: React.FC<{
-    tactic: Tactic; usable: boolean; selected: boolean; onClick: () => void;
+    tactic: AnyTactic; usable: boolean; selected: boolean; onClick: () => void;
     /** 不可用原因；仅当 usable 为 false 时展示，避免玩家面对无解释的灰按钮。 */
     reason?: string;
     /** 攻击战术的射程提示（当前施法者武器）。 */
     rangeText?: string;
 }> = ({ tactic, usable, selected, onClick, reason, rangeText }) => {
     const effects = getTacticEffects(tactic);
-    const isAttack = tactic.type === 'attack';
+    const isAttack = tactic.type === 'A';
+    const requiredWeapon = getTacticWeaponType(tactic);
     return (
         <button onClick={onClick} disabled={!usable}
-            className={`group w-full text-left border transition-all duration-300 relative overflow-hidden shrink-0 ${selected ? 'border-[#4bd6a5]/70 bg-[#081c16]/80 shadow-[inset_0_0_24px_rgba(75,214,165,0.16)]' : usable ? 'border-[rgba(126,156,182,0.22)] bg-[#070d15]/80 hover:border-[#8fd6f7]/60 hover:bg-[#0a1725]' : 'border-[rgba(126,156,182,0.12)] bg-[#060a12]/70 opacity-45 grayscale cursor-not-allowed'}`}>
+            className={`group tactic-lift w-full text-left border relative overflow-hidden shrink-0 ${selected ? 'border-[#4bd6a5]/70 bg-[#081c16]/80 shadow-[inset_0_0_24px_rgba(75,214,165,0.16)]' : usable ? 'border-[rgba(126,156,182,0.22)] bg-[#070d15]/80 hover:border-[#8fd6f7]/60 hover:bg-[#0a1725]' : 'border-[rgba(126,156,182,0.12)] bg-[#060a12]/70 opacity-45 grayscale cursor-not-allowed'}`}>
             <span className={`absolute left-0 top-0 bottom-0 w-[3px] transition-colors ${selected ? 'bg-[#4bd6a5] shadow-[0_0_12px_rgba(75,214,165,0.8)]' : usable ? (isAttack ? 'bg-[#ff7d5e]/70' : 'bg-[#2c8fc0]/80') : 'bg-[#2a3542]'}`} />
-            {usable && <div className="shimmer-overlay opacity-20" />}
+            {/* 常驻微光只留给「已选中」的一项：避免列表里同时存在十几个无限循环的合成层 */}
+            {selected && <div className="shimmer-overlay opacity-25" />}
             <span className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
             <div className="flex items-start gap-3.5 relative z-10 p-3 pl-4">
                 <div className={`ap-diamond ${usable ? (isAttack ? 'ap-diamond--atk' : 'ap-diamond--def') : 'ap-diamond--off'}`}>
@@ -1543,20 +2030,20 @@ const TacticButton: React.FC<{
                 <div className="flex-1 min-w-0 pl-1">
                     <div className="flex items-center justify-between gap-2">
                         <span className="text-[13px] font-display font-bold tracking-[0.12em] text-[#e9f2f8] truncate">{tactic.name}</span>
-                        <span className={`text-[8px] font-mono font-bold px-1.5 py-px border tracking-[0.16em] shrink-0 ${isAttack ? 'border-[#ff7d5e]/60 text-[#ffc4b0] bg-[#3a0f0b]/50' : 'border-[#8fd6f7]/60 text-[#cdeeff] bg-[#0a2735]/50'}`}>
-                            {isAttack ? '攻击' : '防御'}
+                        <span className={`text-[8px] font-mono font-bold px-1.5 py-px border tracking-[0.16em] shrink-0 ${TACTIC_KIND_META[tactic.type].className}`}>
+                            {TACTIC_KIND_META[tactic.type].label}
                         </span>
                     </div>
                     <div className="text-[11px] text-[#96a7b8] mt-1 leading-relaxed">{tactic.desc}</div>
-                    {tactic.type === 'attack' && tactic.requireWeapon && (
-                        <div className="mt-1 text-[10px] font-mono text-[#f0c05a]/90">需要武器：{WEAPON_LABEL[tactic.requireWeapon]}</div>
+                    {isAttack && requiredWeapon && (
+                        <div className="mt-1 text-[10px] font-mono text-[#f0c05a]/90">需要武器：{WEAPON_LABEL[requiredWeapon]}</div>
                     )}
-                    {tactic.type === 'attack' && rangeText && (
+                    {isAttack && rangeText && (
                         <div className="mt-1 text-[10px] font-mono text-[#4bd6a5]/90">射程 {rangeText}</div>
                     )}
                     <div className="mt-2 flex flex-col gap-1">
                         {effects.length === 0 ? (
-                            <span className="text-[10px] font-mono text-[#5f6e7e]">{isAttack ? '执行武器攻击' : '布设防御判定'}</span>
+                            <span className="text-[10px] font-mono text-[#5f6e7e]">{TACTIC_KIND_FALLBACK[tactic.type]}</span>
                         ) : (
                             effects.map((effect, index) => (
                                 <span key={index} className="text-[10px] font-mono text-[#a5e6ff]/85">{formatTacticEffect(effect)}</span>
@@ -1576,47 +2063,29 @@ const TacticButton: React.FC<{
 };
 
 // =====================
-// 战斗遥测条（吃掉右列剩余空间，使无死黑留白且信息更密）
+// 战斗地图（只保留战场地图本体，吃掉右列剩余空间）
 // =====================
-const CombatTelemetry: React.FC<{
-    isPlayerPhase: boolean; activeName: string; aliveEnemies: number; totalEnemies: number;
-    focusName: string; focusHpPct: number; focusAtk: number; focusSpd: number;
-    /** 战线地图节点，与遥测合并展示（插在标题行与数据格之间）。 */
+const CombatMap: React.FC<{
+    isPlayerPhase: boolean;
+    /** 战场地图节点。 */
     grid?: React.ReactNode;
-}> = ({ isPlayerPhase, activeName, aliveEnemies, totalEnemies, focusName, focusHpPct, focusAtk, focusSpd, grid }) => {
-    const Cell: React.FC<{ k: string; v: string; tone?: string }> = ({ k, v, tone = 'text-[#dbe8f2]' }) => (
-        <div className="relative flex flex-col gap-0.5 border border-[rgba(126,156,182,0.16)] bg-[#05090f]/70 px-2 py-1.5 overflow-hidden">
-            <span className="absolute left-0 top-0 bottom-0 w-px bg-[rgba(126,156,182,0.3)]" />
-            <span className="text-[8px] font-mono text-[#5f6e7e] tracking-[0.18em] uppercase">{k}</span>
-            <span className={`text-[11px] font-mono font-bold tabular truncate ${tone}`}>{v}</span>
+}> = ({ isPlayerPhase, grid }) => (
+    <div className="relative shrink-0 border-t border-[rgba(126,156,182,0.2)] p-2.5 overflow-hidden" style={{ background: 'linear-gradient(180deg, rgba(6,11,19,0.6), rgba(4,7,13,0.85))' }}>
+        <div className="absolute inset-0 bg-grid-tech opacity-20 pointer-events-none" />
+        <div className="absolute inset-0 hud-hatch opacity-50 pointer-events-none" />
+        <div className="absolute top-0 left-0 right-0 h-px overflow-hidden pointer-events-none">
+            <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-[#8fd6f7]/60 to-transparent animate-sweep-x" />
         </div>
-    );
-    return (
-        <div className="relative shrink-0 border-t border-[rgba(126,156,182,0.2)] p-2.5 overflow-hidden" style={{ background: 'linear-gradient(180deg, rgba(6,11,19,0.6), rgba(4,7,13,0.85))' }}>
-            <div className="absolute inset-0 bg-grid-tech opacity-20 pointer-events-none" />
-            <div className="absolute inset-0 hud-hatch opacity-50 pointer-events-none" />
-            <div className="absolute top-0 left-0 right-0 h-px overflow-hidden pointer-events-none">
-                <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-[#8fd6f7]/60 to-transparent animate-sweep-x" />
-            </div>
-            <div className="relative flex items-center gap-2 mb-2">
-                <span className="text-[9px] font-display font-bold text-[#9fdcf7] tracking-[0.28em]">战斗遥测</span>
-                <span className="flex-1 h-px hud-hairline opacity-25" />
-                <span className={`text-[9px] font-mono font-bold tracking-[0.14em] ${isPlayerPhase ? 'text-[#4bd6a5] animate-soft-blink' : 'text-[#f0c05a]'}`}>
-                    {isPlayerPhase ? '阶段 · 我方' : '阶段 · 敌方'}
-                </span>
-            </div>
-            {grid && <div className="relative mb-2.5">{grid}</div>}
-            <div className="relative grid grid-cols-2 gap-1.5">
-                <Cell k="当前行动" v={activeName} tone="text-[#cdeeff]" />
-                <Cell k="敌存" v={`${aliveEnemies} / ${totalEnemies}`} tone={aliveEnemies > 0 ? 'text-[#ffc4b0]' : 'text-[#5f6e7e]'} />
-                <Cell k="焦点" v={focusName} tone="text-[#ffc4b0]" />
-                <Cell k="焦点生命" v={`${focusHpPct}%`} tone={focusHpPct <= 30 ? 'text-[#f0c05a]' : 'text-[#dbe8f2]'} />
-                <Cell k="焦点攻击" v={formatNumber(focusAtk)} />
-                <Cell k="焦点速度" v={formatNumber(focusSpd)} />
-            </div>
+        <div className="relative flex items-center gap-2 mb-2">
+            <span className="text-[9px] font-display font-bold text-[#9fdcf7] tracking-[0.28em]">战斗地图</span>
+            <span className="flex-1 h-px hud-hairline opacity-25" />
+            <span className={`text-[9px] font-mono font-bold tracking-[0.14em] ${isPlayerPhase ? 'text-[#4bd6a5] animate-soft-blink' : 'text-[#f0c05a]'}`}>
+                {isPlayerPhase ? '阶段 · 我方' : '阶段 · 敌方'}
+            </span>
         </div>
-    );
-};
+        {grid && <div className="relative">{grid}</div>}
+    </div>
+);
 
 // =====================
 // 蓄反 / 差反预支询问（底部通栏，不遮挡主界面）
@@ -1624,9 +2093,21 @@ const CombatTelemetry: React.FC<{
 const CounterPromptBar: React.FC<{
     request: CounterAdvanceRequest;
     actorName: string;
-    onResolve: (approve: boolean) => void;
+    onResolve: (approve: boolean, advancePoints?: number) => void;
 }> = ({ request, actorName, onResolve }) => {
-    const isAccumulate = request.kind === 'accumulate';
+    const isAccumulate = request.type === 'accumulate';
+    /**
+     * 差反档位（2n 候选）：档位恒为 2 的倍数，上限即请求给出的默认预支量，默认取最大档后可由做出决定的单位下调；
+     * 蓄反档位由槽值唯一确定，不提供选择。
+     */
+    const options = isAccumulate
+        ? []
+        : Array.from({ length: Math.floor(request.apToAdvance / 2) }, (_, i) => (i + 1) * 2);
+    const [chosenDebt, setChosenDebt] = useState<number>(() =>
+        options.length > 0 ? options[options.length - 1] : request.apToAdvance
+    );
+    const debt = options.length > 0 ? chosenDebt : request.apToAdvance;
+    const windowAp = isAccumulate ? request.windowAp : Math.floor(debt / 2);
     return (
         <div className="relative shrink-0 pointer-events-auto border-t border-[#c28df5]/45"
             style={{ background: 'linear-gradient(180deg, rgba(18,8,30,0.92), rgba(6,3,12,0.97))' }}
@@ -1642,15 +2123,28 @@ const CounterPromptBar: React.FC<{
                 <span className="flex-1 min-w-0 truncate text-[11.5px] text-[#dbe8f2]">
                     <span className="text-[#e6cffb] font-bold">{actorName}</span>
                     {isAccumulate ? (
-                        <> 当前蓄反槽 <span className="font-mono text-[#c28df5] tabular font-bold">{formatNumber(request.availableCounter)}</span>，消耗 {formatNumber((request.threshold || 5) * request.advancePoints)} 点蓄反值预支 {formatNumber(request.advancePoints)} 点行动力、立即反击 {formatNumber(request.advancePoints)} 次（优先消耗当前行动点，不足部分下回合扣除）；保留则回合末按 10% 转化行动点</>
+                        <> 蓄反达标，消耗蓄反槽内对应蓄反值、预支 <span className="font-mono text-[#c28df5] tabular font-bold">{formatNumber(request.apToAdvance)}</span> 点行动力（下回合扣除），开启立即行动窗口（可用行动点 {formatNumber(windowAp)}）：按各行动自身消耗扣减，耗尽即结束（预支优先消耗当前行动点）；本回合预支额度剩余 <span className="font-mono text-[#c28df5] tabular font-bold">{formatNumber(request.existQuota)}</span>；保留则回合末按 10% 转化行动点</>
                     ) : (
-                        <> 速度满足差反，预支 2 点行动力立即反击 1 次（优先消耗当前行动点，不足部分下回合扣除）</>
+                        <> 速度满足差反，选择预支档位后开启立即行动窗口（可用行动点 {formatNumber(windowAp)}）：按各行动自身消耗扣减，耗尽即结束（预支优先消耗当前行动点，不足部分下回合扣除）；本回合预支额度剩余 <span className="font-mono text-[#c28df5] tabular font-bold">{formatNumber(request.existQuota)}</span></>
                     )}
                 </span>
+                {!isAccumulate && options.length > 1 && (
+                    <div className="shrink-0 flex items-center gap-1">
+                        {options.map((option) => (
+                            <button key={option} type="button" onClick={() => setChosenDebt(option)}
+                                title={`预支 ${option} 点（下回合扣除），窗口可用 ${Math.floor(option / 2)} 点行动点`}
+                                className={`h-7 px-2 border font-mono text-[10px] font-bold tabular transition-all whitespace-nowrap ${option === debt
+                                    ? 'border-[#c28df5] bg-[#3a1a55]/85 text-white'
+                                    : 'border-[rgba(126,156,182,0.35)] bg-[#0a1119]/70 text-[#96a7b8] hover:border-[#c28df5]/70 hover:text-[#e6cffb]'}`}>
+                                2n={option}
+                            </button>
+                        ))}
+                    </div>
+                )}
                 <div className="shrink-0 flex items-center gap-2">
-                    <button type="button" onClick={() => onResolve(true)}
+                    <button type="button" onClick={() => onResolve(true, debt)}
                         className="h-8 px-5 border border-[#c28df5]/70 bg-[#2a1240]/80 text-[#e6cffb] font-display font-bold text-[11px] tracking-[0.24em] hover:border-[#c28df5] hover:text-white active:scale-[0.98] transition-all whitespace-nowrap">
-                        预支反击
+                        预支行动
                     </button>
                     <button type="button" onClick={() => onResolve(false)}
                         className="h-8 px-5 border border-[rgba(126,156,182,0.3)] bg-[#0a1119]/70 text-[#96a7b8] font-display font-bold text-[11px] tracking-[0.24em] hover:border-[#8ea3b8] hover:text-[#dbe8f2] active:scale-[0.98] transition-all whitespace-nowrap">
@@ -1667,14 +2161,16 @@ const CounterPromptBar: React.FC<{
 // =====================
 const CombatActivePanel: React.FC<CombatPanelProps> = ({
     enemies, enemyIntents, allies, activeAllyId, setActiveAllyId, isPlayerPhase, isBusy,
-    getTacticsFor, canUseTactic, executeTactic, endPlayerPhase, getVisibleResultSequence, pendingDefense,
+    getTacticsFor, canUseTactic, executeTactic, endPlayerPhase, getVisibleResultSequence, getPredictionDepthFor, getAttackForecast, pendingDefense,
     onGenerateEnemyVisual, onRandomSwitchEnemyVisual, isEnemyVisualGenerating,
-    positions, battleLineMin, battleLineMax, getUnitRange, onMoveAlly,
-    counterPrompt, onResolveCounterPrompt, counterSkip, onToggleCounterSkip,
+    positions, battleMap, covers, getUnitRange, getMoveCost, onMoveAlly,
+    counterPrompt, onResolveCounterPrompt, counterSkip, onToggleCounterSkip, weaponStates,
     insertAction, onEndInsertAction,
 }) => {
-    const [selectedTactic, setSelectedTactic] = useState<Tactic | null>(null);
+    const [selectedTactic, setSelectedTactic] = useState<AnyTactic | null>(null);
     const [focusedEnemyId, setFocusedEnemyId] = useState<string>('');
+    /** 鼠标悬停的敌人：意图栏与战术预测「指哪看哪」（选择目标时不必先点下去）。 */
+    const [hoveredEnemyId, setHoveredEnemyId] = useState<string>('');
     /** 敌人肖像全屏欣赏层。 */
     const [isPortraitFullscreen, setIsPortraitFullscreen] = useState(false);
     const aliveEnemies = useMemo(() => enemies.filter((e) => !e.isDead && safeNumber(e.hp) > 0), [enemies]);
@@ -1699,6 +2195,15 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
     );
     const focusedEnemyIntent = focusedEnemy ? intentFor(focusedEnemy) : null;
     const focusedEnemyGuardCount = focusedEnemy ? (pendingDefense?.[getEnemyTargetId(focusedEnemy)] ?? []).length : 0;
+    /**
+     * 意图栏与战术预测的展示对象：优先跟随鼠标悬停的敌人，未悬停时回落焦点敌人。
+     * 选择目标时鼠标扫过敌方卡片即可逐个比价，不必先点（点下去就是开火）。
+     */
+    const previewEnemy = useMemo(() => {
+        if (!hoveredEnemyId) return focusedEnemy;
+        const hovered = enemies.find((e) => getEnemyTargetId(e) === hoveredEnemyId);
+        return hovered && !hovered.isDead && safeNumber(hovered.hp) > 0 ? hovered : focusedEnemy;
+    }, [hoveredEnemyId, enemies, focusedEnemy]);
     const allyEntries = useMemo(() => allies.map((ally, index) => ({ ally, id: getAllyTargetId(ally, index) })), [allies]);
     /**
      * 蓄反槽展示数据：按 owner 取出全部「owner × trigger」槽，
@@ -1738,20 +2243,19 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
     const targetMode = useMemo(() => (selectedTactic ? getManualTargetMode(selectedTactic) : null), [selectedTactic]);
     /** —— 战场空间派生（未接入空间数据时全部自动降级隐藏） —— */
     const posMap = positions ?? {};
-    const lineMin = battleLineMin ?? 0;
-    const lineMax = battleLineMax ?? 0;
+    const runtimeCovers = covers ?? [];
     const activePos = posMap[effectiveActiveId];
     /** 当前行动单位的武器射程；未接入时为 undefined（不限制目标选取）。 */
     const activeRange = useMemo(
         () => (getUnitRange ? getUnitRange(effectiveActiveId) : undefined),
         [getUnitRange, effectiveActiveId]
     );
-    /** 敌人与当前行动单位之间的战线距离。 */
+    /** 敌人与当前行动单位之间的战场距离（切比雪夫距离）。 */
     const enemyDistanceOf = useCallback((enemy: CombatEnemy): number | undefined => {
         const mine = posMap[effectiveActiveId];
         const theirs = posMap[getEnemyTargetId(enemy)];
-        if (typeof mine !== 'number' || typeof theirs !== 'number') return undefined;
-        return Math.abs(mine - theirs);
+        if (!mine || !theirs) return undefined;
+        return getBattleDistance(mine, theirs);
     }, [posMap, effectiveActiveId]);
     /** 目标是否超出当前射程（无空间数据或无限射程时恒为 false）。 */
     const isOutOfRange = useCallback((enemy: CombatEnemy): boolean => {
@@ -1759,15 +2263,6 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
         const d = enemyDistanceOf(enemy);
         return typeof d === 'number' && d > activeRange;
     }, [activeRange, enemyDistanceOf]);
-    /** 小地图上铺出的「适宜距离」光带；无限射程时覆盖整条战线。 */
-    const rangeBand = useMemo(() => {
-        if (typeof activeRange !== 'number' || typeof activePos !== 'number' || lineMax <= lineMin) return undefined;
-        if (activeRange === 0) return { from: lineMin, to: lineMax };
-        return {
-            from: Math.max(lineMin, activePos - activeRange),
-            to: Math.min(lineMax, activePos + activeRange),
-        };
-    }, [activeRange, activePos, lineMin, lineMax]);
     useEffect(() => { setSelectedTactic(null); }, [effectiveActiveId, isPlayerPhase, focusedEnemyId]);
     /** ESC 取消已选战术（战斗面板内唯一的键盘行为，其余交互一律使用鼠标）。 */
     useEffect(() => {
@@ -1795,7 +2290,7 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
     const playerHpPct = playerAlly ? getPercent(playerAlly.hp, playerAlly.maxHp) : 100;
     const dangerLevel = playerHpPct <= 15 ? 2 : playerHpPct <= 30 ? 1 : 0;
 
-    const handleTacticClick = useCallback((tactic: Tactic) => {
+    const handleTacticClick = useCallback((tactic: AnyTactic) => {
         if (!activeAllyEntry || !canActNow) return;
         if (!canUseTactic(tactic, effectiveActiveId)) return;
         const mode = getManualTargetMode(tactic);
@@ -1818,7 +2313,7 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
         const enemyId = getEnemyTargetId(enemy);
         if (enemy.isDead || safeNumber(enemy.hp) <= 0) return;
         setFocusedEnemyId(enemyId);
-        if (selectedTactic && targetMode === 'enemy') {
+        if (selectedTactic && targetMode === 'single_enemy') {
             // 超距目标不执行：保持战术选中，让玩家先移动调整距离。
             if (isOutOfRange(enemy)) return;
             const tacticId = selectedTactic.id;
@@ -1836,7 +2331,7 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
     const isEnemySelectable = useCallback((enemy: CombatEnemy) => {
         if (enemy.isDead || safeNumber(enemy.hp) <= 0) return false;
         if (!selectedTactic || !targetMode) return false;
-        if (targetMode !== 'enemy') return false;
+        if (targetMode !== 'single_enemy') return false;
         // 攻击战术：射程之外的目标不可选取。
         return !isOutOfRange(enemy);
     }, [selectedTactic, targetMode, isOutOfRange]);
@@ -1847,16 +2342,16 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
         void endPlayerPhase();
     }, [isPlayerPhase, isBusy, endPlayerPhase]);
 
-    /** 我方单位移动：前进 / 后退一步。移动会改变射程可用性，因此先清空待选战术。 */
-    const handleMoveAlly = useCallback((targetId: string, dir: 1 | -1) => {
+    /** 我方单位移动：四向位移一步。移动会改变射程可用性，因此先清空待选战术。 */
+    const handleMoveAlly = useCallback((targetId: string, dir: MoveDirection) => {
         if (!onMoveAlly) return;
         setSelectedTactic(null);
         void onMoveAlly(targetId, dir);
     }, [onMoveAlly]);
 
-    const canMoveUnit = useCallback((targetId: string, dir: 1 | -1): boolean => {
-        if (!onMoveAlly || isBusy) return false;
-        // 「立即行动」窗口期间只允许预支单位移动，且移动不消耗行动点。
+    const canMoveUnit = useCallback((targetId: string, dir: MoveDirection): boolean => {
+        if (!onMoveAlly || !battleMap || isBusy) return false;
+        // 「立即行动」窗口期间只允许预支单位移动，且移动消耗窗口行动点（可反复进行）。
         if (insertUnitId) {
             if (targetId !== insertUnitId) return false;
         } else if (!isPlayerPhase) {
@@ -1864,22 +2359,24 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
         }
         const entry = allyEntries.find((e) => e.id === targetId);
         if (!entry || safeNumber(entry.ally.hp) <= 0) return false;
-        if (!insertUnitId && safeNumber(entry.ally.actionPoint.current) < 1) return false;
+        const apPool = insertUnitId
+            ? Math.max(0, safeNumber(insertAction?.apLeft))
+            : safeNumber(entry.ally.actionPoint.current);
+        if (apPool < (getMoveCost ? getMoveCost() : 1)) return false;
         const pos = posMap[targetId];
-        if (typeof pos !== 'number') return false;
-        const next = pos + dir;
-        return next >= lineMin && next <= lineMax;
-    }, [onMoveAlly, isPlayerPhase, isBusy, insertUnitId, allyEntries, posMap, lineMin, lineMax]);
+        if (!pos) return false;
+        return isCellWalkable(battleMap, runtimeCovers, getSteppedCell(pos, dir));
+    }, [onMoveAlly, battleMap, runtimeCovers, isPlayerPhase, isBusy, insertUnitId, insertAction, allyEntries, posMap, getMoveCost]);
 
     /** 我方单位到最近存活敌人的距离。 */
     const nearestEnemyDistance = useCallback((targetId: string): number | undefined => {
         const mine = posMap[targetId];
-        if (typeof mine !== 'number') return undefined;
+        if (!mine) return undefined;
         let best: number | undefined;
         aliveEnemies.forEach((enemy) => {
             const ep = posMap[getEnemyTargetId(enemy)];
-            if (typeof ep !== 'number') return;
-            const d = Math.abs(ep - mine);
+            if (!ep) return;
+            const d = getBattleDistance(ep, mine);
             if (best === undefined || d < best) best = d;
         });
         return best;
@@ -1893,7 +2390,7 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
      * 战术不可用的具体原因。
      * 仅在 canUseTactic 已判定为 false 时调用，因此可安全地给出确定性解释。
      */
-    const tacticDisabledReason = useCallback((tactic: Tactic): string | undefined => {
+    const tacticDisabledReason = useCallback((tactic: AnyTactic): string | undefined => {
         if (isBusy) return '结算中…';
         if (!isPlayerPhase && !isInsertingUnit) return '敌方回合';
         const ally = activeAllyEntry?.ally;
@@ -1901,22 +2398,44 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
         if (safeNumber(ally.hp) <= 0) return '已阵亡';
         const ap = Math.max(0, safeNumber(ally.actionPoint.current));
         const cost = safeNumber(tactic.apCost);
-        // 立即行动窗口内的行动不消耗行动点。
-        if (!isInsertingUnit && ap < cost) return `AP 不足 · 缺 ${formatNumber(cost - ap)}`;
-        if (safeNumber(ally.resultSequence?.attackResult?.length) <= 0) return '攻击序列耗尽';
+        if (isInsertingUnit) {
+            // 立即行动窗口：行动点取自窗口池，按行动自身消耗扣减。
+            const windowAp = Math.max(0, safeNumber(insertAction?.apLeft));
+            if (windowAp < cost) return `窗口行动点不足 · 缺 ${formatNumber(cost - windowAp)}`;
+        } else if (ap < cost) {
+            return `AP 不足 · 缺 ${formatNumber(cost - ap)}`;
+        }
+        if (sequenceMinLength(ally.resultSequence) <= 0) return '结果序列耗尽';
+        // 战术声明的武器类型必须真的装备在某个槽位上。
+        const requiredWeapon = getTacticWeaponType(tactic);
+        if (requiredWeapon && !hasEquippedWeaponType(ally.equipment, requiredWeapon)) {
+            return `需要武器：${WEAPON_LABEL[requiredWeapon]}`;
+        }
+        // 弩未装填无法发射：这是契约硬约束，需给出明确原因而非灰按钮。
+        if (
+            tactic.type === 'A' &&
+            hasEquippedWeaponType(ally.equipment, 'crossbow') &&
+            weaponStates?.[effectiveActiveId]?.needsReload === true
+        ) {
+            return '弩未装填 · 需先执行装填';
+        }
+        // 已瞄准时无需重复瞄准。
+        if (WEAPON_TRAIT_ACTION_IDS.aim === tactic.id && weaponStates?.[effectiveActiveId]?.aimed) {
+            return '已处于瞄准状态';
+        }
         // 攻击战术：射程内没有可攻击目标。
-        if (tactic.type === 'attack' && typeof activeRange === 'number') {
+        if (tactic.type === 'A' && typeof activeRange === 'number') {
             const hasTarget = aliveEnemies.some((enemy) => !isOutOfRange(enemy));
             if (!hasTarget) return `射程外 · 需接近至 ${formatNumber(activeRange)} 格`;
         }
         return undefined;
-    }, [isBusy, isPlayerPhase, isInsertingUnit, activeAllyEntry, activeRange, aliveEnemies, isOutOfRange]);
+    }, [isBusy, isPlayerPhase, isInsertingUnit, insertAction, activeAllyEntry, activeRange, aliveEnemies, isOutOfRange, effectiveActiveId, weaponStates]);
 
     /** 蓄反 / 差反询问发起者名称（player / 同伴 id）。 */
     const counterActorName = useMemo(() => {
         if (!counterPrompt) return '';
-        if (counterPrompt.actorId === 'player') return allies[0]?.name ?? '操作者';
-        return allies.find((a) => a.id === counterPrompt.actorId)?.name ?? counterPrompt.actorId;
+        if (counterPrompt.entityId === 'player') return allies[0]?.name ?? '操作者';
+        return allies.find((a) => a.id === counterPrompt.entityId)?.name ?? counterPrompt.entityId;
     }, [counterPrompt, allies]);
 
     /** 「立即行动」窗口的行动者名称。 */
@@ -1926,18 +2445,51 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
         return allies.find((a) => a.id === insertAction.unitId)?.name ?? insertAction.unitId;
     }, [insertAction, allies]);
 
-    const intentTargetName = focusedEnemyIntent?.targetId
-        ? allyEntries.find((e) => e.id === focusedEnemyIntent.targetId)?.ally.name ?? focusedEnemyIntent.targetId
+    const previewIntent = previewEnemy ? intentFor(previewEnemy) : null;
+    const intentTargetName = previewIntent?.targetId
+        ? allyEntries.find((e) => e.id === previewIntent.targetId)?.ally.name ?? previewIntent.targetId
         : undefined;
 
-    const focusHpPct = focusedEnemy ? getPercent(safeNumber(focusedEnemy.hp), Math.max(1, safeNumber(focusedEnemy.maxHp))) : 0;
+    /**
+     * 战前预测（XCOM 式）：当前行动单位打「意图栏展示中的敌人」的命中概率、伤害读数与减益来源。
+     * 位置、掩体、地图一变就重算，保证面板读数与实战判定同源。
+     */
+    const attackForecast = useMemo(
+        () =>
+            previewEnemy && getAttackForecast
+                ? getAttackForecast(effectiveActiveId, getEnemyTargetId(previewEnemy))
+                : null,
+        [previewEnemy, getAttackForecast, effectiveActiveId, positions, covers, battleMap]
+    );
+
+    /**
+     * 根节点同时承担两件事：
+     * - 指针视差的 CSS 变量载体（--par-x / --par-y，由景深层读取）；
+     * - 受击震屏的一次性动画载体（直接 classList 播放）。
+     * 两者都不触发 React 重渲染。
+     */
+    const panelRootRef = useRef<HTMLDivElement | null>(null);
+    useParallax(panelRootRef);
+    useDamageShake(safeNumber(allies[0]?.hp), panelRootRef);
 
     return (
-        <div className="combat-panel-root absolute inset-0 z-50 overflow-hidden pointer-events-auto flex flex-col" onClick={handleBackgroundClick}>
-            {/* 全屏氛围层 */}
-            <div className="absolute inset-0 bg-grid-fade opacity-60 pointer-events-none" />
-            <div className="combat-ambience absolute inset-0 pointer-events-none" />
-            <div className="erosion-bloom absolute inset-0 pointer-events-none" />
+        <div ref={panelRootRef}
+            className="combat-panel-root absolute inset-0 z-50 overflow-hidden pointer-events-auto flex flex-col"
+            onClick={handleBackgroundClick}
+            onAnimationEnd={clearShakeOnAnimationEnd}>
+            {/*
+                全屏氛围层（纵深三层，仅 transform 位移，随指针产生视差）：
+                - 远景：技术网格 + 侵蚀脉络（合并为单元素，减少合成层数量）
+                - 中景：舱内氛围光晕
+                - 近景：噪声 / 扫掠线保持原位，充当「贴在镜头玻璃上」的一层
+                各层统一 -inset-6 外扩 24px，位移时不会露出屏幕边缘。
+            */}
+            <div className="parallax-layer parallax-far absolute -inset-6 pointer-events-none">
+                <div className="ambience-deep absolute inset-0 opacity-70" />
+            </div>
+            <div className="parallax-layer parallax-mid absolute -inset-6 pointer-events-none">
+                <div className="combat-ambience absolute inset-0" />
+            </div>
             <div className="noise-overlay absolute inset-0 opacity-20 pointer-events-none" />
             <div className="hud-scanline opacity-[0.08] pointer-events-none" />
             {dangerLevel > 0 && (
@@ -1958,7 +2510,7 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
                 < lg：flex-col 单列纵向滚动。
                 lg+：grid，行 = auto(轨道) + minmax(0,1fr)(主体)，列按 fr 比例铺满。
             */}
-            <main className="relative z-10 flex-1 min-h-0 w-full flex flex-col gap-px hud-seam border border-[rgba(126,156,182,0.22)] overflow-y-auto lg:overflow-hidden lg:grid lg:grid-cols-[minmax(240px,0.82fr)_minmax(0,1.7fr)_minmax(300px,1fr)] lg:grid-rows-[auto_minmax(0,1fr)] pointer-events-none">
+            <main className="main-vignette relative z-10 flex-1 min-h-0 w-full flex flex-col gap-px hud-seam border border-[rgba(126,156,182,0.22)] overflow-y-auto lg:overflow-hidden lg:grid lg:grid-cols-[minmax(240px,0.82fr)_minmax(0,1.7fr)_minmax(300px,1fr)] lg:grid-rows-[auto_minmax(0,1fr)] pointer-events-none">
 
                 {/* —— 敌对单元轨道（DOM 1 / grid 顶行跨三列，卡片 flex-1 铺满） —— */}
                 <section className="pointer-events-auto flex flex-col min-h-0 surf-panel lg:col-span-3 lg:row-start-1">
@@ -1971,7 +2523,9 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
                                 counterSlots={counterSlotsOf(getEnemyTargetId(enemy), enemy.accumulateCounter)}
                                 distance={enemyDistanceOf(enemy)}
                                 range={activeRange}
-                                outOfRange={Boolean(selectedTactic) && targetMode === 'enemy' && isOutOfRange(enemy)}
+                                outOfRange={Boolean(selectedTactic) && targetMode === 'single_enemy' && isOutOfRange(enemy)}
+                                onHoverStart={() => setHoveredEnemyId(getEnemyTargetId(enemy))}
+                                onHoverEnd={() => setHoveredEnemyId('')}
                                 onClick={() => handleEnemyClick(enemy)} />
                         ))}
                     </div>
@@ -1991,9 +2545,10 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
                                 onOpenFullscreen={() => setIsPortraitFullscreen(true)} />
                         )}
                     </div>
-                    {focusedEnemy && (
+                    {previewEnemy && (
                         <div className="shrink-0">
-                            <IntentModule enemy={focusedEnemy} intent={focusedEnemyIntent} targetName={intentTargetName} />
+                            <IntentModule enemy={previewEnemy} intent={previewIntent} targetName={intentTargetName}
+                                attackerName={activeAllyEntry?.ally.name} forecast={attackForecast} />
                         </div>
                     )}
                 </section>
@@ -2008,10 +2563,15 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
                                     isSelectable={isAllySelectable(id, safeNumber(ally.hp) > 0)}
                                     isTargeted={focusedEnemyIntent?.targetId === id}
                                     counterSlots={counterSlotsOf(id, ally.accumulateCounter)}
+                                    weaponState={weaponStates?.[id]}
                                     position={posMap[id]}
                                     nearestEnemyDistance={nearestEnemyDistance(id)}
-                                    canMoveForward={canMoveUnit(id, 1)}
-                                    canMoveBackward={canMoveUnit(id, -1)}
+                                    moveAvailability={onMoveAlly ? {
+                                        forward: canMoveUnit(id, 'forward'),
+                                        backward: canMoveUnit(id, 'backward'),
+                                        lane_left: canMoveUnit(id, 'lane_left'),
+                                        lane_right: canMoveUnit(id, 'lane_right'),
+                                    } : undefined}
                                     onMove={onMoveAlly ? (dir) => handleMoveAlly(id, dir) : undefined}
                                     skipAccumulateCounter={counterSkip?.[id]?.accumulate === true}
                                     skipDifferentialCounter={counterSkip?.[id]?.differential === true}
@@ -2037,7 +2597,13 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
                         {/* 结果序列 */}
                         {activeAllyEntry && getVisibleResultSequence && (() => {
                             const seq = getVisibleResultSequence(effectiveActiveId);
-                            const len = seq ? seq.attackResult.length : 0;
+                            const len = sequenceMinLength(seq);
+                            /**
+                             * 预测深度 n 与可见长度是两个量：
+                             * n 由 will 决定（<50 为 0），可见长度还要受体力推导的序列长度封顶。
+                             * 二者都为 0 时才真正「不可预测」。
+                             */
+                            const depth = getPredictionDepthFor ? getPredictionDepthFor(effectiveActiveId) : len;
                             const ownPending = pendingDefense?.[effectiveActiveId] ?? [];
                             return (
                                 <div className="flex flex-col gap-1.5 p-2.5 border-b border-[rgba(126,156,182,0.18)] bg-black/25 shrink-0">
@@ -2045,15 +2611,19 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
                                         <span className="text-[9px] font-display font-bold text-[#9fdcf7] tracking-[0.24em] whitespace-nowrap">结果序列</span>
                                         <span className="flex-1 h-px hud-hairline opacity-25" />
                                         {len > 0 ? (
-                                            <span className="text-[10px] font-mono text-[#96a7b8] tabular whitespace-nowrap">深度 {len}/24</span>
+                                            <span className="text-[10px] font-mono text-[#96a7b8] tabular whitespace-nowrap">可见 {len} 步 · 预判 {depth} 步</span>
                                         ) : (
-                                            <span className="text-[10px] font-mono text-[#5f6e7e] whitespace-nowrap">灵性不足</span>
+                                            <span className="text-[10px] font-mono text-[#5f6e7e] whitespace-nowrap">
+                                                {depth <= 0 ? '意志不足 · 无法预判' : '序列已耗尽'}
+                                            </span>
                                         )}
                                     </div>
                                     {len > 0 && seq && (
                                         <div className="flex flex-col gap-1 border border-[rgba(126,156,182,0.16)] bg-[#05090f]/80 p-1.5">
-                                            <ResultSequenceBar label="攻" results={seq.attackResult} />
-                                            <ResultSequenceBar label="防" results={seq.defenseResult} />
+                                            {seq.main && <ResultSequenceBar label="主" results={seq.main} />}
+                                            {seq.side && <ResultSequenceBar label="副" results={seq.side} />}
+                                            {seq.attack && <ResultSequenceBar label="攻" results={seq.attack} />}
+                                            <ResultSequenceBar label="防" results={seq.defense} />
                                         </div>
                                     )}
                                     <PendingDefenseBar list={ownPending} />
@@ -2072,30 +2642,28 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
                                         usable={!!activeAllyEntry && canActNow && canUseTactic(tactic, effectiveActiveId)}
                                         selected={selectedTactic?.id === tactic.id}
                                         reason={tacticDisabledReason(tactic)}
-                                        rangeText={tactic.type === 'attack' && typeof activeRange === 'number'
+                                        rangeText={tactic.type === 'A' && typeof activeRange === 'number'
                                             ? (activeRange === 0 ? '无限' : `${formatNumber(activeRange)} 格`)
                                             : undefined}
                                         onClick={() => handleTacticClick(tactic)} />
                                 ))
                             )}
                         </div>
-                        {/* 遥测吃满剩余空间：战线地图与遥测数据合并为同一模块 */}
-                        <CombatTelemetry isPlayerPhase={isPlayerPhase}
-                            activeName={activeAllyEntry?.ally.name ?? '—'}
-                            aliveEnemies={aliveEnemies.length} totalEnemies={enemies.length}
-                            focusName={focusedEnemy?.name ?? '—'} focusHpPct={focusHpPct}
-                            focusAtk={focusedEnemy ? safeNumber(focusedEnemy.baseAttack) : 0}
-                            focusSpd={focusedEnemy ? safeNumber(focusedEnemy.speed) : 0}
-                            grid={onMoveAlly && lineMax > lineMin ? (
-                                <BattleGrid lineMin={lineMin} lineMax={lineMax} rangeBand={rangeBand}
+                        {/* 战斗地图吃满剩余空间：只放地图，其余信息交给意图栏的战术预测 */}
+                        <CombatMap isPlayerPhase={isPlayerPhase}
+                            grid={onMoveAlly && battleMap ? (
+                                <BattleGrid battleMap={battleMap}
+                                    covers={runtimeCovers} activePos={activePos} activeRange={activeRange}
                                     allies={allyEntries.map(({ ally, id }) => ({
-                                        id, label: ally.name ?? id, pos: posMap[id] ?? 0,
+                                        id, label: ally.name ?? id,
+                                        pos: posMap[id] ?? { x: battleMap.depthRange[0], y: 0 },
                                         alive: safeNumber(ally.hp) > 0, highlighted: id === effectiveActiveId,
                                     }))}
                                     enemies={enemies.map((enemy) => {
                                         const id = getEnemyTargetId(enemy);
                                         return {
-                                            id, label: enemy.name ?? id, pos: posMap[id] ?? 0,
+                                            id, label: enemy.name ?? id,
+                                            pos: posMap[id] ?? { x: battleMap.depthRange[0], y: 0 },
                                             alive: !enemy.isDead && safeNumber(enemy.hp) > 0,
                                             highlighted: !isOutOfRange(enemy),
                                         };
@@ -2108,6 +2676,7 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
             {/* 蓄反 / 差反预支询问（底部通栏，不遮挡主界面） */}
             {counterPrompt && onResolveCounterPrompt && (
                 <CounterPromptBar
+                    key={`${counterPrompt.entityId}-${counterPrompt.type}-${counterPrompt.apToAdvance}`}
                     request={counterPrompt}
                     actorName={counterActorName}
                     onResolve={onResolveCounterPrompt} />
@@ -2128,7 +2697,8 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
                         <span className="hidden xl:block shrink-0 font-mono text-[9px] text-[#5f6e7e] tracking-[0.18em] animate-soft-blink">INSERT ACTION</span>
                         <span className="flex-1 min-w-0 truncate text-[11.5px] text-[#dbe8f2]">
                             <span className="text-[#b6f5dd] font-bold">{insertActorName}</span>
-                            {' '}立即行动 · 剩余 <span className="font-mono text-[#4bd6a5] tabular font-bold">{insertAction.chancesLeft}</span> 次（本次行动不消耗行动点）
+                            {' '}立即行动 · 行动点 <span className="font-mono text-[#4bd6a5] tabular font-bold">{formatNumber(insertAction.apLeft)}</span>/<span className="font-mono text-[#7e9c8f] tabular">{formatNumber(insertAction.apMax)}</span>
+                            {' '}（每次行动按其自身消耗扣减，耗尽即结束；可随时手动结束）
                         </span>
                         <button type="button" onClick={onEndInsertAction}
                             className="h-8 px-5 border border-[#4bd6a5]/60 bg-[#04241b]/80 text-[#b6f5dd] font-display font-bold text-[11px] tracking-[0.24em] hover:border-[#4bd6a5] hover:text-white active:scale-[0.98] transition-all whitespace-nowrap">
@@ -2212,7 +2782,7 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
                                 <div className="mt-2 flex flex-wrap items-center gap-x-2.5 font-mono text-[10px] tabular">
                                     <span className="text-[#5f6e7e]">速度</span><span className="text-[#dbe8f2]">{formatNumber(focusedEnemy.speed)}</span>
                                     <span className="w-px h-3 bg-[rgba(126,156,182,0.3)]" />
-                                    <span className="text-[#5f6e7e]">攻击</span><span className="text-[#dbe8f2]">{formatNumber(focusedEnemy.baseAttack)}</span>
+                                    <span className="text-[#5f6e7e]">攻击</span><span className="text-[#dbe8f2]">{formatNumber(focusedEnemy.attack)}</span>
                                 </div>
                             </div>
                             <div className="text-right shrink-0 leading-none">

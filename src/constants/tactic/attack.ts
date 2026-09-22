@@ -12,7 +12,7 @@
  * @version 2.1.1
  */
 
-import type { AttackTactic } from '../../meta'
+import type { Tactic } from '../../meta'
 
 /**
  * 攻击战术构造器
@@ -23,10 +23,10 @@ const atk = (
     name: string,
     desc: string,
     apCost: number,
-    tacticEffect: NonNullable<AttackTactic['tacticEffect']>,
-    requireWeapon?: NonNullable<AttackTactic['requireWeapon']>,
-): AttackTactic => ({
-    type: 'attack',
+    tacticEffect: NonNullable<Tactic['tacticEffect']>,
+    requireWeapon?: NonNullable<Tactic['requireWeapon']>,
+): Tactic => ({
+    type: 'A',
     id: `public_atk_${id}`,
     name,
     desc,
@@ -35,7 +35,7 @@ const atk = (
     ...(requireWeapon ? { requireWeapon } : {}),
 })
 
-export const publicAttackTactics: AttackTactic[] = [
+export const publicAttackTactics: Tactic[] = [
     // --------------------------------------------------------------------------
     // 通用攻击战术
     // --------------------------------------------------------------------------
@@ -53,7 +53,7 @@ export const publicAttackTactics: AttackTactic[] = [
         1,
         [
             ['self', 'agility', 1, 0],
-            ['enemy', 'perception', -1, 1],
+            ['single_enemy', 'awareness', -1, 1],
         ],
     ),
     atk(
@@ -75,7 +75,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '卸力击打',
         '攻击敌方持握、关节或发力结构，削弱其力量输出。',
         2,
-        [['enemy', 'strength', -2, 1]],
+        [['single_enemy', 'strength', -2, 1]],
     ),
     atk(
         'aimed_weakpoint',
@@ -83,8 +83,8 @@ export const publicAttackTactics: AttackTactic[] = [
         '短暂瞄准敌方结构弱点，以感知修正攻击路径并压缩其规避空间。',
         2,
         [
-            ['self', 'perception', 2, 0],
-            ['enemy', 'agility', -1, 1],
+            ['self', 'awareness', 2, 0],
+            ['single_enemy', 'agility', -1, 1],
         ],
     ),
     atk(
@@ -94,7 +94,7 @@ export const publicAttackTactics: AttackTactic[] = [
         2,
         [
             ['single_ally', 'strength', 2, 1],
-            ['enemy', 'agility', -2, 1],
+            ['single_enemy', 'agility', -2, 1],
         ],
     ),
     atk(
@@ -104,7 +104,7 @@ export const publicAttackTactics: AttackTactic[] = [
         4,
         [
             ['self', 'strength', 3, 0],
-            ['self', 'perception', 3, 0],
+            ['self', 'awareness', 3, 0],
         ],
     ),
 
@@ -147,7 +147,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '精准突刺',
         '以刺击类武器攻击敌方缝隙或薄弱点，依赖感知锁定有效命中位置。',
         2,
-        [['self', 'perception', 2, 0]],
+        [['self', 'awareness', 2, 0]],
         'prick',
     ),
     atk(
@@ -155,7 +155,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '透甲刺',
         '以刺击类武器精准贯穿要害，依赖感知锁定致命缝隙。',
         3,
-        [['self', 'perception', 3, 0]],
+        [['self', 'awareness', 3, 0]],
         'prick',
     ),
     atk(
@@ -164,7 +164,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '以双手刺击类武器发动贯穿突刺，牺牲部分机动换取更高命中与弱点锁定。',
         3,
         [
-            ['self', 'perception', 3, 0],
+            ['self', 'awareness', 3, 0],
             ['self', 'agility', -1, 0],
         ],
         'both_prick',
@@ -178,7 +178,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '弓矢射击',
         '以弓进行远程射击，依靠感知修正弹道与命中判断。',
         2,
-        [['self', 'perception', 2, 0]],
+        [['self', 'awareness', 2, 0]],
         'bow',
     ),
     atk(
@@ -186,7 +186,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '箭雨覆盖',
         '以弓进行覆盖式射击，压制所有敌人的规避与反击判断。',
         3,
-        [['all_enemies', 'perception', -2, 1]],
+        [['all_enemies', 'awareness', -2, 1]],
         'bow',
     ),
     atk(
@@ -195,7 +195,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '以弩发射高穿透弹药，利用感知锁定缝隙并以器械张力破坏防护。',
         3,
         [
-            ['self', 'perception', 2, 0],
+            ['self', 'awareness', 2, 0],
             ['self', 'strength', 1, 0],
         ],
         'crossbow',
@@ -206,8 +206,8 @@ export const publicAttackTactics: AttackTactic[] = [
         '以弩进行高精度重击，优先破坏敌方防护与要害。',
         4,
         [
-            ['self', 'perception', 3, 0],
-            ['enemy', 'agility', -1, 1],
+            ['self', 'awareness', 3, 0],
+            ['single_enemy', 'agility', -1, 1],
         ],
         'crossbow',
     ),
@@ -216,7 +216,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '投掷骚扰',
         '投掷小型武器或杂物，以敏捷制造干扰并迫使敌方失去节奏。',
         1,
-        [['enemy', 'agility', -1, 1]],
+        [['single_enemy', 'agility', -1, 1]],
         'throw',
     ),
     atk(
@@ -224,7 +224,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '震爆投掷',
         '投掷震荡性或干扰性物体，以敏捷制造范围骚扰。',
         2,
-        [['enemy', 'agility', -2, 1]],
+        [['single_enemy', 'agility', -2, 1]],
         'throw',
     ),
 
@@ -236,7 +236,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '精确点射',
         '以手枪进行短促点射，依赖感知锁定目标要害。',
         2,
-        [['self', 'perception', 2, 0]],
+        [['self', 'awareness', 2, 0]],
         'pistol',
     ),
     atk(
@@ -244,7 +244,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '冲锋扫射',
         '以冲锋枪近距离连续扫射，压制敌方观察与瞄准能力。',
         3,
-        [['all_enemies', 'perception', -1, 1]],
+        [['all_enemies', 'awareness', -1, 1]],
         'smg',
     ),
     atk(
@@ -252,7 +252,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '火力压制',
         '以突击步枪持续射击压制所有敌人，降低其行动意愿与反击效率。',
         3,
-        [['all_enemies', 'perception', -2, 1]],
+        [['all_enemies', 'awareness', -2, 1]],
         'assault_rifle',
     ),
     atk(
@@ -261,8 +261,8 @@ export const publicAttackTactics: AttackTactic[] = [
         '在近距离释放霰弹弹幕，以火力覆盖扰乱敌方行动节奏。',
         2,
         [
-            ['enemy', 'agility', -1, 1],
-            ['self', 'perception', 1, 0],
+            ['single_enemy', 'agility', -1, 1],
+            ['self', 'awareness', 1, 0],
         ],
         'shotgun',
     ),
@@ -271,7 +271,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '短管破门',
         '以短管霰弹枪贴身轰击，强行撕开敌方架势并制造破绽。',
         2,
-        [['enemy', 'agility', -2, 1]],
+        [['single_enemy', 'agility', -2, 1]],
         'sawed_off',
     ),
     atk(
@@ -279,7 +279,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '致命瞄准',
         '以狙击步枪进行致命单发射击，高度依赖感知锁定目标弱点。',
         3,
-        [['self', 'perception', 3, 0]],
+        [['self', 'awareness', 3, 0]],
         'sniper_rifle',
     ),
 
@@ -291,7 +291,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '异术冲击',
         '以魔法武器或术式释放单体冲击，依赖灵力稳定能量投射。',
         3,
-        [['self', 'spiritual', 3, 0]],
+        [['self', 'will', 3, 0]],
         'magic',
     ),
     atk(
@@ -300,8 +300,8 @@ export const publicAttackTactics: AttackTactic[] = [
         '以术式抽取敌方精神能量，同时稳定自身灵力投射。',
         2,
         [
-            ['enemy', 'spiritual', -2, 1],
-            ['self', 'spiritual', 1, 1],
+            ['single_enemy', 'will', -2, 1],
+            ['self', 'will', 1, 1],
         ],
         'magic',
     ),
@@ -310,7 +310,7 @@ export const publicAttackTactics: AttackTactic[] = [
         '范围湮灭',
         '释放广域魔法波动，对所有敌人造成精神与能量层面的双重压迫。',
         4,
-        [['all_enemies', 'spiritual', -3, 1]],
+        [['all_enemies', 'will', -3, 1]],
         'magic',
     ),
 ]

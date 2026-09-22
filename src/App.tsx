@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense, lazy } from 'react';
-import { GameState, Settings, VisorPanelType, PlayerState, AttributeType, SanctuaryEvent, SanctuaryEventChange } from './meta';
+import { GameState, Settings, VisorPanelType, PlayerState, AttributeType, SanctuaryEvent, getEquippedInstances } from './meta';
 import { useGame } from './hooks';
 import { AudioService, AiService } from './services';
 import { INITIAL_SETTINGS, MODEL_PROVIDER } from './constants';
@@ -39,14 +39,12 @@ const App: React.FC = () => {
         getCurrentNode,
         currentNodeId,
         currentEnemy,
-        combatLog,
         pendingDefense,
         logs,
         loadingStatus,
         sanctuary, // 提取庇护所区域数据
 
         // 生成状态
-        isGenerating,
         isTaskGenerating,
 
         // NPC 交互
@@ -55,9 +53,12 @@ const App: React.FC = () => {
         handleNPCRecruit,
         handleNPCGift,
         closeNPCInteraction,
-        handleLocalNPCAction,
+        handleCompanionHeartToHeart,
+        handleRequestQuest,
+        handleCompanionEquipItem,
+        handleCompanionUnequipItem,
+        handleCompanionUseConsumable,
         handleNPCTakeItem,
-        handleNPCIntimacy,
         handleMountProfile,
         handleUnmountCreateNewProfile,
         handleDeleteProfile,
@@ -69,6 +70,7 @@ const App: React.FC = () => {
         handleUseItem,
         handleEquipItem,
         handleDiscardItem,
+        inventoryGrid,
         generateNewAsset,
         handleRandomSwitch,
         hasMultipleVariants,
@@ -88,6 +90,21 @@ const App: React.FC = () => {
         deleteNarrativeArc,
         deleteEpisodicZone,
         narrativePreview,
+        // 自建叙事库（恐怖域 / 元 / 美学）
+        narrativeDomains,
+        narrativeAtoms,
+        narrativeAesthetics,
+        customNarrativeDomains,
+        customNarrativeAtoms,
+        customNarrativeAesthetics,
+        isNarrativeLibraryLoading,
+        isNarrativeLibrarySaving,
+        upsertNarrativeDomain,
+        upsertNarrativeAtom,
+        upsertNarrativeAesthetic,
+        removeNarrativeDomain,
+        removeNarrativeAtom,
+        removeNarrativeAesthetic,
         narrativeFlowStep,
         narrativeFlowPendingConfig,
         narrativeFlowEpisodicTension,
@@ -97,13 +114,12 @@ const App: React.FC = () => {
         setNarrativeFlowStep,
         setNarrativeFlowEpisodicTension,
         setNarrativeFlowEpisodicNodeCount,
-        setNarrativeFlowPendingConfig,
         // 叙事流程处理函数
         handleNarrativeFlowOpenLibrary,
         handleNarrativeFlowLoadFromLibrary,
         handleNarrativeFlowModeConfirm,
         handleNarrativeFlowPacingConfirm,
-        handleNarrativeFlowThemeConfirm,
+        handleNarrativeFlowAestheticConfirm,
         handleNarrativeFlowConfigConfirm,
         handleNarrativeFlowDetailsConfirm,
         handleNarrativeFlowPreviewConfirm,
@@ -113,14 +129,9 @@ const App: React.FC = () => {
         // 庇护所
         transferItem,
         handleRest,
-        getStorageCapacity,
         getCustomRestConfig,
-        handleUseMedicine,
         handleFacilityUpgrade,
         handleSanctuaryEvent,
-        morale,
-        isLowMorale,
-        maxStorage,
         facilities,
         dailyProduction,
         residents,
@@ -154,14 +165,18 @@ const App: React.FC = () => {
         getTacticsFor,
         canUseTactic,
         getVisibleResultSequence,
+        getPredictionDepthFor,
+        getAttackForecast,
         positions,
-        battleLineMin,
-        battleLineMax,
+        battleMap,
+        covers,
         getUnitRange,
+        getMoveCost,
         moveAlly,
         counterPrompt,
         resolveCounterPrompt,
         counterSkip,
+        weaponStates,
         setCounterSkip,
         insertAction,
         endInsertAction,
@@ -218,27 +233,24 @@ const App: React.FC = () => {
             if (!sanctuaryEvent) return;
             const choice = sanctuaryEvent.choices[choiceIndex];
             if (!choice) return;
-            const spawnedEnemy = handleSanctuaryEvent(choice.stateChange as unknown as SanctuaryEventChange);
+            const spawnedEnemyCount = handleSanctuaryEvent(choice.impact);
             setSanctuaryEvent(null);
-            if (spawnedEnemy) {
-                // 事件引发敌人突袭：增强侵蚀并提示（实体遭遇交由探索/战斗系统接管）。
-                console.warn('[SanctuaryEvent] 事件触发了敌人突袭');
+            if (spawnedEnemyCount > 0) {
+                // 事件引发敌人突袭：实体遭遇交由战斗系统接管。
+                console.warn(`[SanctuaryEvent] 事件触发敌人突袭，抽取 ${spawnedEnemyCount} 名敌人`);
             }
         },
         [sanctuaryEvent, handleSanctuaryEvent]
     );
 
-    /** 让 LLM 裁决一次设施升级的废料消耗（服务失败时内部降级为引擎公式）。 */
+    /** 让 LLM 裁决一次设施升级的支付代价（服务失败时内部降级为引擎兜底）。 */
     const handleFacilityUpgradePriced = useCallback(
-        async (facilityId: string): Promise<number> => {
-            const sanctuary = player.sanctuary;
-            if (!sanctuary) return 20;
-            return AiService.priceFacilityUpgrade(settings, {
-                sanctuary,
+        async (facilityId: string) =>
+            AiService.priceFacilityUpgrade(settings, {
+                sanctuary: player.sanctuary,
                 player,
                 facilityId,
-            });
-        },
+            }),
         [settings, player]
     );
 
@@ -549,6 +561,21 @@ const App: React.FC = () => {
                             onComplete={handleNarrative}
                             onCancel={() => { }}
                             onLoadLibrary={handleLoadLibrary}
+                            // 自建叙事库
+                            narrativeDomains={narrativeDomains}
+                            narrativeAtoms={narrativeAtoms}
+                            narrativeAesthetics={narrativeAesthetics}
+                            customNarrativeDomains={customNarrativeDomains}
+                            customNarrativeAtoms={customNarrativeAtoms}
+                            customNarrativeAesthetics={customNarrativeAesthetics}
+                            isNarrativeLibraryLoading={isNarrativeLibraryLoading}
+                            isNarrativeLibrarySaving={isNarrativeLibrarySaving}
+                            upsertNarrativeDomain={upsertNarrativeDomain}
+                            upsertNarrativeAtom={upsertNarrativeAtom}
+                            upsertNarrativeAesthetic={upsertNarrativeAesthetic}
+                            removeNarrativeDomain={removeNarrativeDomain}
+                            removeNarrativeAtom={removeNarrativeAtom}
+                            removeNarrativeAesthetic={removeNarrativeAesthetic}
                             // 叙事流程状态
                             narrativeFlowStep={narrativeFlowStep}
                             narrativeFlowPendingConfig={narrativeFlowPendingConfig}
@@ -559,13 +586,12 @@ const App: React.FC = () => {
                             setNarrativeFlowStep={setNarrativeFlowStep}
                             setNarrativeFlowEpisodicTension={setNarrativeFlowEpisodicTension}
                             setNarrativeFlowEpisodicNodeCount={setNarrativeFlowEpisodicNodeCount}
-                            setNarrativeFlowPendingConfig={setNarrativeFlowPendingConfig}
                             // 叙事流程处理函数
                             handleNarrativeFlowOpenLibrary={handleNarrativeFlowOpenLibrary}
                             handleNarrativeFlowLoadFromLibrary={handleNarrativeFlowLoadFromLibrary}
                             handleNarrativeFlowModeConfirm={handleNarrativeFlowModeConfirm}
                             handleNarrativeFlowPacingConfirm={handleNarrativeFlowPacingConfirm}
-                            handleNarrativeFlowThemeConfirm={handleNarrativeFlowThemeConfirm}
+                            handleNarrativeFlowAestheticConfirm={handleNarrativeFlowAestheticConfirm}
                             handleNarrativeFlowConfigConfirm={handleNarrativeFlowConfigConfirm}
                             handleNarrativeFlowDetailsConfirm={handleNarrativeFlowDetailsConfirm}
                             handleNarrativeFlowPreviewConfirm={handleNarrativeFlowPreviewConfirm}
@@ -588,9 +614,12 @@ const App: React.FC = () => {
                             onClose={closeNPCInteraction}
                             isGenerating={isTaskGenerating('image', 'npc', activeInteractionNPC.static.id)}
                             isRecruited={player.companions.some((c) => c.static.id === activeInteractionNPC.static.id)}
-                            onLocalAction={handleLocalNPCAction}
                             onTakeItem={handleNPCTakeItem}
-                            onIntimacy={handleNPCIntimacy}
+                            onHeartToHeart={handleCompanionHeartToHeart}
+                            onRequestQuest={handleRequestQuest}
+                            onCompanionEquipItem={handleCompanionEquipItem}
+                            onCompanionUnequipItem={handleCompanionUnequipItem}
+                            onCompanionUseConsumable={handleCompanionUseConsumable}
                             onGenerateNpcImage={handleGenerateNPCImage}
                             onRandomSwitchNpcImage={async () => {
                                 return await handleRandomSwitch('image', 'npc', activeInteractionNPC.static.id, activeInteractionNPC.dynamic.imageUrl);
@@ -636,16 +665,20 @@ const App: React.FC = () => {
                                 executeTactic={executeTactic}
                                 endPlayerPhase={endPlayerPhase}
                                 getVisibleResultSequence={getVisibleResultSequence}
+                                getPredictionDepthFor={getPredictionDepthFor}
+                                getAttackForecast={getAttackForecast}
                                 pendingDefense={pendingDefense}
                                 positions={positions}
-                                battleLineMin={battleLineMin}
-                                battleLineMax={battleLineMax}
+                                battleMap={battleMap}
+                                covers={covers}
                                 getUnitRange={getUnitRange}
+                                getMoveCost={getMoveCost}
                                 onMoveAlly={moveAlly}
                                 counterPrompt={counterPrompt}
                                 onResolveCounterPrompt={resolveCounterPrompt}
                                 counterSkip={counterSkip}
                                 onToggleCounterSkip={setCounterSkip}
+                                weaponStates={weaponStates}
                                 insertAction={insertAction}
                                 onEndInsertAction={endInsertAction}
                                 onGenerateEnemyVisual={handleGenerateEnemyImage}
@@ -682,19 +715,15 @@ const App: React.FC = () => {
                         logs={logs}
                         onAction={(action, payload) => handleAction(action as any, payload as string)}
                         onUseItem={(instanceId) => {
-                            const eq = player.dynamic.equipment;
                             const item = player.dynamic.inventory.find(i => i.instanceId === instanceId) ||
-                                eq.weapons?.find(i => i?.instanceId === instanceId) ||
-                                eq.armors?.find(i => i?.instanceId === instanceId) ||
-                                eq.accessories?.find(i => i?.instanceId === instanceId);
+                                getEquippedInstances(player.dynamic.equipment)
+                                    .find(i => i.instanceId === instanceId);
                             if (item) handleUseItem(item as any);
                         }}
                         // 卸下专线：绕过"物品作为交互钥匙"的优先判定，直达装备结算
                         onUnequipItem={(instanceId) => {
-                            const eq = player.dynamic.equipment;
-                            const item = eq.weapons?.find(i => i?.instanceId === instanceId) ||
-                                eq.armors?.find(i => i?.instanceId === instanceId) ||
-                                eq.accessories?.find(i => i?.instanceId === instanceId) ||
+                            const item = getEquippedInstances(player.dynamic.equipment)
+                                .find(i => i.instanceId === instanceId) ||
                                 player.dynamic.inventory.find(i => i.instanceId === instanceId);
                             if (item) handleEquipItem(item as any);
                         }}
@@ -702,6 +731,7 @@ const App: React.FC = () => {
                             const item = player.dynamic.inventory.find(i => i.instanceId === instanceId);
                             if (item) handleDiscardItem(item);
                         }}
+                        inventoryGrid={inventoryGrid}
                         onInteractWithCompanion={(id) => {
                             const npc = player.companions.find(c => c.static.id === id);
                             if (npc) handleInteractWithCompanion(npc);
@@ -730,16 +760,12 @@ const App: React.FC = () => {
                                     player={player}
                                     sanctuary={(player.sanctuary && player.sanctuary.id !== "empty_zone") ? player.sanctuary : sanctuary}
                                     onRest={handleRest}
-                                    onUseMedicine={handleUseMedicine}
                                     onTransferItem={(item, target) => transferItem(item, target === 'storage')}
                                     onDepart={handleDepartSanctuary}
                                     onClose={handleCloseSanctuaryUI}
-                                    getStorageCapacity={getStorageCapacity}
                                     getCustomRestConfig={getCustomRestConfig}
-                                    morale={morale}
-                                    isLowMorale={isLowMorale}
-                                    maxStorage={maxStorage}
                                     facilities={facilities}
+                                    inventoryGrid={inventoryGrid}
                                     dailyProduction={dailyProduction}
                                     residents={residents}
                                     onFacilityUpgrade={handleFacilityUpgrade}

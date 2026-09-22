@@ -11,28 +11,38 @@
  * @version 2.1.1
  */
 
-import type { DefenseTactic } from '../../meta'
+import type { Tactic, TacticEffectType, Target } from '../../meta'
 
 /**
  * 防御战术构造器
  * 仅用于减少重复字段，最终导出仍为纯数据对象数组。
+ *
+ * 契约的 tacticEffect 恒为四元组，而防御战术不引入持续回合语义，
+ * 故第四位统一补 0（仅本次结算中生效）。
  */
 const def = (
     id: string,
     name: string,
     desc: string,
     apCost: number,
-    tacticEffect: NonNullable<DefenseTactic['tacticEffect']>,
-): DefenseTactic => ({
-    type: 'defense',
+    tacticEffect: Array<[Target, TacticEffectType, number]>,
+): Tactic => ({
+    type: 'D',
     id: `public_def_${id}`,
     name,
     desc,
     apCost,
-    tacticEffect,
+    tacticEffect: tacticEffect.map(
+        ([target, effect, value]): [Target, TacticEffectType, number, number] => [
+            target,
+            effect,
+            value,
+            0,
+        ],
+    ),
 })
 
-export const publicDefenseTactics: DefenseTactic[] = [
+export const publicDefenseTactics: Tactic[] = [
     // --------------------------------------------------------------------------
     // 1 AP：基础自身防御、动态体征微调与轻度代价
     // --------------------------------------------------------------------------
@@ -55,7 +65,7 @@ export const publicDefenseTactics: DefenseTactic[] = [
         '威胁预判',
         '观察敌方起手动作与攻击轨迹，以感知提前判断危险来源。',
         1,
-        [['self', 'perception', 2]],
+        [['self', 'awareness', 2]],
     ),
     def(
         'structural_deconstruct',
@@ -69,7 +79,7 @@ export const publicDefenseTactics: DefenseTactic[] = [
         '灵力调谐',
         '短暂收敛灵力输出，扩大对自身行动结果的预判范围，并提升 magic 武器协同稳定性。',
         1,
-        [['self', 'spiritual', 2]],
+        [['self', 'will', 2]],
     ),
     def(
         'sensory_downgrade',
@@ -78,7 +88,7 @@ export const publicDefenseTactics: DefenseTactic[] = [
         1,
         [
             ['self', 'sanity', 3],
-            ['self', 'perception', -1],
+            ['self', 'awareness', -1],
         ],
     ),
     def(
@@ -163,7 +173,7 @@ export const publicDefenseTactics: DefenseTactic[] = [
         2,
         [
             ['self', 'agility', 2],
-            ['self', 'perception', 2],
+            ['self', 'awareness', 2],
         ],
     ),
     def(
@@ -193,7 +203,7 @@ export const publicDefenseTactics: DefenseTactic[] = [
         2,
         [
             ['self', 'strength', 3],
-            ['self', 'perception', 2],
+            ['self', 'awareness', 2],
         ],
     ),
     def(
@@ -212,7 +222,7 @@ export const publicDefenseTactics: DefenseTactic[] = [
         '主动接纳微量深渊辐射以扩大灵力预判范围，极具风险，会侵蚀理智。',
         2,
         [
-            ['self', 'spiritual', 4],
+            ['self', 'will', 4],
             ['self', 'sanity', -2],
         ],
     ),
@@ -243,7 +253,7 @@ export const publicDefenseTactics: DefenseTactic[] = [
         2,
         [
             ['single_teammate', 'agility', 3],
-            ['self', 'perception', 1],
+            ['self', 'awareness', 1],
         ],
     ),
     def(
@@ -283,7 +293,7 @@ export const publicDefenseTactics: DefenseTactic[] = [
         2,
         [
             ['single_teammate', 'hp', 5],
-            ['self', 'perception', -2],
+            ['self', 'awareness', -2],
         ],
     ),
     def(
@@ -302,8 +312,8 @@ export const publicDefenseTactics: DefenseTactic[] = [
         '保持防御姿态并监视敌方动作，一旦敌方试图突进，立即进行火力或视线干扰。',
         2,
         [
-            ['self', 'perception', 3],
-            ['enemy', 'agility', -2],
+            ['self', 'awareness', 3],
+            ['single_enemy', 'agility', -2],
         ],
     ),
     def(
@@ -312,7 +322,7 @@ export const publicDefenseTactics: DefenseTactic[] = [
         '向敌方感知通道注入噪声协议，扰乱其对灵力波动与攻击轨迹的判读。',
         2,
         [
-            ['enemy', 'spiritual', -3],
+            ['single_enemy', 'will', -3],
             ['self', 'wisdom', 1],
         ],
     ),
@@ -356,7 +366,7 @@ export const publicDefenseTactics: DefenseTactic[] = [
         '警戒网络',
         '将观察任务分配给所有友方，形成互相补位的预警网络。',
         3,
-        [['all_allies', 'perception', 3]],
+        [['all_allies', 'awareness', 3]],
     ),
     def(
         'sanctuary_protocol',
@@ -384,8 +394,8 @@ export const publicDefenseTactics: DefenseTactic[] = [
         '共享灵力校准参数，扩大所有友方对 magic 武器的协同与行动结果预判范围。',
         3,
         [
-            ['all_allies', 'spiritual', 2],
-            ['all_allies', 'perception', 2],
+            ['all_allies', 'will', 2],
+            ['all_allies', 'awareness', 2],
         ],
     ),
     def(
@@ -404,8 +414,8 @@ export const publicDefenseTactics: DefenseTactic[] = [
         '以交叉火力与观测网覆盖敌方阵地，压低其命中判断，同时提升友方预警。',
         3,
         [
-            ['all_enemies', 'perception', -2],
-            ['all_allies', 'perception', 2],
+            ['all_enemies', 'awareness', -2],
+            ['all_allies', 'awareness', 2],
         ],
     ),
     def(

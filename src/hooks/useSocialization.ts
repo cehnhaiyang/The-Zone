@@ -7,20 +7,20 @@ import type {
     Settings,
     Quest,
     ItemInstance,
-    NpcTemplate,
+    InteractionNpcEntity,
+    InteractionDialogueContext,
     NpcDynamicState,
     Entity,
+    CompanionDynamicState,
+    CompanionTemplate,
     Words,
     PlayerWordsTag,
     NpcWordsTag,
     CurrentLocation,
-    SanctuaryState,
     Dialogue,
     Mood,
     ZoneDate,
-    NpcDialogueGenerationContext,
     LogType,
-    ConsumableEffectType,
     NodeNpcTemplate,
     AttributeType,
     VitalType,
@@ -32,14 +32,31 @@ import {
     removeItemFromInventory,
     addItemToInventory,
     isConsumableInstance,
+    isEquipmentInstance,
+    isWeaponInstance,
+    isArmorInstance,
+    isAccessoryInstance,
+    normalizeEquipState,
+    equipItem,
+    unequipItem,
+    addUniqueItemToInventory,
+    stripEquipEffectSnapshot,
+    applyEffectDeltas,
+    negateEffectDeltas,
+    getAppliedAccessoryDeltas,
+    collectAccessoryEffects,
+    isAttributeType,
+    isVitalType,
     buildCurrentLocation,
     clamp,
     createEmptyMemoryPyramid,
     safeNumber,
-    getPercent,
-    getEffectValueByType,
     generateInstanceId,
-    safeDeepClone
+    getRelationAxis,
+    getRelationScore,
+    getSanctuaryResourceValue,
+    safeDeepClone,
+    withRelationScore
 } from '../meta';
 import {
     AudioService,
@@ -49,7 +66,6 @@ import {
 } from '../services';
 import type { NpcProfileMeta } from '../services/PersistenceService';
 
-// ——— 由 meta/utils.ts 迁移而来（本文件唯一使用方） ———
 const createQuest = (
     template: QuestTemplate,
     status: QuestStatus = 'on'
@@ -67,28 +83,33 @@ interface UseSocializationParams {
     currentNodeId: string;
     setCurrentZone: Dispatch<SetStateAction<Zone>>;
     currentZone: Zone;
-    activeInteractionNPC: Entity<NpcTemplate, NpcDynamicState> | null;
+    activeInteractionNPC: InteractionNpcEntity | null;
     setActiveInteractionNPC: Dispatch<
-        SetStateAction<Entity<NpcTemplate, NpcDynamicState> | null>
+        SetStateAction<InteractionNpcEntity | null>
     >;
 }
 
 interface UseSocializationReturn {
-    activeInteractionNPC: Entity<NpcTemplate, NpcDynamicState> | null;
+    activeInteractionNPC: InteractionNpcEntity | null;
     setActiveInteractionNPC: Dispatch<
-        SetStateAction<Entity<NpcTemplate, NpcDynamicState> | null>
+        SetStateAction<InteractionNpcEntity | null>
     >;
     handleNPCChat: (message: string) => Promise<void>;
-    handleLocalNPCAction: (actionType: 'hug' | 'heal') => void;
+    handleCompanionHeartToHeart: () => void;
+    handleRequestQuest: () => void;
     handleNPCTakeItem: (item: ItemInstance) => void;
     handleNPCGift: (item: ItemInstance) => void;
     handleNPCRecruit: () => void;
-    handleNPCIntimacy: () => Promise<void>;
+    handleCompanionEquipItem: (item: ItemInstance, slotIndex?: number) => void;
+    handleCompanionUnequipItem: (itemType: 'weapon' | 'armor' | 'accessory', slotIndex: number) => void;
+    handleCompanionUseConsumable: (item: ItemInstance) => void;
     handleAcceptQuest: (questId: string, questData: Partial<Quest>) => void;
     closeNPCInteraction: () => void;
     handleMountProfile: (profileId: string) => Promise<void>;
     handleUnmountCreateNewProfile: (customName?: string) => Promise<void>;
     handleDeleteProfile: (profileId: string) => Promise<void>;
+    /** 好感离队裁定：由 tick 循环驱动，每个 absoluteTick 至多结算一次。 */
+    evaluateCompanionDepartures: () => void;
 }
 
 interface NpcDialogueAiResult {
@@ -96,14 +117,11 @@ interface NpcDialogueAiResult {
     modelThought?: string;
     thought?: string;
     mood?: Mood;
-    trustChange?: number;
+    /** 关系增量：节点 NPC 落到信任轴，同伴落到好感轴。 */
+    relationChange?: number;
+    /** 本轮注入 Prompt 的记忆摘要 id，用于回写检索计数。 */
+    memoryAccessIds?: string[];
     quest?: Partial<QuestTemplate> & { desc?: string };
-}
-
-interface NpcIntimacyAiResult {
-    desc?: string;
-    vocal?: string;
-    thought?: string;
 }
 
 const PENDING_TOKEN = 'pending_npc_response';
@@ -158,18 +176,6 @@ const getEntityNumber = (
     key: DynamicStatKey | string
 ): number => safeNumber((dynamic as unknown as Record<string, unknown>)[key]);
 
-const hasConsumableEffect = (
-    item: ItemInstance,
-    effectType: ConsumableEffectType
-): boolean =>
-    isConsumableInstance(item) &&
-    (item.effects ?? []).some(effect => effect[0] === effectType);
-
-const getConsumableEffectValue = (
-    item: ItemInstance,
-    effectType: ConsumableEffectType
-): number => (isConsumableInstance(item) ? getEffectValueByType(item, effectType) : 0);
-
 const hasRequiredItems = (inventory: ItemInstance[], ids?: string[]): boolean => {
     if (!ids || ids.length === 0) return true;
     return ids.every(id => inventory.some(item => item.id === id));
@@ -180,23 +186,28 @@ const hasArchivedQuests = (player: PlayerState, ids?: string[]): boolean => {
     return ids.every(id => (player.questArchived ?? []).some(q => q.id === id));
 };
 
+/**
+ * 庇护所资源安全线校验。
+ *
+ * requirements 为「资源 id + 最低储备」关系：只有清单内资源全部达标才返回 true。
+ * 未在该庇护所声明的资源按 0 计（即不满足任何正数安全线）。
+ */
 const isSanctuarySafe = (
     player: PlayerState,
-    requirements?: Partial<Record<keyof SanctuaryState, number>>
+    requirements?: Record<string, number>
 ): boolean => {
     if (!requirements) return true;
     const sanctuary = player.sanctuary;
     if (!sanctuary) return false;
 
-    return Object.entries(requirements).every(([key, minValue]) => {
-        const current = safeNumber(sanctuary[key as keyof SanctuaryState]);
-        const required = safeNumber(minValue);
-        return current >= required;
-    });
+    return Object.entries(requirements).every(
+        ([key, minValue]) =>
+            getSanctuaryResourceValue(sanctuary, key) >= safeNumber(minValue)
+    );
 };
 
 const matchesReplacementRequirement = (
-    companion: Entity<NpcTemplate, NpcDynamicState>,
+    companion: InteractionNpcEntity,
     req: ReplacementRequirement
 ): boolean => {
     if (typeof req === 'string') {
@@ -233,22 +244,22 @@ const matchesReplacementRequirement = (
 };
 
 const resolveReplacements = (
-    companions: Array<Entity<NpcTemplate, NpcDynamicState>>,
+    companions: Array<InteractionNpcEntity>,
     requirements: ReplacementRequirement[] | undefined,
     excludeId: string
-): Array<Entity<NpcTemplate, NpcDynamicState>> | null => {
+): Array<InteractionNpcEntity> | null => {
     if (!requirements || requirements.length === 0) return [];
 
     const candidates = companions
         .filter(c => c.static.id !== excludeId)
-        .sort((a, b) => safeNumber(b.dynamic.trust) - safeNumber(a.dynamic.trust));
+        .sort((a, b) => getRelationScore(b.dynamic) - getRelationScore(a.dynamic));
 
     const single = candidates.find(c =>
         requirements.every(req => matchesReplacementRequirement(c, req))
     );
     if (single) return [single];
 
-    const assigned: Array<Entity<NpcTemplate, NpcDynamicState>> = [];
+    const assigned: Array<InteractionNpcEntity> = [];
     for (const req of requirements) {
         const candidate = candidates.find(
             c => !assigned.includes(c) && matchesReplacementRequirement(c, req)
@@ -279,6 +290,8 @@ export const useSocialization = ({
      */
     const interactionClosedRef = useRef(false);
     const npcIdRef = useRef<string | null>(null);
+    /** 最近一次做过离队裁定的 absoluteTick，保证每个 tick 只掷一次骰。 */
+    const lastDepartureTickRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (activeInteractionNPC) {
@@ -336,18 +349,26 @@ export const useSocialization = ({
      * 同步 NPC 状态。
      *
      * 说明：
-     * - 同伴列表承载完整 Entity。
-     * - 节点 nodeNpc 只能合法承载静态模板，因此这里只同步 trust 到 initialState。
+     * - 同伴列表承载完整 Entity，关系轴写回 `affinity`。
+     * - 节点 nodeNpc 只能合法承载静态模板，因此这里只把「信任」同步进 initialState。
      */
     /**
      * 面板会话会写入、且不应被外部系统（战斗/休息/升级）覆盖的 dynamic 字段。
      * 其余字段（stamina/vigor/属性/等级/xp/战术/装备等）一律保留
      * companions 中现有实体的最新值，避免快照回滚外部修改。
      */
-    const SESSION_DYNAMIC_FIELDS = [
+    const SESSION_DYNAMIC_FIELDS: Array<keyof CompanionDynamicState> = [
         'hp',
         'sanity',
-        'trust',
+        'stamina',
+        'vigor',
+        'equipment',
+        'strength',
+        'agility',
+        'wisdom',
+        'awareness',
+        'will',
+        'cthulhu',
         'totalDialogueRounds',
         'memory',
         'mountedProfileId',
@@ -355,10 +376,10 @@ export const useSocialization = ({
         'imageUrl',
         'videoUrl',
         'audioUrl',
-    ] as const;
+    ];
 
     const syncNPCState = useCallback(
-        (npc: Entity<NpcTemplate, NpcDynamicState>) => {
+        (npc: InteractionNpcEntity) => {
             const npcId = npc.static.id;
 
             setPlayer(p => {
@@ -370,11 +391,14 @@ export const useSocialization = ({
                         if (c.static.id !== npcId) return c;
 
                         // 字段级合并：以现有实体为基础，仅覆盖本会话写入的字段。
-                        const merged = { ...c.dynamic } as NpcDynamicState;
+                        // 关系度单独走 withRelationScore：同伴写 affinity、节点 NPC 写 trust。
+                        const merged: CompanionDynamicState = { ...c.dynamic };
                         for (const key of SESSION_DYNAMIC_FIELDS) {
-                            const value = (npc.dynamic as unknown as Record<string, unknown>)[key];
-                            if (value !== undefined) {
-                                (merged as unknown as Record<string, unknown>)[key] = value;
+                            if (key in npc.dynamic) {
+                                const value = (npc.dynamic as CompanionDynamicState)[key];
+                                if (value !== undefined) {
+                                    (merged as Record<keyof CompanionDynamicState, unknown>)[key] = value;
+                                }
                             }
                         }
                         merged.hp = clamp(safeNumber(merged.hp), 0, safeNumber(merged.maxHp));
@@ -383,11 +407,16 @@ export const useSocialization = ({
                             0,
                             safeNumber(merged.maxSanity)
                         );
-                        merged.trust = SocializationService.clampTrust(
-                            safeNumber(merged.trust),
+                        const relation = SocializationService.clampRelation(
+                            getRelationAxis(merged),
+                            getRelationScore(merged),
                             settings
                         );
-                        return { ...c, static: c.static, dynamic: merged };
+                        return {
+                            ...c,
+                            static: c.static,
+                            dynamic: withRelationScore(merged, relation),
+                        };
                     })
                 };
             });
@@ -396,6 +425,8 @@ export const useSocialization = ({
                 const node = prev.nodes?.[currentNodeId];
                 if (!node?.nodeNpc) return prev;
                 if (node.nodeNpc.id !== npc.static.id) return prev;
+                // 只有信任轴才回写节点模板；同伴（好感轴）与节点 NPC 的信任互不相干。
+                if (getRelationAxis(npc.dynamic) !== 'trust') return prev;
 
                 return {
                     ...prev,
@@ -407,7 +438,7 @@ export const useSocialization = ({
                                 ...node.nodeNpc,
                                 initialState: {
                                     ...node.nodeNpc.initialState,
-                                    trust: npc.dynamic.trust
+                                    trust: getRelationScore(npc.dynamic)
                                 }
                             }
                         }
@@ -464,7 +495,7 @@ export const useSocialization = ({
                 ]
             };
 
-            const context: NpcDialogueGenerationContext = {
+            const context: InteractionDialogueContext = {
                 dialogue: mergedDialogueHistory,
                 npc: activeInteractionNPC,
                 player: {
@@ -497,17 +528,29 @@ export const useSocialization = ({
                     }
                 };
 
-                const trustDelta = Math.floor(safeNumber(result.trustChange));
-                const finalTrust = SocializationService.clampTrust(
-                    activeInteractionNPC.dynamic.trust + trustDelta,
+                // 关系增量按目标关系轴落位：节点 NPC 记信任，同伴记好感。
+                const relationUpdate = SocializationService.applyRelationDelta(
+                    activeInteractionNPC.dynamic,
+                    Math.floor(safeNumber(result.relationChange)),
                     settings
                 );
 
-                const updatedNPC: Entity<NpcTemplate, NpcDynamicState> = {
+                // 记忆检索回写：本轮注入 Prompt 的 δ 摘要计一次检索（accessCount / accessRatio）。
+                const accessedMemory = (result.memoryAccessIds ?? []).reduce(
+                    (pyramid, memoryId) =>
+                        SocializationService.recordMemoryAccess(
+                            pyramid,
+                            memoryId,
+                            player.currentZoneTime
+                        ),
+                    relationUpdate.dynamic.memory
+                );
+
+                const updatedNPC: InteractionNpcEntity = {
                     ...activeInteractionNPC,
                     dynamic: {
-                        ...activeInteractionNPC.dynamic,
-                        trust: finalTrust,
+                        ...relationUpdate.dynamic,
+                        memory: accessedMemory,
                         totalDialogueRounds:
                             (activeInteractionNPC.dynamic.totalDialogueRounds || 0) + 1
                     }
@@ -519,14 +562,14 @@ export const useSocialization = ({
                 }
                 syncNPCState(updatedNPC);
 
-                if (trustDelta > 0) {
+                if (relationUpdate.delta > 0) {
                     addLog(
-                        `${ownerName} 似乎被你的话语打动了。(好感 +${trustDelta})`,
+                        `${ownerName} 似乎被你的话语打动了。(${relationUpdate.label} +${relationUpdate.delta})`,
                         'success'
                     );
-                } else if (trustDelta < 0) {
+                } else if (relationUpdate.delta < 0) {
                     addLog(
-                        `${ownerName} 对你的话感到不悦。(好感 ${trustDelta})`,
+                        `${ownerName} 对你的话感到不悦。(${relationUpdate.label} ${relationUpdate.delta})`,
                         'warning'
                     );
                 }
@@ -652,7 +695,7 @@ export const useSocialization = ({
                                 updatedPyramid = evolvedPyramid;
                             }
 
-                            const memoryUpdatedNPC: Entity<NpcTemplate, NpcDynamicState> = {
+                            const memoryUpdatedNPC: InteractionNpcEntity = {
                                 ...updatedNPC,
                                 dynamic: {
                                     ...updatedNPC.dynamic,
@@ -717,378 +760,413 @@ export const useSocialization = ({
         ]
     );
 
-    const handleLocalNPCAction = useCallback(
-        (actionType: 'hug' | 'heal') => {
-            if (!activeInteractionNPC) return;
+    /** 同伴谈心冷却时长（按 absoluteTick 周期计算）。 */
+    const HEART_TO_HEART_COOLDOWN_TICKS = 40;
+    const companionHeartCooldownRef = useRef<Map<string, number>>(new Map());
 
-            let responseText = '';
-            let playerText = '';
-            let npcUpdate: {
-                hp?: number;
-                sanity?: number;
-                trust?: number;
-            } = {};
-
-            const maxHp = activeInteractionNPC.dynamic.maxHp;
-            const maxSanity = activeInteractionNPC.dynamic.maxSanity;
-
-            const findMedicine = (effectType: ConsumableEffectType) =>
-                player.dynamic.inventory.find(item => hasConsumableEffect(item, effectType));
-
-            switch (actionType) {
-                case 'hug': {
-                    playerText = '(试图给一个拥抱)';
-                    const currentTrust = activeInteractionNPC.dynamic.trust;
-
-                    if (
-                        currentTrust >=
-                        safeNumber(settings.gameConfig.social.thresholds.trustHigh, 65)
-                    ) {
-                        responseText = '(紧紧回抱住你，身体在微微颤抖) ...别放手，求你了。';
-                        npcUpdate = {
-                            sanity: Math.min(
-                                maxSanity,
-                                activeInteractionNPC.dynamic.sanity +
-                                safeNumber(
-                                    settings.gameConfig.social.benefits.hugSanityGainHigh
-                                )
-                            )
-                        };
-                    } else if (
-                        currentTrust >=
-                        safeNumber(settings.gameConfig.social.thresholds.trustLow, 25)
-                    ) {
-                        responseText = '(身体僵硬了一下，但没有推开) ...谢谢。我没事。';
-                        npcUpdate = {
-                            sanity: Math.min(
-                                maxSanity,
-                                activeInteractionNPC.dynamic.sanity +
-                                safeNumber(
-                                    settings.gameConfig.social.benefits.hugSanityGainLow
-                                )
-                            )
-                        };
-                    } else {
-                        responseText =
-                            '(猛地退后一步，警惕地看着你) ...保持距离。我不习惯这样。';
-                        npcUpdate = {
-                            trust: SocializationService.clampTrust(
-                                currentTrust -
-                                safeNumber(
-                                    settings.gameConfig.social.benefits.hugTrustPenalty
-                                ),
-                                settings
-                            )
-                        };
-                    }
-                    break;
-                }
-
-                case 'heal': {
-                    playerText = '(尝试进行治疗)';
-
-                    const hpPercent = getPercent(
-                        activeInteractionNPC.dynamic.hp,
-                        maxHp
-                    );
-                    const sanityPercent = getPercent(
-                        activeInteractionNPC.dynamic.sanity,
-                        maxSanity
-                    );
-                    const sanityHigh = safeNumber(
-                        settings.gameConfig.social.vitals.sanityHigh,
-                        70
-                    );
-
-                    const needsHp = activeInteractionNPC.dynamic.hp < maxHp;
-                    const needsSanity =
-                        activeInteractionNPC.dynamic.sanity < maxSanity &&
-                        sanityPercent < sanityHigh;
-
-                    const shouldHealHp =
-                        needsHp && (!needsSanity || hpPercent <= sanityPercent);
-
-                    if (shouldHealHp) {
-                        const hpMeds = findMedicine('heal_hp');
-
-                        if (hpMeds) {
-                            const healVal =
-                                getConsumableEffectValue(hpMeds, 'heal_hp') ||
-                                safeNumber(
-                                    settings.gameConfig.social.benefits.healValueDefault,
-                                    20
-                                );
-
-                            npcUpdate = {
-                                hp: Math.min(
-                                    maxHp,
-                                    activeInteractionNPC.dynamic.hp + healVal
-                                ),
-                                trust: SocializationService.clampTrust(
-                                    activeInteractionNPC.dynamic.trust +
-                                    safeNumber(
-                                        settings.gameConfig.social.benefits.healTrustGain
-                                    ),
-                                    settings
-                                )
-                            };
-
-                            responseText = `(使用了 ${hpMeds.name}) 伤口得到了处理，看起来好多了。`;
-
-                            setPlayer(p => ({
-                                ...p,
-                                dynamic: {
-                                    ...p.dynamic,
-                                    inventory: removeItemFromInventory(
-                                        p.dynamic.inventory,
-                                        hpMeds.instanceId,
-                                        1
-                                    )
-                                }
-                            }));
-
-                            AudioService.playSfx('success');
-                        } else {
-                            responseText = '(翻遍了背包) ...该死，我没有治疗外伤的药物了。';
-                            AudioService.playSfx('ui_click');
-                        }
-                    } else if (needsSanity) {
-                        const sanMeds = findMedicine('heal_sanity');
-
-                        if (sanMeds) {
-                            const healVal =
-                                getConsumableEffectValue(sanMeds, 'heal_sanity') ||
-                                safeNumber(
-                                    settings.gameConfig.social.benefits.healValueDefault,
-                                    20
-                                );
-
-                            npcUpdate = {
-                                sanity: Math.min(
-                                    maxSanity,
-                                    activeInteractionNPC.dynamic.sanity + healVal
-                                ),
-                                trust: SocializationService.clampTrust(
-                                    activeInteractionNPC.dynamic.trust +
-                                    safeNumber(
-                                        settings.gameConfig.social.benefits.healTrustGain
-                                    ),
-                                    settings
-                                )
-                            };
-
-                            responseText = `(使用了 ${sanMeds.name}) 精神状态似乎稳定了一些。`;
-
-                            setPlayer(p => ({
-                                ...p,
-                                dynamic: {
-                                    ...p.dynamic,
-                                    inventory: removeItemFromInventory(
-                                        p.dynamic.inventory,
-                                        sanMeds.instanceId,
-                                        1
-                                    )
-                                }
-                            }));
-
-                            AudioService.playSfx('success');
-                        } else {
-                            responseText = '(翻遍了背包) ...我没有能安抚精神的药物了。';
-                            AudioService.playSfx('ui_click');
-                        }
-                    } else {
-                        responseText = '看起来非常健康，不需要浪费药物。';
-                    }
-                    break;
-                }
-            }
-
-            if (playerText) {
-                addLog(`[动作] ${playerText}`, 'info');
-            }
-
-            if (responseText) {
-                addLog(`${activeInteractionNPC.static.name}: ${responseText}`, 'info');
-            }
-
-            if (Object.keys(npcUpdate).length > 0) {
-                const newNPC: Entity<NpcTemplate, NpcDynamicState> = {
-                    ...activeInteractionNPC,
-                    dynamic: {
-                        ...activeInteractionNPC.dynamic,
-                        ...npcUpdate
-                    }
-                };
-
-                newNPC.dynamic.hp = clamp(newNPC.dynamic.hp, 0, newNPC.dynamic.maxHp);
-                newNPC.dynamic.sanity = clamp(
-                    newNPC.dynamic.sanity,
-                    0,
-                    newNPC.dynamic.maxSanity
-                );
-                newNPC.dynamic.trust = SocializationService.clampTrust(
-                    newNPC.dynamic.trust,
-                    settings
-                );
-
-                setActiveInteractionNPC(newNPC);
-                syncNPCState(newNPC);
-            }
-        },
-        [
-            activeInteractionNPC,
-            player.dynamic.inventory,
-            setPlayer,
-            setActiveInteractionNPC,
-            syncNPCState,
-            settings,
-            addLog
-        ]
-    );
-
-    const handleNPCIntimacy = useCallback(async () => {
+    /**
+     * 同伴专属交互：谈心。
+     *
+     * 恢复少量理智（同伴 +15，玩家 +5），带有基于 absoluteTick 的冷却限制。
+     */
+    const handleCompanionHeartToHeart = useCallback(() => {
         if (!activeInteractionNPC) return;
 
-        const requiredTrust = safeNumber(
-            settings.gameConfig.social.thresholds.trustHigh,
-            65
-        );
-
-        if (activeInteractionNPC.dynamic.trust < requiredTrust) {
-            addLog(
-                `${activeInteractionNPC.static.name} 还没有足够信任你，拒绝了亲密接触。`,
-                'warning'
-            );
+        const isCompanion = player.companions.some(c => c.static.id === activeInteractionNPC.static.id);
+        if (!isCompanion) {
+            addLog(`${activeInteractionNPC.static.name} 并非你的同伴，无法进行深层心智交流。`, 'warning');
             AudioService.playSfx('fail');
             return;
         }
 
-        addLog(`与 ${activeInteractionNPC.static.name} 的深度连接建立中...`, 'event');
+        const currentTick = Math.floor(safeNumber(player.currentGameRound?.absoluteTick, 0));
+        const lastTick = companionHeartCooldownRef.current.get(activeInteractionNPC.static.id) ?? -Infinity;
+        const elapsed = currentTick - lastTick;
 
-        try {
-            const result =
-                (await AiService.generateNPCIntimacy(
-                    settings,
-                    activeInteractionNPC
-                )) as NpcIntimacyAiResult;
+        if (elapsed < HEART_TO_HEART_COOLDOWN_TICKS) {
+            const remaining = HEART_TO_HEART_COOLDOWN_TICKS - elapsed;
+            addLog(`${activeInteractionNPC.static.name} 刚刚才与你倾诉过心声，心智尚需沉淀。（剩余 ${remaining} 周期冷却）`, 'warning');
+            AudioService.playSfx('ui_click');
+            return;
+        }
 
-            const location = buildCurrentLocation(currentZone, currentNodeId);
-            const desc =
-                typeof result.desc === 'string' && result.desc.trim() !== ''
-                    ? result.desc
-                    : '……';
+        companionHeartCooldownRef.current.set(activeInteractionNPC.static.id, currentTick);
 
-            const playerWords = createSocialDialogueRecord(
-                player.static.name,
-                '(进行亲密接触)',
-                location,
-                false,
-                player.currentZoneTime
-            ) as Words<PlayerWordsTag>;
+        const location = buildCurrentLocation(currentZone, currentNodeId);
+        const playerWords = createSocialDialogueRecord(
+            player.static.name,
+            '(在静谧处与对方促膝深谈，倾听彼此心中的阴霾与执念)',
+            location,
+            false,
+            player.currentZoneTime
+        ) as Words<PlayerWordsTag>;
 
-            const npcWords = createSocialDialogueRecord(
-                activeInteractionNPC.static.name,
-                desc,
-                location,
-                true,
-                player.currentZoneTime,
-                'happy',
-                result.thought
-            ) as Words<NpcWordsTag>;
+        const npcWords = createSocialDialogueRecord(
+            activeInteractionNPC.static.name,
+            '(眼中的警惕与戒备渐次融化，长长地呼出一口气) ...说出来以后，脑海里的杂音平息了许多。谢谢你愿意倾听这些。',
+            location,
+            true,
+            player.currentZoneTime,
+            'happy'
+        ) as Words<NpcWordsTag>;
+
+        setPlayer(prev => ({
+            ...prev,
+            dialogue: {
+                dialogue: [...(prev.dialogue?.dialogue ?? []), [playerWords, npcWords]]
+            },
+            dynamic: {
+                ...prev.dynamic,
+                sanity: clamp(safeNumber(prev.dynamic.sanity) + 5, 0, safeNumber(prev.dynamic.maxSanity))
+            }
+        }));
+
+        const maxSanity = activeInteractionNPC.dynamic.maxSanity;
+        const nextSanity = clamp(safeNumber(activeInteractionNPC.dynamic.sanity) + 15, 0, maxSanity);
+
+        // 好感度微量上升
+        const relationUpdate = SocializationService.applyRelationDelta(
+            {
+                ...activeInteractionNPC.dynamic,
+                sanity: nextSanity
+            },
+            2,
+            settings
+        );
+
+        const updatedCompanion: InteractionNpcEntity = {
+            ...activeInteractionNPC,
+            dynamic: relationUpdate.dynamic
+        };
+
+        setActiveInteractionNPC(updatedCompanion);
+        syncNPCState(updatedCompanion);
+
+        addLog(`[谈心] 你与 ${activeInteractionNPC.static.name} 进行了深切交谈，同伴理智恢复 (+15)，心绪逐渐平复。`, 'success');
+        AudioService.playSfx('success');
+    }, [
+        activeInteractionNPC,
+        player.companions,
+        player.currentGameRound?.absoluteTick,
+        player.currentZoneTime,
+        player.static.name,
+        currentZone,
+        currentNodeId,
+        settings,
+        setPlayer,
+        addLog,
+        setActiveInteractionNPC,
+        syncNPCState
+    ]);
+
+    /**
+     * 节点 NPC 专属交互：请求委托。
+     *
+     * 仅在委托面板里无委托时可用；若已有待办委托则进行提示。
+     */
+    const handleRequestQuest = useCallback(() => {
+        if (!activeInteractionNPC) return;
+
+        const isCompanion = player.companions.some(c => c.static.id === activeInteractionNPC.static.id);
+        if (isCompanion) {
+            addLog(`${activeInteractionNPC.static.name} 已经是队伍成员，请查看其同伴需求。`, 'info');
+            return;
+        }
+
+        const nodeNpcQuests = (activeInteractionNPC.static as NodeNpcTemplate).initialState?.quests ?? [];
+        // 判断是否已有未完成的委托
+        const hasPendingOrAcceptedQuest = nodeNpcQuests.some(q => {
+            const isAccepted = (player.questAccepted ?? []).some(accepted => accepted.id === q.id);
+            const isDone = (player.questArchived ?? []).some(archived => archived.id === q.id && archived.status === 'done');
+            return isAccepted || !isDone;
+        });
+
+        if (nodeNpcQuests.length > 0 && hasPendingOrAcceptedQuest) {
+            addLog(`${activeInteractionNPC.static.name} 已有委托，先完成已有委托吧。`, 'warning');
+            AudioService.playSfx('ui_click');
+            return;
+        }
+
+        // 若当前无委托或已全部做完，向 NPC 发送请求委托的指令
+        addLog(`正在向 ${activeInteractionNPC.static.name} 请求委派新任务...`, 'info');
+        void handleNPCChat('(向对方询问是否有需要协助处理的重要委托事项)');
+    }, [
+        activeInteractionNPC,
+        player.companions,
+        player.questAccepted,
+        player.questArchived,
+        addLog,
+        handleNPCChat
+    ]);
+
+    /**
+     * 为同伴装备物品。
+     */
+    const handleCompanionEquipItem = useCallback(
+        (item: ItemInstance, slotIndex?: number) => {
+            if (!activeInteractionNPC) return;
+            if (!isEquipmentInstance(item)) {
+                addLog('该物品不是可装备类型。', 'warning');
+                return;
+            }
+
+            const isCompanion = player.companions.some(c => c.static.id === activeInteractionNPC.static.id);
+            if (!isCompanion) {
+                addLog('仅能为当前小队同伴调配装备。', 'warning');
+                return;
+            }
+
+            const itemType: 'weapon' | 'armor' | 'accessory' = isWeaponInstance(item)
+                ? 'weapon'
+                : isArmorInstance(item)
+                    ? 'armor'
+                    : 'accessory';
+
+            const companionEquipment = normalizeEquipState(activeInteractionNPC.dynamic.equipment);
+            const targetSlot = slotIndex ?? 0;
+
+            // 查找旧装备
+            let oldItem: ItemInstance | null = null;
+            if (itemType === 'weapon') {
+                const weaponSlot = targetSlot === 1 ? 'side' : 'main';
+                oldItem = companionEquipment.weapons[weaponSlot];
+            } else if (itemType === 'armor') {
+                oldItem = companionEquipment.armors[targetSlot] ?? null;
+            } else {
+                oldItem = companionEquipment.accessories[targetSlot] ?? null;
+            }
+
+            // 更新同伴装备
+            const nextEquipment = equipItem(companionEquipment, item, itemType, targetSlot);
+
+            // 从玩家背包移除该装备，若有旧装备则退还至玩家背包
+            let nextPlayerInventory = removeItemFromInventory(player.dynamic.inventory, item.instanceId);
+            if (oldItem) {
+                nextPlayerInventory = addUniqueItemToInventory(nextPlayerInventory, stripEquipEffectSnapshot(oldItem));
+            }
+
+            // 计算属性/加成更新：回收旧饰品加成，应用新饰品加成
+            const nextCompanionDynamic = { ...activeInteractionNPC.dynamic, equipment: nextEquipment };
+            if (oldItem && isAccessoryInstance(oldItem)) {
+                applyEffectDeltas(nextCompanionDynamic, negateEffectDeltas(getAppliedAccessoryDeltas(oldItem)));
+            }
+            if (isAccessoryInstance(item)) {
+                const itemDeltas = collectAccessoryEffects(item);
+                applyEffectDeltas(nextCompanionDynamic, itemDeltas);
+            }
+
+            const updatedCompanion: InteractionNpcEntity = {
+                ...activeInteractionNPC,
+                dynamic: nextCompanionDynamic
+            };
+
+            setActiveInteractionNPC(updatedCompanion);
+            syncNPCState(updatedCompanion);
 
             setPlayer(prev => ({
                 ...prev,
-                dialogue: {
-                    dialogue: [...(prev.dialogue?.dialogue ?? []), [playerWords, npcWords]]
+                dynamic: {
+                    ...prev.dynamic,
+                    inventory: nextPlayerInventory
                 }
             }));
 
-            if (result.vocal) {
-                const voiceName =
-                    activeInteractionNPC.static.gender === 'female' ? 'Kore' : 'Fenrir';
-                const currentNode = getCurrentNode();
+            addLog(
+                oldItem
+                    ? `同伴 ${activeInteractionNPC.static.name} 替换装备: ${oldItem.name} → ${item.name}`
+                    : `为同伴 ${activeInteractionNPC.static.name} 装配模块: ${item.name}`,
+                'info'
+            );
+            AudioService.playSfx('item_equip');
+        },
+        [activeInteractionNPC, player.companions, player.dynamic.inventory, setPlayer, addLog, setActiveInteractionNPC, syncNPCState]
+    );
 
-                addLog(`接收到生物音频信号(${voiceName})...`, 'ai-gen');
+    /**
+     * 为同伴卸下装备。
+     */
+    const handleCompanionUnequipItem = useCallback(
+        (itemType: 'weapon' | 'armor' | 'accessory', slotIndex: number) => {
+            if (!activeInteractionNPC) return;
 
-                const audioContext = {
-                    zoneId: currentZone.id,
-                    nodeId: currentNodeId,
-                    zoneName: currentZone.name,
-                    nodeName: currentNode.name,
-                    entityName: activeInteractionNPC.static.name,
-                    strength: player.dynamic.strength,
-                    agility: player.dynamic.agility,
-                    wisdom: player.dynamic.wisdom,
-                    perception: player.dynamic.perception
-                };
+            const isCompanion = player.companions.some(c => c.static.id === activeInteractionNPC.static.id);
+            if (!isCompanion) {
+                addLog('仅能为当前小队同伴调配装备。', 'warning');
+                return;
+            }
 
-                const audioData = await AiService.generateSpeech(
-                    settings,
-                    result.vocal,
-                    audioContext,
-                    voiceName
-                );
+            const companionEquipment = normalizeEquipState(activeInteractionNPC.dynamic.equipment);
 
-                if (audioData) {
-                    AudioService.playPCM(audioData);
+            // 查找要卸下的装备
+            let equippedItem: ItemInstance | null = null;
+            if (itemType === 'weapon') {
+                const weaponSlot = slotIndex === 1 ? 'side' : 'main';
+                equippedItem = companionEquipment.weapons[weaponSlot];
+            } else if (itemType === 'armor') {
+                equippedItem = companionEquipment.armors[slotIndex] ?? null;
+            } else {
+                equippedItem = companionEquipment.accessories[slotIndex] ?? null;
+            }
+
+            if (!equippedItem) {
+                addLog('该槽位未装配任何物品。', 'warning');
+                return;
+            }
+
+            const nextEquipment = unequipItem(companionEquipment, itemType, slotIndex);
+            const nextCompanionDynamic = { ...activeInteractionNPC.dynamic, equipment: nextEquipment };
+
+            // 若卸下饰品，回收饰品属性加成
+            if (isAccessoryInstance(equippedItem)) {
+                applyEffectDeltas(nextCompanionDynamic, negateEffectDeltas(getAppliedAccessoryDeltas(equippedItem)));
+            }
+
+            // 退回至玩家背包
+            const nextPlayerInventory = addUniqueItemToInventory(
+                player.dynamic.inventory,
+                stripEquipEffectSnapshot(equippedItem)
+            );
+
+            const updatedCompanion: InteractionNpcEntity = {
+                ...activeInteractionNPC,
+                dynamic: nextCompanionDynamic
+            };
+
+            setActiveInteractionNPC(updatedCompanion);
+            syncNPCState(updatedCompanion);
+
+            setPlayer(prev => ({
+                ...prev,
+                dynamic: {
+                    ...prev.dynamic,
+                    inventory: nextPlayerInventory
+                }
+            }));
+
+            addLog(`已卸下同伴 ${activeInteractionNPC.static.name} 的模块: ${equippedItem.name}`, 'info');
+            AudioService.playSfx('item_unequip');
+        },
+        [activeInteractionNPC, player.companions, player.dynamic.inventory, setPlayer, addLog, setActiveInteractionNPC, syncNPCState]
+    );
+
+    /**
+     * 对同伴使用任意消耗品。
+     */
+    const handleCompanionUseConsumable = useCallback(
+        (item: ItemInstance) => {
+            if (!activeInteractionNPC) return;
+            if (!isConsumableInstance(item)) {
+                addLog('该物品不是消耗品。', 'warning');
+                return;
+            }
+
+            const isCompanion = player.companions.some(c => c.static.id === activeInteractionNPC.static.id);
+            if (!isCompanion) {
+                addLog('仅能对当前小队同伴使用补给消耗品。', 'warning');
+                return;
+            }
+
+            const maxHp = safeNumber(activeInteractionNPC.dynamic.maxHp, 100);
+            const maxSanity = safeNumber(activeInteractionNPC.dynamic.maxSanity, 100);
+            const maxStamina = safeNumber(activeInteractionNPC.dynamic.maxStamina, 100);
+            const maxVigor = safeNumber(activeInteractionNPC.dynamic.maxVigor, 100);
+
+            let hpDelta = 0;
+            let sanityDelta = 0;
+            let staminaDelta = 0;
+            let vigorDelta = 0;
+            const attributeUpdates: Partial<Record<AttributeType, number>> = {};
+            const vitalUpdates: Partial<Record<VitalType, number>> = {};
+
+            const effects = item.effects ?? [];
+            for (const effect of effects) {
+                const [effectType, rawValue] = effect;
+                const value = Math.floor(safeNumber(rawValue));
+
+                switch (effectType) {
+                    case 'hp':
+                        hpDelta += value;
+                        break;
+                    case 'sanity':
+                        sanityDelta += value;
+                        break;
+                    case 'stamina':
+                        staminaDelta += value;
+                        break;
+                    case 'vigor':
+                        vigorDelta += value;
+                        break;
+                    default: {
+                        const effectKey = effectType as string;
+                        if (isAttributeType(effectKey)) {
+                            attributeUpdates[effectKey] = safeNumber(attributeUpdates[effectKey] ?? 0) + value;
+                        } else if (isVitalType(effectKey)) {
+                            vitalUpdates[effectKey] = safeNumber(vitalUpdates[effectKey] ?? 0) + value;
+                        }
+                    }
                 }
             }
 
-            const newTrust = SocializationService.clampTrust(
-                activeInteractionNPC.dynamic.trust +
-                safeNumber(settings.gameConfig.social.benefits.intimacyTrustGain),
-                settings
-            );
+            // 计算新的体征与属性
+            const nextDynamic = { ...activeInteractionNPC.dynamic };
+            if (hpDelta !== 0) {
+                nextDynamic.hp = clamp(safeNumber(nextDynamic.hp) + hpDelta, 0, maxHp);
+            }
+            if (sanityDelta !== 0) {
+                nextDynamic.sanity = clamp(safeNumber(nextDynamic.sanity) + sanityDelta, 0, maxSanity);
+            }
+            if (staminaDelta !== 0) {
+                nextDynamic.stamina = clamp(safeNumber(nextDynamic.stamina) + staminaDelta, 0, maxStamina);
+            }
+            if (vigorDelta !== 0) {
+                nextDynamic.vigor = clamp(safeNumber(nextDynamic.vigor) + vigorDelta, 0, maxVigor);
+            }
 
-            const newSanity = clamp(
-                activeInteractionNPC.dynamic.sanity +
-                safeNumber(settings.gameConfig.social.benefits.intimacySanityGain),
-                0,
-                activeInteractionNPC.dynamic.maxSanity
-            );
-
-            const updatedNPC: Entity<NpcTemplate, NpcDynamicState> = {
-                ...activeInteractionNPC,
-                dynamic: {
-                    ...activeInteractionNPC.dynamic,
-                    trust: newTrust,
-                    sanity: newSanity
+            for (const [attr, val] of Object.entries(attributeUpdates)) {
+                if (val !== undefined && isAttributeType(attr)) {
+                    nextDynamic[attr] = Math.max(0, safeNumber(nextDynamic[attr]) + val);
                 }
-            };
+            }
+            for (const [vital, val] of Object.entries(vitalUpdates)) {
+                if (val !== undefined && isVitalType(vital)) {
+                    nextDynamic[vital] = Math.max(0, safeNumber(nextDynamic[vital]) + val);
+                }
+            }
 
-            setActiveInteractionNPC(updatedNPC);
-            syncNPCState(updatedNPC);
-
-            setPlayer(p => ({
-                ...p,
+            // 扣除玩家背包中的消耗品
+            setPlayer(prev => ({
+                ...prev,
                 dynamic: {
-                    ...p.dynamic,
-                    sanity: clamp(
-                        p.dynamic.sanity +
-                        safeNumber(
-                            settings.gameConfig.social.benefits.intimacyPlayerSanityGain
-                        ),
-                        0,
-                        p.dynamic.maxSanity
-                    )
+                    ...prev.dynamic,
+                    inventory: removeItemFromInventory(prev.dynamic.inventory, item.instanceId, 1)
                 }
             }));
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : '未知错误';
-            addLog(`连接意外中断: ${errorMessage}`, 'warning');
-        }
-    }, [
-        activeInteractionNPC,
-        settings,
-        currentZone,
-        currentNodeId,
-        addLog,
-        setActiveInteractionNPC,
-        syncNPCState,
-        setPlayer,
-        player,
-        getCurrentNode
-    ]);
+
+            const updatedCompanion: InteractionNpcEntity = {
+                ...activeInteractionNPC,
+                dynamic: nextDynamic
+            };
+
+            setActiveInteractionNPC(updatedCompanion);
+            syncNPCState(updatedCompanion);
+
+            addLog(`已为同伴 ${activeInteractionNPC.static.name} 注入物资: ${item.name}`, 'command');
+            if (hpDelta !== 0) {
+                addLog(`生命 ${hpDelta >= 0 ? '+' : ''}${hpDelta}`, hpDelta >= 0 ? 'success' : 'warning');
+            }
+            if (sanityDelta !== 0) {
+                addLog(`理智 ${sanityDelta >= 0 ? '+' : ''}${sanityDelta}`, sanityDelta >= 0 ? 'success' : 'warning');
+            }
+            if (staminaDelta !== 0) {
+                addLog(`耐力 ${staminaDelta >= 0 ? '+' : ''}${staminaDelta}`, staminaDelta >= 0 ? 'success' : 'warning');
+            }
+            if (vigorDelta !== 0) {
+                addLog(`活力 ${vigorDelta >= 0 ? '+' : ''}${vigorDelta}`, vigorDelta >= 0 ? 'success' : 'warning');
+            }
+            AudioService.playSfx('item_use');
+        },
+        [activeInteractionNPC, player.companions, setPlayer, addLog, setActiveInteractionNPC, syncNPCState]
+    );
 
     const handleNPCTakeItem = useCallback(
         (item: ItemInstance) => {
@@ -1105,7 +1183,7 @@ export const useSocialization = ({
                 quantity: 1
             } as ItemInstance;
 
-            const newNPC: Entity<NpcTemplate, NpcDynamicState> = {
+            const newNPC: InteractionNpcEntity = {
                 ...activeInteractionNPC,
                 dynamic: {
                     ...activeInteractionNPC.dynamic,
@@ -1146,43 +1224,53 @@ export const useSocialization = ({
                 }
             }));
 
-            let trustGain = safeNumber(settings.gameConfig.social.benefits.giftTrustBase);
-
-            if (item.rarity === 'organized') {
-                trustGain = safeNumber(settings.gameConfig.social.benefits.giftTrustRare);
-            }
-
-            if (item.rarity === 'deep') {
-                trustGain = safeNumber(settings.gameConfig.social.benefits.giftTrustEpic);
-            }
-
-            if (item.rarity === 'abyssal') {
-                trustGain = -Math.abs(
-                    safeNumber(settings.gameConfig.social.benefits.giftTrustBase)
-                );
-            } else if (item.type === 'consumable') {
-                trustGain += safeNumber(
-                    settings.gameConfig.social.benefits.giftTrustConsumableBonus
-                );
-            }
-
-            const newTrust = SocializationService.clampTrust(
-                activeInteractionNPC.dynamic.trust + trustGain,
-                settings
-            );
-
             const giftedItem = {
                 ...item,
                 quantity: 1
             } as ItemInstance;
 
-            const newNPC: Entity<NpcTemplate, NpcDynamicState> = {
+            const isCompanion = player.companions.some(
+                c => c.static.id === activeInteractionNPC.static.id
+            );
+
+            // 同伴状态下双方物资处于共享状态，转交给同伴仅作随身保管，不提高好感度。
+            if (isCompanion) {
+                const newNPC: InteractionNpcEntity = {
+                    ...activeInteractionNPC,
+                    dynamic: {
+                        ...activeInteractionNPC.dynamic,
+                        inventory: addItemToInventory(
+                            activeInteractionNPC.dynamic.inventory || [],
+                            giftedItem
+                        )
+                    }
+                };
+
+                setActiveInteractionNPC(newNPC);
+                syncNPCState(newNPC);
+
+                addLog(
+                    `已将 ${item.name} 转交给同伴 ${activeInteractionNPC.static.name} 保管。`,
+                    'info'
+                );
+                AudioService.playSfx('ui_click');
+                return;
+            }
+
+            // 节点 NPC：赠礼权重按稀有度档位结算，深渊 / 禁忌 / 不可名状类物品会激怒对方。
+            const relationDelta = SocializationService.getGiftRelationDelta(item, settings);
+            const relationUpdate = SocializationService.applyRelationDelta(
+                activeInteractionNPC.dynamic,
+                relationDelta,
+                settings
+            );
+
+            const newNPC: InteractionNpcEntity = {
                 ...activeInteractionNPC,
                 dynamic: {
-                    ...activeInteractionNPC.dynamic,
-                    trust: newTrust,
+                    ...relationUpdate.dynamic,
                     inventory: addItemToInventory(
-                        activeInteractionNPC.dynamic.inventory || [],
+                        relationUpdate.dynamic.inventory || [],
                         giftedItem
                     )
                 }
@@ -1191,15 +1279,15 @@ export const useSocialization = ({
             setActiveInteractionNPC(newNPC);
             syncNPCState(newNPC);
 
-            if (item.rarity === 'abyssal') {
+            if (relationUpdate.delta < 0) {
                 addLog(
-                    `${activeInteractionNPC.static.name} 收到了 ${item.name}，气氛变得有些诡异。`,
+                    `${activeInteractionNPC.static.name} 收到了 ${item.name}，气氛变得有些诡异。(${relationUpdate.label} ${relationUpdate.delta})`,
                     'warning'
                 );
                 AudioService.playSfx('terrifying');
             } else {
                 addLog(
-                    `${activeInteractionNPC.static.name} 收到了 ${item.name}，好感度提升。`,
+                    `${activeInteractionNPC.static.name} 收到了 ${item.name}。(${relationUpdate.label} +${relationUpdate.delta})`,
                     'success'
                 );
                 AudioService.playSfx('success');
@@ -1211,7 +1299,8 @@ export const useSocialization = ({
             setActiveInteractionNPC,
             syncNPCState,
             settings,
-            addLog
+            addLog,
+            player.companions
         ]
     );
 
@@ -1231,12 +1320,17 @@ export const useSocialization = ({
                 return;
             }
 
+            const recruitRelation = SocializationService.resolveRelation(
+                activeInteractionNPC.dynamic
+            );
+
             if (
                 typeof canBeInvited.trust === 'number' &&
-                activeInteractionNPC.dynamic.trust < safeNumber(canBeInvited.trust)
+                recruitRelation.axis === 'trust' &&
+                recruitRelation.score < safeNumber(canBeInvited.trust)
             ) {
                 addLog(
-                    `${activeInteractionNPC.static.name} 还不够信任你，拒绝加入。`,
+                    `${activeInteractionNPC.static.name} 还不够信任你（当前阶段：${recruitRelation.phase}），拒绝加入。`,
                     'warning'
                 );
                 AudioService.playSfx('fail');
@@ -1264,7 +1358,7 @@ export const useSocialization = ({
                 return;
             }
 
-            let replacements: Array<Entity<NpcTemplate, NpcDynamicState>> = [];
+            let replacements: Array<InteractionNpcEntity> = [];
 
             if (canBeInvited.replacement && canBeInvited.replacement.length > 0) {
                 const resolved = resolveReplacements(
@@ -1294,9 +1388,39 @@ export const useSocialization = ({
                 replacements = resolved;
             }
 
-            const newCompanion: Entity<NpcTemplate, NpcDynamicState> = {
-                static: safeDeepClone(activeInteractionNPC.static),
-                dynamic: safeDeepClone(activeInteractionNPC.dynamic)
+            /**
+             * 入队即转为同伴：模板与动态都切到同伴契约。
+             *
+             * 契约规定：入队后关系轴由「信任」切换为「好感」，好感从 0 开始重新积累；
+             * 节点 NPC 的任务槽位随之让位给同伴需求（needs）。
+             */
+            const recruitedStatic = safeDeepClone(activeInteractionNPC.static) as NodeNpcTemplate;
+
+            const recruitedInitialState = {
+                ...recruitedStatic.initialState
+            } as Record<string, unknown>;
+            delete recruitedInitialState.quests;
+
+            const recruitedDynamic = safeDeepClone(
+                activeInteractionNPC.dynamic
+            ) as unknown as Record<string, unknown>;
+            delete recruitedDynamic.trust;
+            delete recruitedDynamic.quests;
+
+            const newCompanion: Entity<CompanionTemplate, CompanionDynamicState> = {
+                static: {
+                    ...recruitedStatic,
+                    initialState: {
+                        ...recruitedInitialState,
+                        affinity: 0,
+                        needs: []
+                    }
+                } as unknown as CompanionTemplate,
+                dynamic: {
+                    ...recruitedDynamic,
+                    affinity: 0,
+                    needs: []
+                } as unknown as CompanionDynamicState
             };
 
             setPlayer(p => {
@@ -1367,11 +1491,29 @@ export const useSocialization = ({
         player
     ]);
 
+    /**
+     * 接取委托 / 同伴需求。
+     *
+     * 目标持有「委托槽位」的两种合法来源：
+     * - 节点 NPC：`NodeNpcTemplate.initialState.quests`（信任轴）；
+     * - 同伴：`CompanionDynamicState.needs`（好感轴），结构与 QuestTemplate 一致。
+     * 两者都按数组顺序解锁：必须完成前一项才能接取后一项。
+     */
     const handleAcceptQuest = useCallback(
         (questId: string, questData: Partial<Quest>) => {
             if (!activeInteractionNPC) return;
 
-            const npcQuests = activeInteractionNPC.static.initialState.quest ?? [];
+            const nodeNpcQuests =
+                (activeInteractionNPC.static as NodeNpcTemplate).initialState.quests ?? [];
+            const companionNeeds =
+                'needs' in activeInteractionNPC.dynamic && Array.isArray(activeInteractionNPC.dynamic.needs)
+                    ? activeInteractionNPC.dynamic.needs
+                    : ('needs' in activeInteractionNPC.static.initialState &&
+                        Array.isArray(activeInteractionNPC.static.initialState.needs)
+                        ? activeInteractionNPC.static.initialState.needs
+                        : []);
+            const npcQuests =
+                nodeNpcQuests.length > 0 ? nodeNpcQuests : companionNeeds;
             let template: QuestTemplate;
 
             if (npcQuests.length > 0) {
@@ -1470,7 +1612,7 @@ export const useSocialization = ({
                     ? (res.dialogue[res.dialogue.length - 1] ?? fallbackDialogue)
                     : (res.dialogue ?? fallbackDialogue);
 
-                const updatedNPC: Entity<NpcTemplate, NpcDynamicState> = {
+                const updatedNPC: InteractionNpcEntity = {
                     ...activeInteractionNPC,
                     dynamic: {
                         ...activeInteractionNPC.dynamic,
@@ -1534,7 +1676,7 @@ export const useSocialization = ({
                     profileName
                 );
 
-                const updatedNPC: Entity<NpcTemplate, NpcDynamicState> = {
+                const updatedNPC: InteractionNpcEntity = {
                     ...activeInteractionNPC,
                     dynamic: {
                         ...activeInteractionNPC.dynamic,
@@ -1591,19 +1733,130 @@ export const useSocialization = ({
         [activeInteractionNPC, addLog]
     );
 
+    /**
+     * 好感离队裁定（契约：好感为负时，每个 absoluteTick 同伴都有概率离开玩家）。
+     *
+     * 命中离队的同伴会在当前节点转为节点 NPC：
+     * - 信任从 0 重新培养（好感不继承，玩家需重新建立信任后再次邀请）；
+     * - 个人需求（needs）转为该节点 NPC 的委托槽位（quests），按顺序解锁；
+     * - 属性 / 体征 / 装备 / 战术 / 随身物资按离队时的实测值冻结在原地，不静默丢失；
+     * - 重新邀请的门槛按「长盟」边界结算：必须先把信任培养到阈值，才可能再次入队。
+     *   （契约中「反复离队加大难度」需要持久化的离队计数，当前契约未提供该字段，
+     *   故此处以「信任归零 + 高门槛重新邀请」表达其代价。）
+     *
+     * 当前节点已安置其他节点 NPC（nodeNpc 槽位被占用）时本次不离队，
+     * 避免实体与随身物资被静默丢弃。
+     */
+    const evaluateCompanionDepartures = useCallback(() => {
+        const tick = Math.floor(safeNumber(player.currentGameRound.absoluteTick));
+        if (lastDepartureTickRef.current === tick) return;
+        lastDepartureTickRef.current = tick;
+
+        const leaver = player.companions.find(companion => {
+            const affinity = getRelationScore(companion.dynamic);
+            return affinity < 0 && SocializationService.shouldCompanionLeave(affinity);
+        });
+        if (!leaver) return;
+
+        const node = currentZone.nodes?.[currentNodeId];
+        if (!node || node.nodeNpc) return;
+
+        const { dynamic } = leaver;
+        const departedNeeds = safeDeepClone(
+            dynamic.needs ?? leaver.static.initialState.needs ?? []
+        );
+
+        const nodeNpc = {
+            ...safeDeepClone(leaver.static),
+            initialState: {
+                attribute: {
+                    strength: safeNumber(dynamic.strength),
+                    agility: safeNumber(dynamic.agility),
+                    wisdom: safeNumber(dynamic.wisdom),
+                    awareness: safeNumber(dynamic.awareness),
+                    will: safeNumber(dynamic.will),
+                    cthulhu: safeNumber(dynamic.cthulhu)
+                },
+                vital: {
+                    maxHp: safeNumber(dynamic.maxHp),
+                    maxSanity: safeNumber(dynamic.maxSanity),
+                    maxStamina: safeNumber(dynamic.maxStamina),
+                    maxVigor: safeNumber(dynamic.maxVigor)
+                },
+                equipState: safeDeepClone(dynamic.equipment),
+                inventory: safeDeepClone(dynamic.inventory ?? []),
+                uniqueTactic: safeDeepClone(dynamic.tactics ?? []),
+                trust: 0,
+                quests: departedNeeds
+            },
+            canBeInvited: {
+                trust: safeNumber(
+                    settings.gameConfig.social.thresholds.trustHigh,
+                    60
+                )
+            }
+        } as unknown as NodeNpcTemplate;
+
+        const leaverName = leaver.static.name;
+        const affinity = Math.floor(getRelationScore(leaver.dynamic));
+
+        setPlayer(p => ({
+            ...p,
+            companions: p.companions.filter(c => c.static.id !== leaver.static.id)
+        }));
+
+        setCurrentZone((prev: Zone) => {
+            const current = prev.nodes?.[currentNodeId];
+            if (!current) return prev;
+
+            return {
+                ...prev,
+                nodes: {
+                    ...prev.nodes,
+                    [currentNodeId]: { ...current, nodeNpc }
+                }
+            };
+        });
+
+        if (activeInteractionNPC?.static.id === leaver.static.id) {
+            closeNPCInteraction();
+        }
+
+        addLog(
+            `[关系断裂] ${leaverName} 的好感已跌至 ${affinity}，脱离了小队，并在当前区域重新落脚。重建信任后方可再次邀请。`,
+            'critical'
+        );
+        AudioService.playSfx('event_npc_leave');
+    }, [
+        player.companions,
+        player.currentGameRound.absoluteTick,
+        currentZone.nodes,
+        currentNodeId,
+        activeInteractionNPC,
+        closeNPCInteraction,
+        settings,
+        setPlayer,
+        setCurrentZone,
+        addLog
+    ]);
+
     return {
         activeInteractionNPC,
         setActiveInteractionNPC,
         handleNPCChat,
-        handleLocalNPCAction,
+        handleCompanionHeartToHeart,
+        handleRequestQuest,
         handleNPCTakeItem,
         handleNPCGift,
         handleNPCRecruit,
-        handleNPCIntimacy,
+        handleCompanionEquipItem,
+        handleCompanionUnequipItem,
+        handleCompanionUseConsumable,
         handleAcceptQuest,
         closeNPCInteraction,
         handleMountProfile,
         handleUnmountCreateNewProfile,
-        handleDeleteProfile
+        handleDeleteProfile,
+        evaluateCompanionDepartures
     };
 };

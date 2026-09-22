@@ -5,11 +5,13 @@ import {
     applyEffectDeltas,
     clampDynamicVitals,
     getAppliedAccessoryDeltas,
+    getBackpackGridSize,
     negateEffectDeltas,
     normalizeEquipmentWithOverflow,
     reclaimOverflowEquipments,
     initializeZoneRuntime,
     buildZoneGenerationContext,
+    getNodeAmbushRate,
     safeAudioOperation,
     initializeGameFromOrigin,
 } from '../meta';
@@ -18,12 +20,14 @@ import type {
     Log,
     Zone,
     Settings,
-    NpcTemplate,
     AttributeType,
     Sanctuary,
     Entity,
-    NpcDynamicState,
+    CompanionDynamicState,
+    CompanionTemplate,
+    InteractionNpcEntity,
     StoryConfig,
+    BattleMap,
     CombatEnemy,
     EnemyTemplate,
     ItemInstance,
@@ -40,15 +44,17 @@ import type {
     NarrativeMode,
     NarrativePacing,
     ChainNarrative,
-    SanctuaryState,
+    HorrorAesthetic,
+    HorrorAtom,
+    HorrorDomain,
+    ChoiceImpact,
     CombatIntent,
     Tactic,
     CombatAlly,
-    AttackResult,
+    Cover,
     DefenseResult,
     Facility,
     Resident,
-    SanctuaryEventChange,
 } from '../meta';
 import { INITIAL_SETTINGS, ORIGIN_TEMPLATES } from '../constants';
 import {
@@ -60,11 +66,22 @@ import {
     DynamicNarrativeService,
 } from '../services';
 import { useCombat } from './useCombat';
-import type { CounterAdvanceRequest } from './useCombat';
+import type {
+    AnyTactic,
+    AttackForecast,
+    BattleStartContext,
+    CombatPosition,
+    CounterAdvanceRequest,
+    CounterDecisionResult,
+    InsertActionWindow,
+    MoveDirection,
+    WeaponTraitState,
+} from './useCombat';
 import { useSocialization } from './useSocialization';
 import { useSanctuary } from './useSanctuary';
-import type { CustomRestConfig } from './useSanctuary';
+import type { CustomRestConfig, FacilityUpgradePayment } from './useSanctuary';
 import { useGameState } from './useGameState';
+import type { NarrativeMutationResult } from './useGameState';
 import { usePersistence } from './usePersistence';
 import { useAssetLoad } from './useAssetLoad';
 import { useAiGeneration } from './useAiGeneration';
@@ -73,8 +90,36 @@ import type { PuzzleInteractionController } from './useInteraction';
 import { useZoneTransition } from './useZoneTransition';
 
 // =====================
+// 对外出口（模块唯一出口：视图层禁止深度引用内部文件）
+// =====================
+export type {
+    AnyTactic,
+    AttackForecast,
+    AttackForecastSource,
+    BattleStartContext,
+    CombatPosition,
+    CounterAdvanceRequest,
+    CounterDecisionResult,
+    InsertActionWindow,
+    MoveDirection,
+    WeaponTraitState,
+} from './useCombat';
+export { getBattleDistance, getCoverAtCell, getSteppedCell, isCellWalkable } from './useCombat';
+export type { PuzzleInteractionController } from './useInteraction';
+export type { NarrativeMutationResult } from './useGameState';
+export type { CustomRestConfig, FacilityUpgradePayment } from './useSanctuary';
+
+// =====================
 // 接口定义
 // =====================
+
+/**
+ * 背包网格对外契约
+ *
+ * 自 useInteraction 的组合结果中提取；视图层只消费该契约，
+ * 不参与任何网格落位计算。
+ */
+export type InventoryGridApi = ReturnType<typeof useInteraction>['inventoryGrid'];
 interface UseGameParams { }
 
 interface UseGameReturn {
@@ -100,7 +145,7 @@ interface UseGameReturn {
         type: 'scene' | 'enemy' | 'npc' | 'player',
         objId?: string
     ) => boolean;
-    activeInteractionNPC: Entity<NpcTemplate, NpcDynamicState> | null;
+    activeInteractionNPC: InteractionNpcEntity | null;
     showCutscene: boolean;
     setShowCutscene: Dispatch<SetStateAction<boolean>>;
     showNarrative: boolean;
@@ -122,35 +167,56 @@ interface UseGameReturn {
     allies: CombatAlly[];
     activeAllyId: string;
     setActiveAllyId: Dispatch<SetStateAction<string>>;
-    getTacticsFor: (ownerId: string) => Tactic[];
-    canUseTactic: (tactic: Tactic, casterId: string) => boolean;
-    getVisibleResultSequence?: (targetId: string) => {
-        attackResult: AttackResult[];
-        defenseResult: DefenseResult[];
-    };
+    getTacticsFor: (ownerId: string) => AnyTactic[];
+    canUseTactic: (tactic: AnyTactic, casterId: string) => boolean;
+    getVisibleResultSequence?: (targetId: string) => CombatAlly['resultSequence'];
+    /**
+     * 该单位的序列预测深度 n（契约 `CombatAlly.resultSequence`）：
+     * will 为 50 时 n 为 1，此后每 5 点 will 额外 +1；will 小于 50 时 n 为 0。
+     * 敌人恒为 0。
+     */
+    getPredictionDepthFor?: (targetId: string) => number;
+    /**
+     * 战前预测：指定单位攻击指定目标的命中档位、伤害区间与每一处减益的来源。
+     * 返回 null 表示不可预测（序列不可见 / 已耗尽 / 目标已阵亡）。
+     */
+    getAttackForecast?: (attackerId: string, targetId: string) => AttackForecast | null;
     pendingDefense: Record<string, DefenseResult[]>;
     /** 战场位置表：key 为我方 targetId（player / 同伴 id）或敌方 instanceId。 */
-    positions: Record<string, number>;
-    /** 战线坐标下限（小地图渲染用）。 */
-    battleLineMin: number;
-    /** 战线坐标上限（小地图渲染用）。 */
-    battleLineMax: number;
+    positions: Record<string, CombatPosition>;
+    /** 当前战场地图：纵深范围、轨道数、掩体落点与环境修正。 */
+    battleMap: BattleMap;
+    /** 运行时掩体（契约 Cover：覆盖率 / 通行性 / 耐久；落点见 battleMap.covers）。 */
+    covers: Cover[];
     /** 单位攻击距离查询：我方取主手武器 range，敌方取模板 range；0 = 无限距离。 */
     getUnitRange: (unitId: string) => number;
-    /** 两个单位之间的战线距离。 */
+    /** 两个单位之间的战场距离（切比雪夫距离）。 */
     getDistance: (aId: string, bId: string) => number;
-    /** 我方单位前进 / 后退一步，消耗行动点。 */
-    moveAlly: (allyId: string, dir: 1 | -1) => Promise<void>;
+    /** 单次位移的行动点消耗（基础值 + 环境移动修正）。 */
+    getMoveCost: () => number;
+    /** 我方单位四向位移一步（纵深推进 / 撤离、换轨），消耗行动点。 */
+    moveAlly: (allyId: string, dir: MoveDirection) => Promise<void>;
     /** 蓄反 / 差反预支询问；非空时战斗界面底部弹出通栏询问条等待玩家决策。 */
     counterPrompt: CounterAdvanceRequest | null;
-    /** 回应预支询问：true = 预支，false = 保留 / 放弃。 */
-    resolveCounterPrompt: (approve: boolean) => void;
+    /**
+     * 回应预支询问：approve = false 保留 / 放弃；
+     * approve = true 且给出 advancePoints 时按该档位预支（仅差反的 2n），否则采用默认档位。
+     */
+    resolveCounterPrompt: (approve: boolean, advancePoints?: number) => void;
     /** 每单位预支询问跳过开关（player / 同伴 id → 蓄反 / 差反）。 */
-    counterSkip: Record<string, Partial<Record<CounterAdvanceRequest['kind'], boolean>>>;
+    counterSkip: Record<string, Partial<Record<CounterAdvanceRequest['type'], boolean>>>;
     /** 设置 / 取消跳过开关。 */
-    setCounterSkip: (unitId: string, kind: CounterAdvanceRequest['kind'], skip: boolean) => void;
-    /** 「立即行动」窗口：预支结算后我方单位的立即行动机会。 */
-    insertAction: { unitId: string; chancesLeft: number } | null;
+    setCounterSkip: (unitId: string, type: CounterAdvanceRequest['type'], skip: boolean) => void;
+    /**
+     * 我方单位的武器特性回合状态（瞄准 / 待装填 / 本回合移动 / 免费攻击已用）。
+     * 供战斗界面展示「已瞄准」「待装填」等契约特性提示。
+     */
+    weaponStates: Record<string, WeaponTraitState>;
+    /**
+     * 「立即行动」窗口：预支结算后我方单位的立即行动行动点池。
+     * 每次行动按其自身行动点成本消耗窗口行动点，不再限制攻击次数。
+     */
+    insertAction: InsertActionWindow | null;
     /** 手动结束「立即行动」窗口。 */
     endInsertAction: () => void;
 
@@ -169,9 +235,10 @@ interface UseGameReturn {
         targetId?: string,
         label?: string
     ) => Promise<void>;
-    handleUseItem: (item: ItemInstance, npc?: Entity<NpcTemplate, NpcDynamicState>) => Promise<void>;
+    handleUseItem: (item: ItemInstance, npc?: InteractionNpcEntity) => Promise<void>;
     handleEquipItem: (item: ItemInstance) => void;
     handleDiscardItem: (item: ItemInstance) => void;
+    inventoryGrid: ReturnType<typeof useInteraction>['inventoryGrid'];
     generateNewAsset: (
         type: 'scene' | 'enemy' | 'npc' | 'player',
         mediaType?: 'image' | 'video',
@@ -199,6 +266,24 @@ interface UseGameReturn {
     deleteNarrativeArc: (arcId: string) => Promise<boolean>;
     deleteEpisodicZone: (zoneId: string) => Promise<boolean>;
 
+    // === 自建叙事库（恐怖域 / 元 / 美学） ===
+    /** 预设 + 自建的合并视图，供叙事面板选择。 */
+    narrativeDomains: HorrorDomain[];
+    narrativeAtoms: HorrorAtom[];
+    narrativeAesthetics: HorrorAesthetic[];
+    /** 仅自建内容，供编辑器区分「可删除」与「预设只读」。 */
+    customNarrativeDomains: HorrorDomain[];
+    customNarrativeAtoms: HorrorAtom[];
+    customNarrativeAesthetics: HorrorAesthetic[];
+    isNarrativeLibraryLoading: boolean;
+    isNarrativeLibrarySaving: boolean;
+    upsertNarrativeDomain: (draft: HorrorDomain, isNew: boolean) => Promise<NarrativeMutationResult>;
+    upsertNarrativeAtom: (draft: HorrorAtom, isNew: boolean) => Promise<NarrativeMutationResult>;
+    upsertNarrativeAesthetic: (draft: HorrorAesthetic, isNew: boolean) => Promise<NarrativeMutationResult>;
+    removeNarrativeDomain: (id: string) => Promise<NarrativeMutationResult>;
+    removeNarrativeAtom: (id: string) => Promise<NarrativeMutationResult>;
+    removeNarrativeAesthetic: (id: string) => Promise<NarrativeMutationResult>;
+
     // === 叙事推演预览 ===
     narrativePreview: {
         params?: StoryConfig;
@@ -213,7 +298,7 @@ interface UseGameReturn {
     narrativeFlowStep:
     | 'mode'
     | 'pacing'
-    | 'theme'
+    | 'aesthetic'
     | 'config'
     | 'details'
     | 'preview'
@@ -227,7 +312,7 @@ interface UseGameReturn {
         SetStateAction<
             | 'mode'
             | 'pacing'
-            | 'theme'
+            | 'aesthetic'
             | 'config'
             | 'details'
             | 'preview'
@@ -242,7 +327,7 @@ interface UseGameReturn {
     handleNarrativeFlowLoadFromLibrary: (type: 'chain' | 'episodic', identifier: string) => void;
     handleNarrativeFlowModeConfirm: (mode: NarrativeMode) => void;
     handleNarrativeFlowPacingConfirm: (pacing: NarrativePacing) => void;
-    handleNarrativeFlowThemeConfirm: (theme: string) => void;
+    handleNarrativeFlowAestheticConfirm: (aesthetic: StoryConfig['aesthetic']) => void;
     handleNarrativeFlowConfigConfirm: (themeConfig: { motif: string; mainAxis: string }) => void;
     handleNarrativeFlowDetailsConfirm: () => void;
     handleNarrativeFlowPreviewConfirm: (autoGenOptions?: {
@@ -254,21 +339,24 @@ interface UseGameReturn {
     handleNarrativeFlowCancel: () => void;
 
     // === 角色与同伴 ===
-    handleInteractWithCompanion: (npc: Entity<NpcTemplate, NpcDynamicState> | null) => void;
+    handleInteractWithCompanion: (npc: InteractionNpcEntity | null) => void;
     levelUp: (targetId: string, attr: AttributeType) => void;
     gainExperience: (amount: number) => void;
     pendingTacticOptions: Tactic[] | null;
     selectTactic: (tacticId: string) => void;
 
     // === NPC 交互系统 ===
-    setActiveInteractionNPC: Dispatch<SetStateAction<Entity<NpcTemplate, NpcDynamicState> | null>>;
+    setActiveInteractionNPC: Dispatch<SetStateAction<InteractionNpcEntity | null>>;
     handleNPCChat: (message: string) => Promise<void>;
     handleNPCRecruit: () => void;
     handleNPCGift: (item: ItemInstance) => void;
     closeNPCInteraction: () => void;
-    handleLocalNPCAction: (actionType: 'hug' | 'heal') => void;
+    handleCompanionHeartToHeart: () => void;
+    handleRequestQuest: () => void;
+    handleCompanionEquipItem: (item: ItemInstance, slotIndex?: number) => void;
+    handleCompanionUnequipItem: (itemType: 'weapon' | 'armor' | 'accessory', slotIndex: number) => void;
+    handleCompanionUseConsumable: (item: ItemInstance) => void;
     handleNPCTakeItem: (item: ItemInstance) => void;
-    handleNPCIntimacy: () => Promise<void>;
     handleAcceptQuest: (questId: string, questData: Partial<Quest>) => void;
     handleMountProfile: (profileId: string) => Promise<void>;
     handleUnmountCreateNewProfile: (customName?: string) => Promise<void>;
@@ -277,19 +365,13 @@ interface UseGameReturn {
     // === 庇护所管理 ===
     transferItem: (item: ItemInstance, toStorage: boolean) => void;
     handleRest: (hours: number) => void;
-    handleResourceTrade: (target: keyof SanctuaryState, amount: number) => void;
     upgradeSanctuary: () => void;
-    getStorageCapacity: () => number;
     handleRepair: () => void;
     getCustomRestConfig: (hours: number) => CustomRestConfig | null;
-    handleUseMedicine: (amount?: number) => void;
-    handleFacilityUpgrade: (facilityId: string, scrapCost: number, success?: boolean) => void;
-    handleSanctuaryEvent: (stateChange: SanctuaryEventChange) => boolean;
-    morale: number;
-    isLowMorale: boolean;
-    maxStorage: number;
+    handleFacilityUpgrade: (facilityId: string, payment: FacilityUpgradePayment, success?: boolean) => void;
+    handleSanctuaryEvent: (impact: ChoiceImpact) => number;
     facilities: Facility[];
-    dailyProduction: Partial<SanctuaryState>;
+    dailyProduction: Record<string, number>;
     residents: Resident[];
 
     // === 系统与持久化 ===
@@ -366,7 +448,7 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
     const [showCutscene, setShowCutscene] = useState(false);
     const [loadingStatus, setLoadingStatus] = useState<string>('');
     const [activeInteractionNPC, setActiveInteractionNPC] = useState<
-        Entity<NpcTemplate, NpcDynamicState> | null
+        InteractionNpcEntity | null
     >(null);
     const [showNarrative, setShowNarrative] = useState(false);
     const [tempSearchVisualOverride, setTempSearchVisualOverride] = useState(false);
@@ -466,7 +548,7 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
     );
 
     const setCompanions = useCallback(
-        (updater: SetStateAction<Array<Entity<NpcTemplate, NpcDynamicState>>>) => {
+        (updater: SetStateAction<Array<Entity<CompanionTemplate, CompanionDynamicState>>>) => {
             setPlayer((prev) => {
                 const newCompanions =
                     typeof updater === 'function' ? updater(prev.companions) : updater;
@@ -593,7 +675,7 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
 
     // --- 蓄反 / 差反询问 ---
     const [counterPrompt, setCounterPrompt] = useState<CounterAdvanceRequest | null>(null);
-    const counterPromptResolverRef = useRef<((ok: boolean) => void) | null>(null);
+    const counterPromptResolverRef = useRef<((result: CounterDecisionResult) => void) | null>(null);
 
     /**
      * 蓄反 / 差反预支决策。
@@ -601,26 +683,37 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
      * - 敌人：暂由引擎默认拒绝，预留 LLM 决策接入点
      *   （Settings.accumulateCounterEnabled / differentialCounterEnabled 仅控制是否向敌方发起询问）。
      */
-    const counterDecision = useCallback((request: CounterAdvanceRequest): Promise<boolean> => {
-        const isAllyActor =
-            request.actorId === 'player' ||
-            playerRef.current.companions.some((c) => c.static.id === request.actorId);
-        if (!isAllyActor) return Promise.resolve(false);
+    const counterDecision = useCallback(
+        (request: CounterAdvanceRequest): Promise<CounterDecisionResult> => {
+            const isAllyActor =
+                request.entityId === 'player' ||
+                playerRef.current.companions.some((c) => c.static.id === request.entityId);
+            if (!isAllyActor) return Promise.resolve(false);
 
-        return new Promise<boolean>((resolve) => {
-            // 防御性处理：极端情况下若已有悬挂询问，先按放弃结算，避免旧 Promise 永久挂起。
-            counterPromptResolverRef.current?.(false);
-            counterPromptResolverRef.current = resolve;
-            setCounterPrompt(request);
-        });
-    }, []);
+            return new Promise<CounterDecisionResult>((resolve) => {
+                // 防御性处理：极端情况下若已有悬挂询问，先按放弃结算，避免旧 Promise 永久挂起。
+                counterPromptResolverRef.current?.(false);
+                counterPromptResolverRef.current = resolve;
+                setCounterPrompt(request);
+            });
+        },
+        []
+    );
 
-    /** 回应蓄反 / 差反询问。 */
-    const resolveCounterPrompt = useCallback((approve: boolean) => {
+    /**
+     * 回应蓄反 / 差反询问。
+     * 差反可由玩家选择预支档位（2n）：给出 advancePoints 时按该档位预支。
+     */
+    const resolveCounterPrompt = useCallback((approve: boolean, advancePoints?: number) => {
         const resolver = counterPromptResolverRef.current;
         counterPromptResolverRef.current = null;
         setCounterPrompt(null);
-        if (resolver) resolver(approve);
+        if (!resolver) return;
+        if (!approve) {
+            resolver(false);
+            return;
+        }
+        resolver(typeof advancePoints === 'number' ? advancePoints : true);
     }, []);
 
     // --- 战斗系统 ---
@@ -642,14 +735,18 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         getTacticsFor,
         canUseTactic,
         getVisibleResultSequence,
+        getPredictionDepthFor,
+        getAttackForecast,
         positions,
-        battleLineMin,
-        battleLineMax,
+        battleMap,
+        covers,
         getUnitRange,
         getDistance,
+        getMoveCost,
         moveAlly,
         counterSkip,
         setCounterSkip,
+        weaponStates,
         insertAction,
         endInsertAction,
     } = useCombat({
@@ -657,11 +754,8 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         companions: player.companions,
         setPlayerState: setPlayer,
         setCompanions,
-        gameState,
         setGameState,
         addLog,
-        updatePlayer,
-        updateCompanion,
         counterDecision,
         accumulateCounterEnabled: settings.accumulateCounterEnabled,
         differentialCounterEnabled: settings.differentialCounterEnabled,
@@ -702,6 +796,20 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         loadNarrativeLibrary,
         deleteNarrativeArc,
         deleteEpisodicZone,
+        narrativeDomains,
+        narrativeAtoms,
+        narrativeAesthetics,
+        customNarrativeDomains,
+        customNarrativeAtoms,
+        customNarrativeAesthetics,
+        isNarrativeLibraryLoading,
+        isNarrativeLibrarySaving,
+        upsertNarrativeDomain,
+        upsertNarrativeAtom,
+        upsertNarrativeAesthetic,
+        removeNarrativeDomain,
+        removeNarrativeAtom,
+        removeNarrativeAesthetic,
         narrativePreview,
         advanceExplorationStep,
         advanceCombatTurn,
@@ -721,7 +829,7 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         handleNarrativeFlowLoadFromLibrary,
         handleNarrativeFlowModeConfirm,
         handleNarrativeFlowPacingConfirm,
-        handleNarrativeFlowThemeConfirm,
+        handleNarrativeFlowAestheticConfirm,
         handleNarrativeFlowConfigConfirm,
         handleNarrativeFlowDetailsConfirm,
         handleNarrativeFlowPreviewConfirm,
@@ -743,8 +851,25 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         },
         currentNodeId,
         addLog,
-        spawnEnemy: (enemyTemplate?: EnemyTemplate, zoneId?: string) =>
-            spawnEnemy(enemyTemplate, zoneId),
+        spawnEnemy: (
+            enemyTemplate?: EnemyTemplate,
+            zoneId?: string,
+            threatLevel?: number,
+            context?: BattleStartContext
+        ) => {
+            // 补全开战上下文：庇护所内的战斗同样按玩家当前所在节点匹配战场地图。
+            const node = currentZone?.nodes?.[currentNodeId];
+            spawnEnemy(
+                enemyTemplate,
+                zoneId,
+                threatLevel,
+                context ?? {
+                    nodeId: currentNodeId,
+                    mapOverride: node?.map,
+                    isAmbushed: getNodeAmbushRate(node),
+                }
+            );
+        },
         narrativeFlowCallbacks: narrativeFlowCallbacksRef.current,
     });
 
@@ -752,15 +877,9 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
     const {
         transferItem,
         handleRest,
-        handleResourceTrade,
-        getStorageCapacity,
         getCustomRestConfig,
-        handleUseMedicine,
         handleFacilityUpgrade,
         handleSanctuaryEvent,
-        morale,
-        isLowMorale,
-        maxStorage,
         facilities,
         dailyProduction,
         residents,
@@ -771,21 +890,27 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         gameState,
     });
 
-    // 事件抉择若触发敌袭（stateChange.spawnEnemy === true），立即实体化敌人并进入战斗。
+    // 事件抉择若触发敌袭（impact.spawnEnemy 为敌人数量），立即实体化对应数量的敌人并进入战斗。
     const handleSanctuaryEventWithSpawn = useCallback(
-        (stateChange: SanctuaryEventChange): boolean => {
-            const shouldSpawn = handleSanctuaryEvent(stateChange);
-            if (shouldSpawn) {
+        (impact: ChoiceImpact): number => {
+            const enemyCount = handleSanctuaryEvent(impact);
+            if (enemyCount > 0) {
                 addLog('警报：庇护所边界被突破，不明实体正在侵入！', 'critical');
                 safeAudioOperation(
                     () => AudioService.playSfx('terrifying'),
                     '音效播放失败'
                 );
-                spawnEnemy(undefined, playerRef.current?.sanctuary?.id ?? undefined);
+                const node = currentZone?.nodes?.[currentNodeId];
+                spawnEnemy(undefined, playerRef.current?.sanctuary?.id ?? undefined, undefined, {
+                    nodeId: currentNodeId,
+                    mapOverride: node?.map,
+                    isAmbushed: getNodeAmbushRate(node),
+                    enemyCount,
+                });
             }
-            return shouldSpawn;
+            return enemyCount;
         },
-        [handleSanctuaryEvent, spawnEnemy, addLog]
+        [handleSanctuaryEvent, spawnEnemy, addLog, currentZone, currentNodeId]
     );
 
     // --- 资产加载 ---
@@ -971,6 +1096,7 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         handleUseItem,
         handleEquipItem,
         handleDiscardItem,
+        inventoryGrid,
         loadingAudioId,
     } = useInteraction({
         currentZone,
@@ -1036,6 +1162,38 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         );
     }, [equipmentOverflow, settings.gameConfig, setPlayer, addLog]);
 
+    // --- 背包网格容量同步 ---
+    // 力量会被饰品加成改写，而 storageSize 是契约中"与力量正相关"的字段，
+    // 不随力量重算的话，格子背包容量会永久停在初始值。
+    useEffect(() => {
+        setPlayer((prev) => {
+            const nextSize = getBackpackGridSize({ strength: prev.dynamic.strength });
+            const current = prev.dynamic.storageSize;
+
+            if (current && current[0] === nextSize[0] && current[1] === nextSize[1]) {
+                return prev;
+            }
+
+            return { ...prev, dynamic: { ...prev.dynamic, storageSize: nextSize } };
+        });
+    }, [player.dynamic.strength, setPlayer]);
+
+    // --- 仓库取出校验 ---
+    // 仓库本身无容量上限，但物品取回背包时必须装得进储物网格；
+    // 交付类操作在此统一拦截，避免物资被塞进溢出区。
+    const transferItemToBackpack = useCallback(
+        (item: ItemInstance, toStorage: boolean) => {
+            if (!toStorage && !inventoryGrid.canFit(item)) {
+                addLog(`储物网格空间不足：${item.name} 无法放入背包。`, 'warning');
+                AudioService.playSfx('error');
+                return;
+            }
+
+            transferItem(item, toStorage);
+        },
+        [addLog, inventoryGrid, transferItem]
+    );
+
     // --- 动态叙事 ---
     const triggerDyNarrative = useCallback(async () => {
         clearDyNarrative();
@@ -1090,16 +1248,20 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
     // --- 社交系统 ---
     const {
         handleNPCChat,
-        handleLocalNPCAction,
+        handleCompanionHeartToHeart,
+        handleRequestQuest,
         handleNPCTakeItem,
         handleNPCRecruit,
         handleNPCGift,
-        handleNPCIntimacy,
+        handleCompanionEquipItem,
+        handleCompanionUnequipItem,
+        handleCompanionUseConsumable,
         closeNPCInteraction,
         handleAcceptQuest,
         handleMountProfile,
         handleUnmountCreateNewProfile,
         handleDeleteProfile,
+        evaluateCompanionDepartures,
     } = useSocialization({
         player,
         setPlayer,
@@ -1112,6 +1274,14 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         activeInteractionNPC,
         setActiveInteractionNPC,
     });
+
+    /**
+     * 好感离队裁定（契约）：跟随 absoluteTick 结算，
+     * 每个 tick 对好感为负的同伴至多掷一次骰（内部按 tick 去重）。
+     */
+    useEffect(() => {
+        evaluateCompanionDepartures();
+    }, [player.currentGameRound.absoluteTick, evaluateCompanionDepartures]);
 
     // --- 持久化 ---
     const { handleSaveGame, handleLoadGame, handleListSaves, handleDeleteSave } = usePersistence({
@@ -1478,17 +1648,21 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         getTacticsFor,
         canUseTactic,
         getVisibleResultSequence,
+        getPredictionDepthFor,
+        getAttackForecast,
         pendingDefense,
         positions,
-        battleLineMin,
-        battleLineMax,
+        battleMap,
+        covers,
         getUnitRange,
         getDistance,
+        getMoveCost,
         moveAlly,
         counterPrompt,
         resolveCounterPrompt,
         counterSkip,
         setCounterSkip,
+        weaponStates,
         insertAction,
         endInsertAction,
 
@@ -1498,6 +1672,7 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         handleUseItem,
         handleEquipItem,
         handleDiscardItem,
+        inventoryGrid,
         generateNewAsset: generateNewAssetWrapper,
         proceedToNextZone,
         handleNarrative: handleNarrativeWrapper,
@@ -1511,6 +1686,22 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
 
         // === 叙事推演预览 ===
         narrativePreview,
+
+        // === 自建叙事库 ===
+        narrativeDomains,
+        narrativeAtoms,
+        narrativeAesthetics,
+        customNarrativeDomains,
+        customNarrativeAtoms,
+        customNarrativeAesthetics,
+        isNarrativeLibraryLoading,
+        isNarrativeLibrarySaving,
+        upsertNarrativeDomain,
+        upsertNarrativeAtom,
+        upsertNarrativeAesthetic,
+        removeNarrativeDomain,
+        removeNarrativeAtom,
+        removeNarrativeAesthetic,
 
         // === 叙事流程状态 ===
         narrativeFlowStep,
@@ -1526,7 +1717,7 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         handleNarrativeFlowLoadFromLibrary,
         handleNarrativeFlowModeConfirm,
         handleNarrativeFlowPacingConfirm,
-        handleNarrativeFlowThemeConfirm,
+        handleNarrativeFlowAestheticConfirm,
         handleNarrativeFlowConfigConfirm,
         handleNarrativeFlowDetailsConfirm,
         handleNarrativeFlowPreviewConfirm,
@@ -1546,28 +1737,25 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         handleNPCRecruit,
         handleNPCGift,
         closeNPCInteraction,
-        handleLocalNPCAction,
+        handleCompanionHeartToHeart,
+        handleRequestQuest,
+        handleCompanionEquipItem,
+        handleCompanionUnequipItem,
+        handleCompanionUseConsumable,
         handleNPCTakeItem,
-        handleNPCIntimacy,
         handleAcceptQuest,
         handleMountProfile,
         handleUnmountCreateNewProfile,
         handleDeleteProfile,
 
         // === 庇护所管理 ===
-        transferItem,
+        transferItem: transferItemToBackpack,
         handleRest,
-        handleResourceTrade,
         upgradeSanctuary,
-        getStorageCapacity,
         handleRepair,
         getCustomRestConfig,
-        handleUseMedicine,
         handleFacilityUpgrade,
         handleSanctuaryEvent: handleSanctuaryEventWithSpawn,
-        morale,
-        isLowMorale,
-        maxStorage,
         facilities,
         dailyProduction,
         residents,

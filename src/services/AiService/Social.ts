@@ -10,18 +10,16 @@
  * - 所有枚举、字段、任务结构都必须符合 type.ts / interface.copy.ts。
  */
 
-import { RelationshipPhase } from '../../meta';
 import type {
     Settings,
     QuestTemplate,
-    NpcTemplate,
+    InteractionDialogueContext,
+    InteractionNpcEntity,
     Dialogue,
-    NpcDialogueGenerationContext,
     PlayerTemplate,
     PlayerDynamicState,
     Mood,
     Entity,
-    NpcDynamicState,
     Words,
     PlayerWordsTag,
     NpcWordsTag,
@@ -30,10 +28,14 @@ import type {
     AccessoryEffectType,
     ConsumableEffectType,
     CombatStyle,
-    MemorySummaries
+    MemorySummaries,
+    WeaponType,
+    WeaponDamageType
 } from '../../meta';
+import { getRelationScore, normalizeEquipState } from '../../meta';
+import type { CompanionTemplate, NodeNpcTemplate } from '../../meta';
 import { SocializationService } from '../SocializationService';
-import { getSeverity, HP_STATE_CONFIG, SANITY_STATE_CONFIG } from '../../constants';
+import { getSeverity, HP_STATE, SANITY_STATE } from '../../constants';
 import { callAi } from './providers';
 import {
     BaseProvider,
@@ -61,8 +63,9 @@ const ATTRIBUTE_TYPES = [
     'strength',
     'agility',
     'wisdom',
-    'perception',
-    'spiritual'
+    'awareness',
+    'will',
+    'cthulhu'
 ] as const;
 
 const VITAL_TYPES = [
@@ -77,19 +80,36 @@ const ACCESSORY_EFFECT_TYPES: readonly string[] = [
     ...VITAL_TYPES
 ];
 
+/** 消耗品可用效果键，严格对齐契约 ConsumableEffectType。 */
 const CONSUMABLE_EFFECT_TYPES: readonly string[] = [
     ...ACCESSORY_EFFECT_TYPES,
-    'heal_hp',
-    'heal_sanity',
-    'heal_stamina',
-    'heal_vigor',
-    'restore_battery',
-    'repair_integrity'
+    'hp',
+    'sanity',
+    'stamina',
+    'vigor',
+    'battery',
+    'integrity'
 ];
 
-const ITEM_RARITIES = ['standard', 'organized', 'deep', 'abyssal'] as const;
+/** 物品品质，严格对齐契约 ItemGrade 的 8 阶物理工造体系。 */
+const ITEM_GRADES = [
+    'salvaged',
+    'standard',
+    'reinforced',
+    'military',
+    'corporate',
+    'foundation',
+    'prototype',
+    'ark_prime'
+] as const;
+
 const WEAPON_TYPES = [
-    'magic',
+    'wave',
+    'both_wave',
+    'prick',
+    'both_prick',
+    'shield',
+    'both_shield',
     'sniper_rifle',
     'assault_rifle',
     'smg',
@@ -99,12 +119,9 @@ const WEAPON_TYPES = [
     'crossbow',
     'throw',
     'bow',
-    'wave',
-    'both_wave',
-    'prick',
-    'both_prick'
+    'magic'
 ] as const;
-const WEAPON_DAMAGE_TYPES = ['cold', 'hot', 'instant'] as const;
+const WEAPON_DAMAGE_TYPES = ['melee', 'range', 'instant'] as const;
 
 /** 武器类型缺省攻击距离（12 档体系，0 = 无限），仅用于 LLM 输出缺失 range 时的兜底。 */
 const WEAPON_DEFAULT_RANGE: Record<string, number> = {
@@ -121,9 +138,51 @@ const WEAPON_DEFAULT_RANGE: Record<string, number> = {
     wave: 1,
     both_wave: 1,
     prick: 1,
-    both_prick: 2
+    both_prick: 2,
+    shield: 1,
+    both_shield: 1
+};
+
+/** 武器类型缺省占地 [列, 行]，仅用于 LLM 输出缺失 size 时的兜底。 */
+const WEAPON_DEFAULT_SIZE: Record<string, [number, number]> = {
+    magic: [1, 1],
+    sniper_rifle: [4, 2],
+    assault_rifle: [3, 2],
+    smg: [2, 2],
+    pistol: [2, 1],
+    shotgun: [3, 2],
+    sawed_off: [2, 2],
+    crossbow: [3, 2],
+    throw: [1, 1],
+    bow: [3, 2],
+    wave: [2, 1],
+    both_wave: [3, 2],
+    prick: [2, 1],
+    both_prick: [4, 1],
+    shield: [2, 2],
+    both_shield: [3, 2]
+};
+
+/** 物品大类缺省占地 [列, 行]，仅用于 LLM 输出缺失 size 时的兜底。 */
+const ITEM_DEFAULT_SIZE: Record<ItemTemplate['type'], [number, number]> = {
+    weapon: [2, 1],
+    armor: [2, 2],
+    accessory: [1, 1],
+    storage: [2, 2],
+    consumable: [1, 1],
+    data: [1, 1],
+    material: [1, 1]
 };
 const COMBAT_STYLES = ['burst', 'attack', 'balance', 'defense', 'skirmish'] as const;
+
+/**
+ * 关系阶段的冷暖分组。
+ *
+ * 阶段名来自 SocializationService 的信任 / 好感阶段表（两条轴互不重名），
+ * 这里只做语气倾向分组，供反应生成等轻量 Prompt 引用。
+ */
+const WARM_RELATION_PHASES = new Set<string>(['长盟', '同气']);
+const COLD_RELATION_PHASES = new Set<string>(['猜忌', '防备', '离心', '芥蒂']);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' &&
@@ -187,7 +246,7 @@ const normalizeObjectKeys = <T>(value: T): T => {
 // 状态格式化
 // =====================
 
-const formatNpcState = (npc: Entity<NpcTemplate, NpcDynamicState>): string => {
+const formatNpcState = (npc: InteractionNpcEntity): string => {
     const hp = asNumber(npc.dynamic.hp, 0);
     const sanity = asNumber(npc.dynamic.sanity, 0);
     const stamina = asNumber(npc.dynamic.stamina, 0);
@@ -203,8 +262,8 @@ const formatNpcState = (npc: Entity<NpcTemplate, NpcDynamicState>): string => {
     const staminaPct = maxStamina > 0 ? (stamina / maxStamina) * 100 : 0;
     const vigorPct = maxVigor > 0 ? (vigor / maxVigor) * 100 : 0;
 
-    const hpDesc = HP_STATE_CONFIG[getSeverity(hpPct, HP_STATE_CONFIG)].description(hp, maxHp);
-    const sanityDesc = SANITY_STATE_CONFIG[getSeverity(sanityPct, SANITY_STATE_CONFIG)].description(
+    const hpDesc = HP_STATE[getSeverity(hpPct, HP_STATE)].description(hp, maxHp);
+    const sanityDesc = SANITY_STATE[getSeverity(sanityPct, SANITY_STATE)].description(
         sanity,
         maxSanity
     );
@@ -219,11 +278,11 @@ const formatNpcState = (npc: Entity<NpcTemplate, NpcDynamicState>): string => {
         currentAction = '疲惫——动作迟缓，语句短促。';
     }
 
-    const equippedWeapon =
-        npc.dynamic.equipment.weapons?.[0] ?? npc.dynamic.equipment.weapons?.[1];
+    const npcEquip = normalizeEquipState(npc.dynamic.equipment);
+    const equippedWeapon = npcEquip.weapons.main ?? npcEquip.weapons.side;
     const weaponDesc = equippedWeapon ? `持握着【${equippedWeapon.name}】` : '手无寸铁';
 
-    const armorCount = (npc.dynamic.equipment.armors ?? []).filter(Boolean).length;
+    const armorCount = npcEquip.armors.filter(Boolean).length;
     const armorDesc = armorCount > 0 ? `身上有 ${armorCount} 件护甲` : '没有明显护甲';
 
     const inventoryDesc = npc.dynamic.inventory?.length
@@ -267,17 +326,15 @@ const ContextParser = {
             }
 
             if (zone.isSanctuary) {
-                const s = zone.isSanctuary;
-                desc += `【庇护所状态】人口: ${s.population}, 士气: ${s.morale}, 侵蚀度: ${s.erosion}%。\n`;
-                desc += `资源: 食物(${s.food}) 饮水(${s.water}) 药物(${s.medicine}) 电力(${s.electricity}) 零件(${s.scraps})。\n`;
+                desc += `【庇护所资源】已耗竭资源 ${zone.isSanctuary.lackingResource ?? 0} 项。\n`;
             }
         }
 
         if (node) {
             desc += `当前位置: ${node.name}。环境: ${node.desc}。\n`;
 
-            if (typeof node.isDangerous === 'number') {
-                desc += `威胁等级: ${node.isDangerous}。\n`;
+            if (node.isDangerous) {
+                desc += '威胁等级: 危险。\n';
             } else {
                 desc += '威胁等级: 相对安全。\n';
             }
@@ -312,12 +369,13 @@ const ContextParser = {
         if (staminaRatio < 0.25) obs.push('呼吸沉重，体力透支');
         if (vigorRatio < 0.25) obs.push('神情疲惫，注意力涣散');
 
-        const weapon = player.dynamic.equipment.weapons?.[0];
+        const playerEquip = normalizeEquipState(player.dynamic.equipment);
+        const weapon = playerEquip.weapons.main ?? playerEquip.weapons.side;
         if (weapon && weapon.name !== '无') {
             obs.push(`手持武器[${weapon.name}]`);
         }
 
-        const armorCount = (player.dynamic.equipment.armors ?? []).filter(Boolean).length;
+        const armorCount = playerEquip.armors.filter(Boolean).length;
         if (armorCount > 0) {
             obs.push(`穿着 ${armorCount} 件护甲`);
         }
@@ -447,8 +505,30 @@ const normalizeMood = (value: unknown): Mood => {
     }
 };
 
-const normalizeAccessoryEffects = (raw: unknown): Array<[AccessoryEffectType, number]> => {
-    if (!Array.isArray(raw)) return [];
+/**
+ * 归一化物品占地。
+ *
+ * 契约 `BaseItemTemplate.size` 为必填的 [列, 行] 正整数对；
+ * LLM 漏写或写出非法值时按武器形态 / 物品大类的缺省占地补齐。
+ */
+const normalizeItemSize = (
+    raw: unknown,
+    type: ItemTemplate['type'] | undefined,
+    weaponType?: WeaponType
+): [number, number] => {
+    if (Array.isArray(raw) && raw.length >= 2) {
+        const cols = Math.floor(Number(raw[0]));
+        const rows = Math.floor(Number(raw[1]));
+        if (Number.isInteger(cols) && Number.isInteger(rows) && cols >= 1 && rows >= 1) {
+            return [cols, rows];
+        }
+    }
+
+    if (weaponType && WEAPON_DEFAULT_SIZE[weaponType]) return WEAPON_DEFAULT_SIZE[weaponType];
+    return type ? ITEM_DEFAULT_SIZE[type] : [1, 1];
+};
+
+const normalizeAccessoryEffects = (raw: unknown): Array<[AccessoryEffectType, number]> => {    if (!Array.isArray(raw)) return [];
 
     return raw.reduce<Array<[AccessoryEffectType, number]>>((acc, entry) => {
         let type: string | undefined;
@@ -522,38 +602,67 @@ const normalizeItemTemplate = (raw: unknown): ItemTemplate | null => {
     if (!name) return null;
 
     const desc = asString(raw.desc, name).trim();
-    const rarity = ITEM_RARITIES.includes(raw.rarity as any)
-        ? (raw.rarity as ItemTemplate['rarity'])
+    const type = asString(raw.type).trim() as ItemTemplate['type'];
+    const grade = (ITEM_GRADES as readonly unknown[]).includes(raw.grade)
+        ? (raw.grade as ItemTemplate['grade'])
         : 'standard';
+    const size = normalizeItemSize(
+        raw.size,
+        type,
+        asString(raw.weaponType).trim() as WeaponType
+    );
 
-    const type = asString(raw.type).trim();
+    // 深渊异态三态为可选正交属性，仅在 LLM 给出有效数值时写入，避免污染普通工造物品。
+    const anomalyStates = {
+        ...(Number.isFinite(Number(raw.fleshFusionState))
+            ? { fleshFusionState: Math.max(0, Math.floor(Number(raw.fleshFusionState))) }
+            : {}),
+        ...(Number.isFinite(Number(raw.cognitiveErosionState))
+            ? { cognitiveErosionState: Math.max(0, Math.floor(Number(raw.cognitiveErosionState))) }
+            : {}),
+        ...(Number.isFinite(Number(raw.causalInversionState))
+            ? { causalInversionState: Math.max(0, Math.floor(Number(raw.causalInversionState))) }
+            : {})
+    };
 
     switch (type) {
         case 'weapon': {
-            const weaponType = WEAPON_TYPES.includes(raw.weaponType as any)
-                ? (raw.weaponType as any)
+            const weaponType = (WEAPON_TYPES as readonly unknown[]).includes(raw.weaponType)
+                ? (raw.weaponType as WeaponType)
                 : 'wave';
 
-            const weaponDamageType = WEAPON_DAMAGE_TYPES.includes(raw.weaponDamageType as any)
-                ? (raw.weaponDamageType as any)
-                : 'instant';
+            const weaponDamageType = (WEAPON_DAMAGE_TYPES as readonly unknown[]).includes(
+                raw.weaponDamageType
+            )
+                ? (raw.weaponDamageType as WeaponDamageType)
+                : 'melee';
+
+            const damage = Math.max(0, Math.floor(asNumber(raw.damage, 5)));
+            const critRaw = isRecord(raw.crit) ? raw.crit : {};
 
             return {
                 id,
                 name,
                 desc,
-                rarity,
+                grade,
+                size,
+                ...anomalyStates,
                 type: 'weapon',
                 weaponType,
                 weaponDamageType,
                 range: clampNumber(
-                    Math.floor(asNumber(raw.range, WEAPON_DEFAULT_RANGE[weaponType as string] ?? 1)),
+                    Math.floor(asNumber(raw.range, WEAPON_DEFAULT_RANGE[weaponType] ?? 1)),
                     0,
                     12
                 ),
-                maxUses: Math.max(1, Math.floor(asNumber(raw.maxUses, 10))),
-                damage: Math.max(0, Math.floor(asNumber(raw.damage, 5)))
-            } as unknown as ItemTemplate;
+                damage,
+                // 契约 WeaponTemplate.crit 为必填结构，缺失时按「无暴击加成」补齐。
+                crit: {
+                    chance: clampNumber(asNumber(critRaw.chance, 0.1), 0, 1),
+                    bonus: Math.max(0, Math.floor(asNumber(critRaw.bonus, Math.floor(damage / 2))))
+                },
+                maxUses: Math.max(1, Math.floor(asNumber(raw.maxUses, 10)))
+            };
         }
 
         case 'armor': {
@@ -561,11 +670,14 @@ const normalizeItemTemplate = (raw: unknown): ItemTemplate | null => {
                 id,
                 name,
                 desc,
-                rarity,
+                grade,
+                size,
+                ...anomalyStates,
                 type: 'armor',
-                partialReduction: clampNumber(asNumber(raw.partialReduction, 0.1), 0, 0.999),
+                // 契约 ArmorTemplate 的字段名为 defense（-1~1 的减伤比）。
+                defense: clampNumber(asNumber(raw.defense, 0.1), -1, 1),
                 maxUses: Math.max(1, Math.floor(asNumber(raw.maxUses, 10)))
-            } as unknown as ItemTemplate;
+            };
         }
 
         case 'accessory': {
@@ -573,10 +685,12 @@ const normalizeItemTemplate = (raw: unknown): ItemTemplate | null => {
                 id,
                 name,
                 desc,
-                rarity,
+                grade,
+                size,
+                ...anomalyStates,
                 type: 'accessory',
                 effects: normalizeAccessoryEffects(raw.effects)
-            } as unknown as ItemTemplate;
+            };
         }
 
         case 'consumable': {
@@ -584,10 +698,24 @@ const normalizeItemTemplate = (raw: unknown): ItemTemplate | null => {
                 id,
                 name,
                 desc,
-                rarity,
+                grade,
+                size,
+                ...anomalyStates,
                 type: 'consumable',
                 effects: normalizeConsumableEffects(raw.effects)
-            } as unknown as ItemTemplate;
+            };
+        }
+
+        case 'storage': {
+            return {
+                id,
+                name,
+                desc,
+                grade,
+                size,
+                ...anomalyStates,
+                type: 'storage'
+            };
         }
 
         case 'data': {
@@ -598,11 +726,13 @@ const normalizeItemTemplate = (raw: unknown): ItemTemplate | null => {
                 id,
                 name,
                 desc,
-                rarity,
+                grade,
+                size,
+                ...anomalyStates,
                 type: 'data',
                 documentContent: documentContent || undefined,
                 audioScript: audioScript || undefined
-            } as unknown as ItemTemplate;
+            };
         }
 
         case 'material': {
@@ -610,9 +740,11 @@ const normalizeItemTemplate = (raw: unknown): ItemTemplate | null => {
                 id,
                 name,
                 desc,
-                rarity,
+                grade,
+                size,
+                ...anomalyStates,
                 type: 'material'
-            } as unknown as ItemTemplate;
+            };
         }
 
         default:
@@ -620,7 +752,18 @@ const normalizeItemTemplate = (raw: unknown): ItemTemplate | null => {
     }
 };
 
-const normalizeNpcTemplate = (raw: unknown): NpcTemplate | null => {
+/**
+ * 归一化 LLM 输出的 NPC 模板。
+ *
+ * 奖励里的人员是同伴（`affinity` / `needs`），节点 NPC 只以 id 形式出现在任务目标里，
+ * 两者共用同一套属性与体征，只有关系字段不同，故按用途补齐对应字段。
+ */
+function normalizeNpcTemplate(raw: unknown, kind: 'nodeNpc'): NodeNpcTemplate | null;
+function normalizeNpcTemplate(raw: unknown, kind: 'companion'): CompanionTemplate | null;
+function normalizeNpcTemplate(
+    raw: unknown,
+    kind: 'nodeNpc' | 'companion'
+): NodeNpcTemplate | CompanionTemplate | null {
     if (!isRecord(raw)) return null;
 
     const maybeNpc =
@@ -665,8 +808,9 @@ const normalizeNpcTemplate = (raw: unknown): NpcTemplate | null => {
                 strength: clampNumber(Math.floor(asNumber(attributeRaw.strength, 10)), 0, 100),
                 agility: clampNumber(Math.floor(asNumber(attributeRaw.agility, 10)), 0, 100),
                 wisdom: clampNumber(Math.floor(asNumber(attributeRaw.wisdom, 10)), 0, 100),
-                perception: clampNumber(Math.floor(asNumber(attributeRaw.perception, 10)), 0, 100),
-                spiritual: clampNumber(Math.floor(asNumber(attributeRaw.spiritual, 10)), 0, 100)
+                awareness: clampNumber(Math.floor(asNumber(attributeRaw.awareness, 10)), 0, 100),
+                will: clampNumber(Math.floor(asNumber(attributeRaw.will, 10)), 0, 100),
+                cthulhu: clampNumber(Math.floor(asNumber(attributeRaw.cthulhu, 0)), 0, 100)
             },
             vital: {
                 maxHp: clampNumber(Math.floor(asNumber(vitalRaw.maxHp, 100)), 1, 5000),
@@ -675,14 +819,39 @@ const normalizeNpcTemplate = (raw: unknown): NpcTemplate | null => {
                 maxVigor: clampNumber(Math.floor(asNumber(vitalRaw.maxVigor, 100)), 1, 5000)
             },
             inventory: [],
-            trust: Math.floor(asNumber(initialState.trust, 0)),
-            quest: []
+            ...(kind === 'nodeNpc'
+                ? { trust: Math.floor(asNumber(initialState.trust, 0)), quests: [] }
+                : { affinity: Math.floor(asNumber(initialState.affinity, 0)), needs: [] })
         }
-    } as unknown as NpcTemplate;
+    } as unknown as NodeNpcTemplate | CompanionTemplate;
+}
+
+/**
+ * 归一化任务目标项。
+ *
+ * 契约规定 goals 里的人员只能是「已存在的节点 NPC id」，
+ * 因此字符串项直接作为 id 保留，其余按物品模板解析。
+ */
+const normalizeQuestGoal = (raw: unknown): ItemTemplate | string | null => {
+    if (typeof raw === 'string') {
+        const id = raw.trim();
+        return id.length > 0 ? id : null;
+    }
+
+    const asNpcId = isRecord(raw) && typeof raw.id === 'string' ? raw.id.trim() : '';
+    const item = normalizeItemTemplate(raw);
+    if (item) return item;
+
+    return asNpcId.length > 0 ? asNpcId : null;
 };
 
-const normalizeQuestEntity = (raw: unknown): ItemTemplate | NpcTemplate | null =>
-    normalizeItemTemplate(raw) ?? normalizeNpcTemplate(raw);
+/**
+ * 归一化任务奖励项。
+ *
+ * 契约规定 rewards 可以为物品模板，也可以是完整同伴模板（永久入队）。
+ */
+const normalizeQuestReward = (raw: unknown): ItemTemplate | CompanionTemplate | null =>
+    normalizeItemTemplate(raw) ?? normalizeNpcTemplate(raw, 'companion');
 
 const normalizeQuestOutput = (raw: unknown): Partial<QuestTemplate> | undefined => {
     if (!isRecord(raw)) return undefined;
@@ -694,14 +863,14 @@ const normalizeQuestOutput = (raw: unknown): Partial<QuestTemplate> | undefined 
 
     const goals = Array.isArray(raw.goals)
         ? raw.goals
-            .map(normalizeQuestEntity)
-            .filter((x): x is ItemTemplate | NpcTemplate => Boolean(x))
+            .map((entry) => normalizeQuestGoal(entry))
+            .filter((x): x is ItemTemplate | string => Boolean(x))
         : [];
 
     const rewards = Array.isArray(raw.rewards)
         ? raw.rewards
-            .map(normalizeQuestEntity)
-            .filter((x): x is ItemTemplate | NpcTemplate => Boolean(x))
+            .map((entry) => normalizeQuestReward(entry))
+            .filter((x): x is ItemTemplate | CompanionTemplate => Boolean(x))
         : [];
 
     return {
@@ -720,7 +889,7 @@ const normalizeQuestOutput = (raw: unknown): Partial<QuestTemplate> | undefined 
 const PromptBuilder = {
     buildRoleplaySystem(
         settings: Settings,
-        npc: Entity<NpcTemplate, NpcDynamicState>,
+        npc: InteractionNpcEntity,
         environmentContext: string,
         dialogueHistory?: Dialogue,
         retrievedDialoguePairs?: Dialogue['dialogue']
@@ -735,19 +904,20 @@ const PromptBuilder = {
         const coreDrive = ContextParser.inferCoreDrive(npc.static.style);
         const stateDesc = formatNpcState(npc);
 
-        const trustValue = Math.floor(asNumber(npc.dynamic.trust, 0));
-        const relationshipPhase = SocializationService.getRelationshipPhase(trustValue);
+        const relation = SocializationService.resolveRelation(npc.dynamic);
+        const relationAxisDesc =
+            relation.axis === 'trust' ? '节点 NPC / 社会性与契约性' : '同伴 / 情绪性与偏好性';
 
         const historyArray = dialogueHistory ? [dialogueHistory] : [];
         const memoryContext = SocializationService.buildMemoryContext(
-            trustValue,
+            npc.dynamic,
             historyArray,
             npc.dynamic.memory
         );
 
         const specialInstructions = SocializationService.generateSpecialStateInstructions({
             settings,
-            trust: trustValue,
+            dynamic: npc.dynamic,
             sanity: npc.dynamic.sanity,
             hp: npc.dynamic.hp,
             maxHp: npc.dynamic.maxHp
@@ -782,8 +952,9 @@ const PromptBuilder = {
 核心驱动: ${coreDrive}
 背景故事: ${npc.static.desc || '未知'}
 战斗风格: ${npc.static.style || 'balance'}
-与玩家关系阶段: ${relationshipPhase}
-信任值: ${trustValue}
+与玩家关系轴: ${relation.label}（${relationAxisDesc}）
+与玩家关系阶段: ${relation.phase}
+${relation.label}读数: ${Math.floor(relation.score)} / ${relation.range.max}（阶段区间 ${relation.range.min}~${relation.range.max}）
 
 【生理与心理状态】
 ${stateDesc}
@@ -807,7 +978,7 @@ ${SOCIAL_DIALOGUE_SCHEMA}
     },
 
     buildRoleplayUser(
-        context: NpcDialogueGenerationContext,
+        context: InteractionDialogueContext,
         previousPairs: Dialogue['dialogue'],
         lastInput: string,
         memorySummaries: string[]
@@ -837,13 +1008,13 @@ ${playerObservation}
     },
 
     buildReactionSystem(
-        npc: Entity<NpcTemplate, NpcDynamicState>,
+        npc: InteractionNpcEntity,
         currentNodeName: string,
         eventDesc: string,
         nodeDesc?: string,
         threatLevel?: number | string
     ): string {
-        const phase = SocializationService.getRelationshipPhase(npc.dynamic.trust || 0);
+        const relation = SocializationService.resolveRelation(npc.dynamic);
         const stateDesc = formatNpcState(npc);
 
         const sanityInst =
@@ -851,12 +1022,11 @@ ${playerObservation}
                 ? '你的精神状态极差——反应可能不合逻辑、带有幻觉色彩、词语轻微错位。'
                 : '';
 
-        const trustInst =
-            phase === RelationshipPhase.BONDED || phase === RelationshipPhase.TRUSTING
-                ? '你关心玩家的安危，反应中体现这一点，但不要过度煽情。'
-                : phase === RelationshipPhase.HOSTILE || phase === RelationshipPhase.GUARDED
-                    ? '你对玩家保持警惕，反应中体现距离感、试探或压抑的敌意。'
-                    : '';
+        const relationInst = WARM_RELATION_PHASES.has(relation.phase)
+            ? `你${relation.label}玩家，反应中体现这一点，但不要过度煽情。`
+            : COLD_RELATION_PHASES.has(relation.phase)
+                ? '你对玩家保持警惕，反应中体现距离感、试探或压抑的敌意。'
+                : '';
 
         return `
 你现在是《The Zone — 无尽领域》中的角色「${npc.static.name}」。
@@ -866,7 +1036,9 @@ ${npc.static.desc || ''}
 
 【当前状态】
 ${stateDesc}
-与玩家关系: ${phase}，信任值: ${Math.floor(asNumber(npc.dynamic.trust, 0))}。
+与玩家关系轴: ${relation.label}
+与玩家关系阶段: ${relation.phase}（${Math.floor(relation.score)}）
+行为基准线: ${relation.behavior}
 
 【环境】
 位置: ${currentNodeName}${nodeDesc ? ` — ${nodeDesc}` : ''}
@@ -880,17 +1052,18 @@ ${eventDesc}
 反应必须体现你的性格、当前状态和与玩家的关系。
 
 ${sanityInst}
-${trustInst}
+${relationInst}
 
 ${SOCIAL_REACTION_SCHEMA}
 `.trim();
     },
 
-    buildIntimacySystem(npc: Entity<NpcTemplate, NpcDynamicState>): string {
+    buildIntimacySystem(npc: InteractionNpcEntity): string {
         const totalRounds = npc.dynamic.totalDialogueRounds || 0;
+        const relation = SocializationService.resolveRelation(npc.dynamic);
 
         const intimacyScore = SocializationService.calculateIntimacyScore({
-            trust: npc.dynamic.trust || 0,
+            score: relation.score,
             memory: npc.dynamic.memory,
             dialogueTurns: totalRounds
         });
@@ -927,7 +1100,10 @@ Task: 描写一段玩家与角色之间深刻、克制、带有心理恐怖色�
 【角色上下文】
 性别: ${gender}
 性格: ${npc.static.desc || ''}
-信任: ${npc.dynamic.trust}/100
+关系轴: ${relation.label}（${relation.axis === 'trust' ? '契约性 / 社会性' : '情绪性 / 偏好性'}）
+关系阶段: ${relation.phase}
+${relation.label}读数: ${Math.floor(relation.score)} / ${relation.range.max}
+亲密深度评分: ${Math.round(intimacyScore)}
 ${memoryDesc}
 
 【情感基调】
@@ -1000,22 +1176,22 @@ const readCachedJSON = <T>(cacheKey: string): T | null => {
 const getFallbackDialogue = (
     error: unknown,
     userMsg: string
-): { text: string; trustChange: number; mood: Mood } => {
+): { text: string; relationChange: number; mood: Mood } => {
     if (error instanceof AIOutputTruncatedError) {
-        return { text: '...(信号丢失)...', trustChange: 0, mood: 'neutral' };
+        return { text: '...(信号丢失)...', relationChange: 0, mood: 'neutral' };
     }
 
     if (error instanceof AIServiceError) {
         if (error.errorType === ErrorType.SAFETY) {
-            return { text: '(认知过滤阻断)', trustChange: 0, mood: 'neutral' };
+            return { text: '(认知过滤阻断)', relationChange: 0, mood: 'neutral' };
         }
 
         if (error.errorType === ErrorType.RATE_LIMIT) {
-            return { text: '...(精神网络繁忙)...', trustChange: 0, mood: 'neutral' };
+            return { text: '...(精神网络繁忙)...', relationChange: 0, mood: 'neutral' };
         }
     }
 
-    return { text: `...(${userMsg})...`, trustChange: 0, mood: 'neutral' };
+    return { text: `...(${userMsg})...`, relationChange: 0, mood: 'neutral' };
 };
 
 // =====================
@@ -1024,16 +1200,28 @@ const getFallbackDialogue = (
 
 export interface NPCDialogueOutput {
     text: string;
-    trustChange: number;
+    /**
+     * 关系增量。
+     *
+     * 目标为节点 NPC 时写入信任轴，目标为同伴时写入好感轴，
+     * 具体落位由 SocializationService.applyRelationDelta 按动态字段判定。
+     */
+    relationChange: number;
     mood: Mood;
     thought?: string;
     modelThought?: string;
     quest?: Partial<QuestTemplate>;
+    /**
+     * 本轮真正注入 Prompt 的记忆摘要 id。
+     *
+     * 供引擎回写 accessCount / accessRatio / lastAccessedAt（记忆长期维护契约）。
+     */
+    memoryAccessIds?: string[];
 }
 
 export const generateNPCDialogue = async (
     settings: Settings,
-    context: NpcDialogueGenerationContext
+    context: InteractionDialogueContext
 ): Promise<NPCDialogueOutput> => {
     const { npc, player, dialogue, location } = context;
 
@@ -1048,7 +1236,11 @@ export const generateNPCDialogue = async (
 
     const environmentContext = ContextParser.parseLocation(location);
     const lastPlayerInput = ContextParser.extractLastPlayerInput(dialogue);
-    const memorySummaries = npc.dynamic.memory.δ.slice(-5).map((m) => m.summary);
+
+    // 本轮注入 Prompt 的 δ 摘要：同时回报 id，供引擎回写检索计数。
+    const injectedMemories = npc.dynamic.memory.δ.slice(-5);
+    const memorySummaries = injectedMemories.map((m) => m.summary);
+    const memoryAccessIds = injectedMemories.map((m) => m.id);
 
     const previousPairs = dialogue.dialogue.filter(
         ([p, n]) =>
@@ -1103,6 +1295,8 @@ export const generateNPCDialogue = async (
             const parsed = BaseProvider.safeJSONParseWithInfo<{
                 response?: unknown;
                 needMemorySearch?: unknown;
+                relationChange?: unknown;
+                /** 旧字段：契约迁移前的信任增量，仅作兼容读取。 */
                 trustChange?: unknown;
                 mood?: unknown;
                 thought?: unknown;
@@ -1120,11 +1314,16 @@ export const generateNPCDialogue = async (
             if (responseText && responseText !== '...') {
                 const result: NPCDialogueOutput = {
                     text: responseText,
-                    trustChange: clampNumber(Math.floor(asNumber(data.trustChange, 0)), -100, 100),
+                    relationChange: clampNumber(
+                        Math.floor(asNumber(data.relationChange ?? data.trustChange, 0)),
+                        -100,
+                        100
+                    ),
                     mood: normalizeMood(data.mood),
                     thought: asString(data.thought) || undefined,
                     modelThought: aiResponse.thought,
-                    quest: normalizeQuestOutput(data.quest)
+                    quest: normalizeQuestOutput(data.quest),
+                    memoryAccessIds
                 };
 
                 npcCache.set(cacheKey, JSON.stringify(result));
@@ -1195,7 +1394,7 @@ export const generateNPCDialogue = async (
 
 export const generateNPCReaction = async (
     settings: Settings,
-    npc: Entity<NpcTemplate, NpcDynamicState>,
+    npc: InteractionNpcEntity,
     location: Location['currentLocation'],
     eventDesc: string
 ): Promise<{ content: string; isAction: boolean }> => {
@@ -1212,7 +1411,9 @@ export const generateNPCReaction = async (
 
     const currentNodeName = location.node ? location.node.name : '未知区域';
     const currentNodeDesc = location.node ? location.node.desc : undefined;
-    const currentThreatLevel = location.node ? location.node.isDangerous : '安全';
+    const currentThreatLevel = location.node
+        ? (location.node.isDangerous ? '危险' : '安全')
+        : '未知';
 
     const systemPrompt = PromptBuilder.buildReactionSystem(
         npc,
@@ -1275,7 +1476,7 @@ export const generateNPCReaction = async (
 
 export const generateNPCIntimacy = async (
     settings: Settings,
-    npc: Entity<NpcTemplate, NpcDynamicState>
+    npc: InteractionNpcEntity
 ): Promise<{ desc: string; vocal: string }> => {
     BaseProvider.validateRequiredParams(
         { settings, npc },
@@ -1292,7 +1493,7 @@ export const generateNPCIntimacy = async (
     const cacheKey = generateCacheKey(
         npc.static.id,
         'intimacy',
-        String(npc.dynamic.trust),
+        String(getRelationScore(npc.dynamic)),
         modelToUse
     );
 
@@ -1340,7 +1541,7 @@ export const generateNPCIntimacy = async (
 
 export const extractNpcMemorySummaries = async (
     settings: Settings,
-    npc: Entity<NpcTemplate, NpcDynamicState>,
+    npc: InteractionNpcEntity,
     dialogueHistory: Array<[Words<PlayerWordsTag>, Words<NpcWordsTag>]>
 ): Promise<{ summary: string; keyEntities: string[]; importanceScore: number } | null> => {
     BaseProvider.validateRequiredParams(
@@ -1398,7 +1599,7 @@ export const extractNpcMemorySummaries = async (
 
 export const consolidateNpcMemories = async (
     settings: Settings,
-    npc: Entity<NpcTemplate, NpcDynamicState>,
+    npc: InteractionNpcEntity,
     memories: MemorySummaries[]
 ): Promise<{ summary: string; keyEntities: string[]; importanceScore: number } | null> => {
     BaseProvider.validateRequiredParams(

@@ -6,8 +6,8 @@
  * - 组装区域生成上下文
  * - 直接引用 schema.ts 中已定义好的领域 Schema
  * - 让 LLM 返回区域模板：
- *   - 链式叙事：ChainZoneTemplate
- *   - 单元剧：EpisodicZoneTemplate
+ *   - 链式叙事：ZoneTemplate
+ *   - 单元剧：ZoneTemplate
  * - 不输出运行时字段
  * - 不在本文件中二次加工 schema
  *
@@ -70,7 +70,6 @@ const OUTPUT_DIRECTIVES = `
 【输出】
 只输出一个合法 JSON 对象。
 输出必须是区域模板。
-不要输出运行时字段。
 `.trim();
 
 //=============================================================================
@@ -157,8 +156,8 @@ function buildEpisodicBaseContext(context: EpisodicGenerationContext): string {
         const companions = context.extra.companions
             .map((companion) => {
                 const name = companion.static.name;
-                const trust = toFiniteNumber(companion.dynamic.trust);
-                return `${name} (信任: ${trust})`;
+                const affinity = toFiniteNumber(companion.dynamic.affinity);
+                return `${name} (好感: ${affinity})`;
             })
             .join(', ');
 
@@ -199,8 +198,7 @@ function buildChainNarrativeContext(context: ChainGenerationContext): string {
     }
 
     if (output.ppToSolve > 0 && params.activePlotPoints) {
-        const [mainPlots = [], sidePlots = []] = params.activePlotPoints;
-        const unresolvedPlotPoints = [...mainPlots, ...sidePlots].filter(
+        const unresolvedPlotPoints = params.activePlotPoints.filter(
             (plotPoint) => !plotPoint.isSolved
         );
 
@@ -212,12 +210,12 @@ function buildChainNarrativeContext(context: ChainGenerationContext): string {
         if (expectedSolveCount > 0) {
             parts.push(`- 本区域可解决伏笔数量: ${expectedSolveCount}`);
             parts.push(
-                `- 解决方式：在相关 Node、MapItem、NodeNpcTemplate、specificEnemy、Interaction 或 Puzzle 模板根部添加 toSolvePP: "伏笔ID"。`
+                `- 解决方式：在相关 NodeTemplate、Item、NodeNpcTemplate、isDangerous、Interaction 或 Puzzle 模板根部添加 toSolvePP: "伏笔ID"。`
             );
             parts.push(`- 当前未解决伏笔:`);
 
             unresolvedPlotPoints.forEach((plotPoint) => {
-                const typeLabel = plotPoint.type === 'main' ? '主线' : '支线';
+                const typeLabel = plotPoint.type === 'M' ? '主线' : '支线';
                 parts.push(`  - [${typeLabel}] ${plotPoint.id}: ${plotPoint.content}`);
                 parts.push(`    - hint: ${plotPoint.hint}`);
             });
@@ -267,7 +265,7 @@ ${narrativeContext}
 ${DESIGN_DIRECTIVES}
 
 # Schema
-请严格按以下 Schema 输出 ChainZoneTemplate：
+请严格按以下 Schema 输出 ZoneTemplate：
 
 ${CHAIN_ZONE_GENERATION_SCHEMA}
 
@@ -291,7 +289,7 @@ ${globalContext}
 ${DESIGN_DIRECTIVES}
 
 # Schema
-请严格按以下 Schema 输出 EpisodicZoneTemplate：
+请严格按以下 Schema 输出 ZoneTemplate：
 
 ${EPISODIC_ZONE_GENERATION_SCHEMA}
 

@@ -8,3 +8,4 @@ dist
 dist-electron
 src/constants/config.ts
 config.ts
+.typecheck.log

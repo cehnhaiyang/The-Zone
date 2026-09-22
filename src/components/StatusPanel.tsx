@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
-  PlayerState, Entity, NpcTemplate, NpcDynamicState, Attribute, ItemInstance, Tactic, Settings,
+  PlayerState, Entity, CompanionTemplate, CompanionDynamicState, AttributeType, ItemInstance, Tactic, Settings,
   WeaponInstance, ArmorInstance, AccessoryInstance,
   isWeaponInstance, isArmorInstance, isAccessoryInstance, isConsumableInstance, hasDurability,
   normalizeEquipState,
@@ -26,9 +26,12 @@ interface EquipSummary {
 // 图表组件 (Charts)
 // =====================
 
-// === 属性雷达图 (5-point Pentagon Radar) ===
-export const AttributeRadar = React.memo(({ attribute }: { attribute: Attribute }) => {
-  const rawMax = Math.max(attribute.strength, attribute.agility, attribute.wisdom, attribute.perception, attribute.spiritual, 10);
+// === 属性雷达图 (6-point Hexagon Radar) ===
+export const AttributeRadar = React.memo(({ attribute }: { attribute: Record<AttributeType, number> }) => {
+  const rawMax = Math.max(
+    attribute.strength, attribute.agility, attribute.wisdom,
+    attribute.awareness, attribute.will, attribute.cthulhu, 10
+  );
   const maxVal = Math.ceil(rawMax / 5) * 5;
   const center = 50;
   const radius = 35;
@@ -39,13 +42,14 @@ export const AttributeRadar = React.memo(({ attribute }: { attribute: Attribute 
     return { x: center + r * Math.cos(rad), y: center + r * Math.sin(rad) };
   };
 
-  // 5个轴向：STR(0°), AGI(72°), WIS(144°), PER(216°), SPI(288°)
+  // 6个轴向，间隔 60°：STR(0°) AGI(60°) WIS(120°) PER(180°) SPI(240°) CTL(300°)
   const axes = [
     { key: 'strength', angle: 0, label: 'STR', color: 'fill-red-400' },
-    { key: 'agility', angle: 72, label: 'AGI', color: 'fill-emerald-400' },
-    { key: 'wisdom', angle: 144, label: 'WIS', color: 'fill-blue-400' },
-    { key: 'perception', angle: 216, label: 'PER', color: 'fill-amber-400' },
-    { key: 'spiritual', angle: 288, label: 'SPI', color: 'fill-purple-400' },
+    { key: 'agility', angle: 60, label: 'AGI', color: 'fill-emerald-400' },
+    { key: 'wisdom', angle: 120, label: 'WIS', color: 'fill-blue-400' },
+    { key: 'awareness', angle: 180, label: 'PER', color: 'fill-amber-400' },
+    { key: 'will', angle: 240, label: 'SPI', color: 'fill-purple-400' },
+    { key: 'cthulhu', angle: 300, label: 'CTL', color: 'fill-fuchsia-400' },
   ] as const;
 
   const points = axes.map(a => getPoint(attribute[a.key], a.angle));
@@ -227,19 +231,23 @@ const UpgradeRow: React.FC<{
   name: string;
   level: number;
   role: string;
-  attribute: Attribute;
+  attribute: Record<AttributeType, number>;
   playerXp: number;
-  onLevelUp?: (targetId: string, attr: string) => void;
+  onLevelUp?: (targetId: string, attr: AttributeType) => void;
 }> = ({ id, name, level, role, attribute, playerXp, onLevelUp }) => {
   const cost = getXpCost(level);
   const canAfford = playerXp >= cost;
 
-  const attrs = [
-    { attr: 'strength' as keyof Attribute, label: 'STR', val: attribute.strength, text: 'text-red-400', btn: 'border-red-900/50 hover:border-red-500 hover:shadow-[0_0_10px_rgba(239,68,68,0.3)]', bar: 'bg-red-500' },
-    { attr: 'agility' as keyof Attribute, label: 'AGI', val: attribute.agility, text: 'text-emerald-400', btn: 'border-emerald-900/50 hover:border-emerald-500 hover:shadow-[0_0_10px_rgba(16,185,129,0.3)]', bar: 'bg-emerald-500' },
-    { attr: 'wisdom' as keyof Attribute, label: 'WIS', val: attribute.wisdom, text: 'text-blue-400', btn: 'border-blue-900/50 hover:border-blue-500 hover:shadow-[0_0_10px_rgba(59,130,246,0.3)]', bar: 'bg-blue-500' },
-    { attr: 'perception' as keyof Attribute, label: 'PER', val: attribute.perception, text: 'text-amber-400', btn: 'border-amber-900/50 hover:border-amber-500 hover:shadow-[0_0_10px_rgba(245,158,11,0.3)]', bar: 'bg-amber-500' },
-    { attr: 'spiritual' as keyof Attribute, label: 'SPI', val: attribute.spiritual, text: 'text-purple-400', btn: 'border-purple-900/50 hover:border-purple-500 hover:shadow-[0_0_10px_rgba(168,85,247,0.3)]', bar: 'bg-purple-500' },
+  const attrs: Array<{
+    attr: AttributeType; label: string; val: number;
+    text: string; btn: string; bar: string;
+  }> = [
+    { attr: 'strength', label: 'STR', val: attribute.strength, text: 'text-red-400', btn: 'border-red-900/50 hover:border-red-500 hover:shadow-[0_0_10px_rgba(239,68,68,0.3)]', bar: 'bg-red-500' },
+    { attr: 'agility', label: 'AGI', val: attribute.agility, text: 'text-emerald-400', btn: 'border-emerald-900/50 hover:border-emerald-500 hover:shadow-[0_0_10px_rgba(16,185,129,0.3)]', bar: 'bg-emerald-500' },
+    { attr: 'wisdom', label: 'WIS', val: attribute.wisdom, text: 'text-blue-400', btn: 'border-blue-900/50 hover:border-blue-500 hover:shadow-[0_0_10px_rgba(59,130,246,0.3)]', bar: 'bg-blue-500' },
+    { attr: 'awareness', label: 'PER', val: attribute.awareness, text: 'text-amber-400', btn: 'border-amber-900/50 hover:border-amber-500 hover:shadow-[0_0_10px_rgba(245,158,11,0.3)]', bar: 'bg-amber-500' },
+    { attr: 'will', label: 'SPI', val: attribute.will, text: 'text-purple-400', btn: 'border-purple-900/50 hover:border-purple-500 hover:shadow-[0_0_10px_rgba(168,85,247,0.3)]', bar: 'bg-purple-500' },
+    { attr: 'cthulhu', label: 'CTL', val: attribute.cthulhu, text: 'text-fuchsia-400', btn: 'border-fuchsia-900/50 hover:border-fuchsia-500 hover:shadow-[0_0_10px_rgba(217,70,239,0.3)]', bar: 'bg-fuchsia-500' },
   ];
 
   return (
@@ -318,13 +326,7 @@ export const LevelManager: React.FC<LevelManagerProps> = ({ player, onClose, onL
             name={player.static.name}
             level={player.dynamic.level}
             role={player.static.style.toUpperCase()}
-            attribute={{
-              strength: player.dynamic.strength,
-              agility: player.dynamic.agility,
-              wisdom: player.dynamic.wisdom,
-              perception: player.dynamic.perception,
-              spiritual: player.dynamic.spiritual,
-            }}
+            attribute={player.dynamic}
             playerXp={player.dynamic.xp}
             onLevelUp={onLevelUp}
           />
@@ -343,13 +345,7 @@ export const LevelManager: React.FC<LevelManagerProps> = ({ player, onClose, onL
                   name={comp.static.name}
                   level={comp.dynamic.level || 1}
                   role={comp.static.style.toUpperCase()}
-                  attribute={{
-                    strength: comp.dynamic.strength,
-                    agility: comp.dynamic.agility,
-                    wisdom: comp.dynamic.wisdom,
-                    perception: comp.dynamic.perception,
-                    spiritual: comp.dynamic.spiritual,
-                  }}
+                  attribute={comp.dynamic}
                   playerXp={player.dynamic.xp}
                   onLevelUp={onLevelUp}
                 />
@@ -517,19 +513,21 @@ const StatRow: React.FC<{ label: string; value: string; color?: string }> = ({ l
 
 export const StatsColumn: React.FC<StatsColumnProps> = React.memo(({ player }) => {
   const derived = useMemo(() => {
-    const { strength, agility, wisdom, perception, spiritual } = player.dynamic;
+    const { strength, agility, wisdom, awareness, will, cthulhu } = player.dynamic;
     return {
       meleeDmg: (strength * 1.5).toFixed(3),
       carryWeight: (10 + strength / 2).toFixed(3),
       critChance: (agility * 2).toFixed(3) + '%',
       evasion: (agility * 1.5).toFixed(3) + '%',
       techSkill: (wisdom * 5).toFixed(3),
-      discovery: (perception * 5).toFixed(3) + '%',
-      // 与 utils.calculateCombatBonus 公式一致：clamp(1.0 + (WIS - 3) × 0.05, 0.5, 2.0)
+      discovery: (awareness * 5).toFixed(3) + '%',
+      // 与 meta/tools 的 calculateCombatBonus 公式一致：clamp(1.0 + (WIS - 3) × 0.05, 0.5, 2.0)
       combatBonus: Math.max(0.5, Math.min(2.0, 1.0 + (wisdom - 3) * 0.05)).toFixed(2) + '×',
-      // 与 utils.createActionPoint 公式一致：max(1, floor(speed / 5))，speed 默认等于敏捷
+      // 与 meta/tools 的 createActionPoint 公式一致：max(1, floor(speed / 5))，speed 默认等于敏捷
       apBase: String(Math.max(1, Math.floor(agility / 5))),
-      spiritRes: (spiritual * 2).toFixed(3),
+      spiritRes: (will * 2).toFixed(3),
+      // 不可知力：异态物品加成与理智抗性的读数来源，仅作展示
+      arcaneAffinity: (cthulhu * 1.5).toFixed(3) + '%',
     };
   }, [player.dynamic]);
 
@@ -537,8 +535,9 @@ export const StatsColumn: React.FC<StatsColumnProps> = React.memo(({ player }) =
     { label: 'STR', val: player.dynamic.strength, col: 'text-red-400' },
     { label: 'AGI', val: player.dynamic.agility, col: 'text-emerald-400' },
     { label: 'WIS', val: player.dynamic.wisdom, col: 'text-blue-400' },
-    { label: 'PER', val: player.dynamic.perception, col: 'text-amber-400' },
-    { label: 'SPI', val: player.dynamic.spiritual, col: 'text-purple-400' },
+    { label: 'PER', val: player.dynamic.awareness, col: 'text-amber-400' },
+    { label: 'SPI', val: player.dynamic.will, col: 'text-purple-400' },
+    { label: 'CTL', val: player.dynamic.cthulhu, col: 'text-fuchsia-400' },
   ];
 
   return (
@@ -551,7 +550,7 @@ export const StatsColumn: React.FC<StatsColumnProps> = React.memo(({ player }) =
         <div className="my-1 w-full">
           <AttributeRadar attribute={player.dynamic} />
         </div>
-        <div className="grid grid-cols-5 w-full mt-1.5 pt-2 border-t border-gray-800/50 gap-1">
+        <div className="grid grid-cols-6 w-full mt-1.5 pt-2 border-t border-gray-800/50 gap-1">
           {attrGrid.map((attr) => (
             <div key={attr.label} className="flex flex-col items-center bg-black/30 py-0.5 rounded-sm border border-gray-800/30 hover:border-gray-600 transition-colors">
               <span className={`text-[8px] font-bold ${attr.col}`}>{attr.label}</span>
@@ -582,6 +581,7 @@ export const StatsColumn: React.FC<StatsColumnProps> = React.memo(({ player }) =
           <StatRow label="Combat Bonus" value={derived.combatBonus} color="text-blue-300" />
           <StatRow label="Base AP" value={derived.apBase} color="text-cyan-300" />
           <StatRow label="Spirit Resonance" value={derived.spiritRes} color="text-purple-300" />
+          <StatRow label="Arcane Affinity" value={derived.arcaneAffinity} color="text-fuchsia-300" />
           <StatRow label="Carry Capacity" value={derived.carryWeight} />
         </div>
         <div className="shrink-0 h-1 w-full bg-gradient-to-r from-gray-800 via-cyan-900/30 to-gray-800"></div>
@@ -597,7 +597,7 @@ export const StatsColumn: React.FC<StatsColumnProps> = React.memo(({ player }) =
 interface LogisticsColumnProps {
   player: PlayerState;
   equip: EquipSummary;
-  onInteractWithCompanion: (npc: Entity<NpcTemplate, NpcDynamicState>) => void;
+  onInteractWithCompanion: (npc: Entity<CompanionTemplate, CompanionDynamicState>) => void;
   onOpenEquipment: () => void;
 }
 
@@ -613,10 +613,10 @@ const EquipmentSlot: React.FC<{ label: string; item: ItemInstance | undefined; t
 
   return (
     <div
-      data-rarity={item?.rarity}
-      data-intensity={item ? RARITY_MAP[item.rarity].intensity : undefined}
+      data-rarity={item?.grade}
+      data-intensity={item ? RARITY_MAP[item.grade].intensity : undefined}
       style={
-        item ? ({ ...RARITY_MAP[item.rarity].vars } as React.CSSProperties) : undefined
+        item ? ({ ...RARITY_MAP[item.grade].vars } as React.CSSProperties) : undefined
       }
       className={`relative h-20 border transition-all group p-2 flex flex-col justify-between ${styleClass} hover:bg-opacity-20`}
     >
@@ -641,7 +641,7 @@ const EquipmentSlot: React.FC<{ label: string; item: ItemInstance | undefined; t
           <div className="text-[8px] opacity-60 truncate font-mono mt-0.5">
             {item ? (
               isWeaponInstance(item) ? `DMG: ${item.damage}` :
-                isArmorInstance(item) ? `DEF: ${(item.partialReduction * 100).toFixed(0)}%` :
+                isArmorInstance(item) ? `DEF: ${(item.defense * 100).toFixed(0)}%` :
                   isAccessoryInstance(item) && (item.effects?.length ?? 0) > 0 ? `MOD: ${item.effects[0][0]} ${formatEffectValue(item.effects[0][1])}` :
                     isConsumableInstance(item) && (item.effects?.length ?? 0) > 0 ? `USE: ${item.effects[0][0]} ${formatEffectValue(item.effects[0][1])}` :
                       item.desc
@@ -663,7 +663,7 @@ const EquipmentSlot: React.FC<{ label: string; item: ItemInstance | undefined; t
 };
 
 export const LogisticsColumn: React.FC<LogisticsColumnProps> = ({ player, equip, onInteractWithCompanion, onOpenEquipment }) => {
-  const aliveCompanions = player.companions.filter((c: Entity<NpcTemplate, NpcDynamicState>) => c.dynamic.hp > 0);
+  const aliveCompanions = player.companions.filter((c: Entity<CompanionTemplate, CompanionDynamicState>) => c.dynamic.hp > 0);
 
   return (
     <div className="col-span-12 md:col-span-4 flex flex-col gap-3 md:min-h-0">
@@ -775,7 +775,7 @@ export const LogisticsColumn: React.FC<LogisticsColumnProps> = ({ player, equip,
 interface StatusPanelProps {
   player: PlayerState;
   settings: Settings;
-  onInteractWithCompanion: (npc: Entity<NpcTemplate, NpcDynamicState>) => void;
+  onInteractWithCompanion: (npc: Entity<CompanionTemplate, CompanionDynamicState>) => void;
   onManualGen?: () => void;
   isGenerating?: boolean;
   onLevelUp?: (targetId: string, attr: string) => void;
@@ -800,12 +800,13 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
   const [showLevelManager, setShowLevelManager] = useState(false);
   const [showEquipment, setShowEquipment] = useState(false);
 
-  // 武器槽恒为 2（元组硬约束）；护甲 / 饰品槽位读取全局配置 equipmentSlots
+  // 武器槽恒为主手 / 副手两个；护甲 / 饰品槽位读取全局配置 equipmentSlots
   const equip = useMemo<EquipSummary>(() => {
     const n = normalizeEquipState(player.dynamic.equipment, settings.gameConfig);
-    const all = [...n.weapons, ...n.armors, ...n.accessories];
+    const weapons = [n.weapons.main, n.weapons.side];
+    const all = [...weapons, ...n.armors, ...n.accessories];
     return {
-      weapons: [...n.weapons],
+      weapons,
       armors: n.armors,
       accessories: n.accessories,
       equipped: all.filter(Boolean).length,
@@ -816,7 +817,7 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
   const canAnyLevelUp = useMemo(() => {
     if (player.dynamic.xp >= getXpCost(player.dynamic.level)) return true;
     return player.companions
-      .filter((c: Entity<NpcTemplate, NpcDynamicState>) => c.dynamic.hp > 0)
+      .filter((c: Entity<CompanionTemplate, CompanionDynamicState>) => c.dynamic.hp > 0)
       .some(c => player.dynamic.xp >= getXpCost(c.dynamic.level || 1));
   }, [player.dynamic.xp, player.dynamic.level, player.companions]);
 
@@ -906,7 +907,7 @@ const StatusPanel: React.FC<StatusPanelProps> = ({
           <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-[#050510] flex items-center justify-center">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
               {pendingTacticOptions.map((tactic) => {
-                const isAttack = tactic.type === 'attack';
+                const isAttack = tactic.type === 'A';
                 return (
                   <button
                     key={tactic.id}

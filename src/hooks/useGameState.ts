@@ -8,29 +8,32 @@ import {
     NarrativeMode,
     NarrativePacing,
     NarrativePhase,
-    SanctuaryState,
-    ThemeType,
     BaseDynamicState,
     ChainNarrative,
     CurrentTime,
     EnemyTemplate,
     GameStateData,
     GameStateUpdaters,
+    HorrorAesthetic,
+    HorrorAtom,
+    HorrorDomain,
     PlayerDynamicState,
     PlayerState,
     PlotPoint,
-    PlotPointNet,
     Sanctuary,
     StoryConfig,
     Tactic,
     Vital,
     Zone,
     ZoneDate,
+    applySanctuaryResourceDeltas,
     buildCurrentLocation,
     clamp,
     clampDynamicVitals,
     getEntranceNodeId,
     getNodeByKey,
+    getNodeSpecificEnemies,
+    getNodeThreatLevel,
     isItemTemplate,
     isSanctuary,
     markNodeVisited,
@@ -38,29 +41,26 @@ import {
     safeDeepClone,
     safeNumber,
 } from '../meta';
-import { pickRandomTactics, PUBLIC_TACTIC_POOL } from '../constants';
+import {
+    HORROR_AESTHETICS,
+    HORROR_ATOMS,
+    HORROR_DOMAINS,
+    findAestheticReferences,
+    mergeNarrativeLibrary,
+    pickRandomTactics,
+    PUBLIC_TACTIC_POOL,
+    validateAesthetic,
+    validateAtom,
+    validateDomain,
+} from '../constants';
+import type { NarrativeDraftContext, NarrativeDraftIssue } from '../constants';
+import { NECESSARY_RESOURCE_CONSUMPTION_PER_DAY } from './useSanctuary';
 import {
     AudioService,
     ChainNarrativeService,
     PersistenceService,
 } from '../services';
-
-// ——— 由 meta/utils.ts 迁移而来（本文件唯一使用方） ———
-const asSanctuaryResourceRecordLocal = (
-    target: Sanctuary
-): Record<keyof SanctuaryState, number> =>
-    target as unknown as Record<keyof SanctuaryState, number>;
-
-const updateSanctuaryResource = (
-    sanctuary: Sanctuary,
-    resource: keyof SanctuaryState,
-    amount: number
-): Sanctuary => {
-    const next = safeDeepClone(sanctuary);
-    const record = asSanctuaryResourceRecordLocal(next);
-    record[resource] = Math.max(0, safeNumber(record[resource]) + safeNumber(amount));
-    return next;
-};
+import type { NarrativeLibrary } from '../services';
 
 const HALLUCINATION_TEXTS = [
     '墙壁里传来了呼吸声',
@@ -74,7 +74,7 @@ const HALLUCINATION_TEXTS = [
 type NarrativeFlowStep =
     | 'mode'
     | 'pacing'
-    | 'theme'
+    | 'aesthetic'
     | 'config'
     | 'details'
     | 'preview'
@@ -86,7 +86,13 @@ interface NarrativeState {
     analysis: ChainNarrative['analysis'];
 }
 
-interface NarrativeLibrary {
+/**
+ * 已落盘叙事产物的索引。
+ *
+ * 只承载存档列表的元信息（叙事链摘要与单元剧区域摘要），供归档面板渲染；
+ * 与 {@link NarrativeLibrary}（玩家自建的恐怖域 / 元 / 美学）是两套互不相干的数据。
+ */
+interface NarrativeArchiveIndex {
     arcs: Array<{
         id: string;
         title: string;
@@ -103,31 +109,88 @@ interface NarrativeLibrary {
 
 const FLOW_BACK_MAP: Record<string, NarrativeFlowStep> = {
     pacing: 'mode',
-    theme_chain: 'pacing',
-    theme_episodic: 'mode',
-    config: 'theme',
-    details: 'theme',
+    aesthetic_chain: 'pacing',
+    aesthetic_episodic: 'mode',
+    config: 'aesthetic',
+    details: 'aesthetic',
     preview_chain: 'config',
     preview_episodic: 'details',
     library: 'mode',
     closed: 'closed',
 };
 
-const EMPTY_LIBRARY: NarrativeLibrary = {
+const EMPTY_ARCHIVE_INDEX: NarrativeArchiveIndex = {
     arcs: [],
     episodic: [],
     isLoading: false,
+};
+
+/** 空的自建叙事库。 */
+const EMPTY_NARRATIVE_LIBRARY: NarrativeLibrary = {
+    domains: [],
+    atoms: [],
+    aesthetics: [],
 };
 
 const DEFAULT_NODE_COUNT = 15;
 const DEFAULT_TENSION = 500;
 const DEFAULT_EPISODIC_TENSION_INPUT = 50;
 
+/**
+ * 一次自建叙事库写入 / 删除操作的结果。
+ *
+ * 校验失败或删除被拒时 ok 为 false，issues 直接呈现给玩家。
+ */
+export interface NarrativeMutationResult {
+    ok: boolean;
+    /** 校验失败项；ok 为 true 时为空数组。 */
+    issues: NarrativeDraftIssue[];
+    /** 删除被拒时，引用该条目的美学名称列表。 */
+    blockedBy?: string[];
+}
+
+/**
+ * 预设条目只读守卫。
+ *
+ * 自建库只承载玩家创作，预设库由常量维护。编辑模式下若目标不在自建库中，
+ * 说明玩家试图改动预设条目：此时必须拒绝，否则 map 找不到目标，
+ * 会「保存成功」但实际什么都没写入。
+ */
+const PRESET_READONLY_ISSUE: NarrativeDraftIssue = {
+    field: 'id',
+    message: '预设条目不可直接修改，请改用新的 id 另存为自建条目。',
+};
+
+/**
+ * 运行时读入的自建库可能被外部手工篡改或来自旧版本，
+ * 此处做一次形状收敛，避免非法条目污染 UI 渲染。
+ */
+const sanitizeNarrativeLibrary = (raw: NarrativeLibrary | null): NarrativeLibrary => {
+    if (!raw || typeof raw !== 'object') return EMPTY_NARRATIVE_LIBRARY;
+
+    const pickArray = <T extends { id?: unknown }>(value: unknown): T[] =>
+        Array.isArray(value)
+            ? value.filter(
+                (item): item is T =>
+                    Boolean(item) && typeof item === 'object' && typeof (item as T).id === 'string',
+            )
+            : [];
+
+    return {
+        domains: pickArray<HorrorDomain>(raw.domains),
+        atoms: pickArray<HorrorAtom>(raw.atoms),
+        aesthetics: pickArray<HorrorAesthetic>(raw.aesthetics),
+    };
+};
+
 /** ZoneDate 刻度：tick 取值 0-29（30 进制），cycle 取值 0-11（12 进制）。
  *  一天 = 30×12 = 360 tick。与 useSanctuary.TIME_CONFIG（TICKS_PER_HOUR=15）
  *  保持一致：24 小时休息 = 360 tick = 恰好 1 天，确保设施每日产出可跨天结算。 */
 const TICKS_PER_CYCLE = 30;
 const CYCLES_PER_DAY = 12;
+
+/** 一天对应的 tick 数：庇护所资源 consumptionRate 以「每人每天」为单位。 */
+const TICKS_PER_DAY = TICKS_PER_CYCLE * CYCLES_PER_DAY;
 
 /** 升级成长曲线：每次升级各体征上限增量。 */
 const LEVEL_UP_GROWTH = {
@@ -171,11 +234,10 @@ const snapshotVital = (dynamic: BaseDynamicState): Vital => ({
 
 const mutateSanctuaryResource = (
     sanctuary: Sanctuary,
-    resource: keyof SanctuaryState,
+    resourceId: string,
     amount: number
 ): void => {
-    const record = sanctuary as unknown as Record<keyof SanctuaryState, number>;
-    record[resource] = Math.max(0, safeNumber(record[resource]) + safeNumber(amount));
+    applySanctuaryResourceDeltas(sanctuary, { [resourceId]: amount });
 };
 
 /**
@@ -225,13 +287,13 @@ const buildStoryConfigFromPending = (
     episodicTension: number
 ): StoryConfig | undefined => {
     const mode = pending.mode;
-    const theme = pending.theme;
-    if (!mode?.id || !theme?.id) return undefined;
+    const aesthetic = pending.aesthetic;
+    if (!mode?.id || !aesthetic?.id) return undefined;
 
     const isEpisodic = mode.id === 'episodic';
     const rawNodeCount = isEpisodic
         ? episodicNodeCount
-        : (pending.nodeCount ?? DEFAULT_NODE_COUNT);
+        : (pending.nodesCount ?? DEFAULT_NODE_COUNT);
     const nodeCount = Math.max(
         1,
         Math.round(Number.isFinite(rawNodeCount) ? rawNodeCount : DEFAULT_NODE_COUNT)
@@ -240,8 +302,8 @@ const buildStoryConfigFromPending = (
     const config: StoryConfig = {
         mode,
         pacing: pending.pacing ?? { id: 'balanced', prompt: 'balanced' },
-        theme,
-        nodeCount,
+        aesthetic,
+        nodesCount: nodeCount,
         tension: isEpisodic
             ? normalizeTension(episodicTension)
             : normalizeTension(pending.tension ?? DEFAULT_TENSION),
@@ -279,17 +341,35 @@ interface UseGameStateReturn {
     getNarrativeHealth: (playerState: PlayerState) => number;
     getCurrentNarrativePhase: () => NarrativePhase;
     resetNarrative: () => void;
-    updatePlayerStateAndPlot: (newZone: Zone) => void;
+    updatePlayerStateAndPlot: (newZone: Zone, explicitChainIndex?: number) => void;
     advanceExplorationStep: () => void;
     advanceCombatTurn: () => void;
     resetCombatTurn: () => void;
     getCurrentTime: () => CurrentTime;
     getTimeTuple: () => [ZoneDate, number];
     narrativeConfig?: StoryConfig;
-    narrativeLibrary: NarrativeLibrary;
+    narrativeLibrary: NarrativeArchiveIndex;
     loadNarrativeLibrary: () => Promise<void>;
     deleteNarrativeArc: (arcId: string) => Promise<boolean>;
     deleteEpisodicZone: (zoneId: string) => Promise<boolean>;
+
+    // --- 玩家自建叙事库（恐怖域 / 元 / 美学） ---
+    /** 预设 + 自建的合并视图，供叙事面板选择。 */
+    narrativeDomains: HorrorDomain[];
+    narrativeAtoms: HorrorAtom[];
+    narrativeAesthetics: HorrorAesthetic[];
+    /** 仅自建内容，供编辑器区分「可删除」与「预设只读」。 */
+    customNarrativeDomains: HorrorDomain[];
+    customNarrativeAtoms: HorrorAtom[];
+    customNarrativeAesthetics: HorrorAesthetic[];
+    isNarrativeLibraryLoading: boolean;
+    isNarrativeLibrarySaving: boolean;
+    upsertNarrativeDomain: (draft: HorrorDomain, isNew: boolean) => Promise<NarrativeMutationResult>;
+    upsertNarrativeAtom: (draft: HorrorAtom, isNew: boolean) => Promise<NarrativeMutationResult>;
+    upsertNarrativeAesthetic: (draft: HorrorAesthetic, isNew: boolean) => Promise<NarrativeMutationResult>;
+    removeNarrativeDomain: (id: string) => Promise<NarrativeMutationResult>;
+    removeNarrativeAtom: (id: string) => Promise<NarrativeMutationResult>;
+    removeNarrativeAesthetic: (id: string) => Promise<NarrativeMutationResult>;
     narrativePreview: {
         params?: StoryConfig;
         activePlots: PlotPoint[];
@@ -311,7 +391,7 @@ interface UseGameStateReturn {
     handleNarrativeFlowLoadFromLibrary: (type: 'chain' | 'episodic', identifier: string) => void;
     handleNarrativeFlowModeConfirm: (mode: NarrativeMode) => void;
     handleNarrativeFlowPacingConfirm: (pacing: NarrativePacing) => void;
-    handleNarrativeFlowThemeConfirm: (theme: string) => void;
+    handleNarrativeFlowAestheticConfirm: (aesthetic: StoryConfig['aesthetic']) => void;
     handleNarrativeFlowConfigConfirm: (themeConfig: { motif: string; mainAxis: string }) => void;
     handleNarrativeFlowDetailsConfirm: () => void;
     handleNarrativeFlowPreviewConfirm: (autoGenOptions?: {
@@ -367,8 +447,8 @@ export const extractPlotPointsFromZone = (
         if (node.nodeNpc) {
             extract(node.nodeNpc, `遭遇 [${node.nodeNpc.name}] 时获悉`);
         }
-        // toSolvePP 挂载于 data 内的 EnemyTemplate，而非 specificEnemy 包装对象。
-        node.specificEnemy?.data.forEach((enemy) => {
+        // 固定遭遇（isDangerous 数组形态）中的 EnemyTemplate 同样承载 toSolvePP。
+        getNodeSpecificEnemies(node)?.forEach((enemy) => {
             extract(enemy, `面对 [${enemy.name}] 时显现`);
         });
         node.interactions?.forEach((interaction) => {
@@ -396,26 +476,25 @@ export const extractPlotPointsFromZone = (
 };
 
 export const resolvePlotPointNet = (
-    net: PlotPointNet,
+    plots: PlotPoint[],
     resolvedIds: string[]
 ): {
-    net: PlotPointNet;
+    plots: PlotPoint[];
     resolvedCount: number;
 } => {
     const ids = new Set(resolvedIds);
     let resolvedCount = 0;
 
-    const resolve = <T extends PlotPoint>(points: T[]): T[] =>
-        points.map((point) => {
-            if (ids.has(point.id) && !point.isSolved) {
-                resolvedCount += 1;
-                return { ...point, isSolved: true } as T;
-            }
-            return point;
-        });
+    const resolved = plots.map((point) => {
+        if (ids.has(point.id) && !point.isSolved) {
+            resolvedCount += 1;
+            return { ...point, isSolved: true };
+        }
+        return point;
+    });
 
     return {
-        net: [resolve(net[0]), resolve(net[1])],
+        plots: resolved,
         resolvedCount,
     };
 };
@@ -472,20 +551,23 @@ export const calculateNextTickState = (
         isBatteryDepleted = previousBattery > 0 && nextPlayer.neuralLink.battery <= 0;
     }
 
-    // 庇护所资源结算：驻留时按人口消耗；外出时维持基础损耗。
+    // 庇护所资源结算：按「每人每天」消耗。
+    // 必要资源（食物 / 饮水）用引擎配平速率；独特资源用各自声明的 consumptionRate，
+    // 未声明速率的资源不随日常驻留消耗（如药品、废料）。
     const sanctuary = nextPlayer.sanctuary;
     const population = Math.max(0, safeNumber(sanctuary.population));
-    if (population > 0) {
-        if (isSanctuaryMode) {
-            mutateSanctuaryResource(sanctuary, 'food', -timeDelta * population * 0.1);
-            mutateSanctuaryResource(sanctuary, 'water', -timeDelta * population * 0.15);
-            mutateSanctuaryResource(sanctuary, 'electricity', -timeDelta * population * 0.5);
-            if (sanctuary.food <= 0 || sanctuary.water <= 0) {
-                mutateSanctuaryResource(sanctuary, 'morale', -timeDelta * 2.0);
-            }
-        } else {
-            mutateSanctuaryResource(sanctuary, 'food', -timeDelta * 0.05);
-            mutateSanctuaryResource(sanctuary, 'water', -timeDelta * 0.08);
+    const elapsedDays = Math.max(0, safeNumber(timeDelta)) / TICKS_PER_DAY;
+    if (population > 0 && elapsedDays > 0) {
+        for (const [key, ratePerDay] of Object.entries(
+            NECESSARY_RESOURCE_CONSUMPTION_PER_DAY
+        )) {
+            mutateSanctuaryResource(sanctuary, key, -ratePerDay * population * elapsedDays);
+        }
+
+        for (const entry of sanctuary.uniqueResource) {
+            const rate = safeNumber(entry.consumptionRate);
+            if (rate <= 0) continue;
+            mutateSanctuaryResource(sanctuary, entry.id, -rate * population * elapsedDays);
         }
     }
 
@@ -545,7 +627,7 @@ export const useGameState = ({
     const [narrativeFlowEpisodicNodeCount, setNarrativeFlowEpisodicNodeCount] =
         useState(DEFAULT_NODE_COUNT);
     const [currentNarrative, setCurrentNarrative] = useState<NarrativeState | null>(null);
-    const [narrativeLibrary, setNarrativeLibrary] = useState<NarrativeLibrary>(EMPTY_LIBRARY);
+    const [narrativeLibrary, setNarrativeLibrary] = useState<NarrativeArchiveIndex>(EMPTY_ARCHIVE_INDEX);
     const [pendingTacticOptions, setPendingTacticOptions] = useState<Tactic[] | null>(null);
 
     const narrativeFlowHasSuspendedArc = player.activeArc?.status === 'suspended';
@@ -581,7 +663,7 @@ export const useGameState = ({
      * 5. 延迟释放日志与音效副作用。
      */
     const updatePlayerStateAndPlot = useCallback(
-        (newZone: Zone) => {
+        (newZone: Zone, explicitChainIndex?: number) => {
             const prevPlayer = playerRef.current;
             if (!newZone) return;
 
@@ -658,15 +740,21 @@ export const useGameState = ({
                 }
             }
 
+            // 首次进入链式区域时推进或对齐叙事链索引（对齐本地 maps/chain/${id}/${currentIndex}.json）
+            if (isFirstEnter && nextPlayer.activeArc?.config.mode.id === 'chain') {
+                nextPlayer = ChainNarrativeService.advanceChainIndex(
+                    nextPlayer,
+                    explicitChainIndex
+                );
+            }
+
             // 解析区域内可回收伏笔。
             const { resolvedIds, resolutionContexts } = extractPlotPointsFromZone(visitedZone);
             if (resolvedIds.length > 0) {
                 let resolvedCount = 0;
                 resolvedIds.forEach((id) => {
                     const hasUnresolved = nextPlayer.activeArc
-                        ? nextPlayer.activeArc.plotPoints
-                            .flat()
-                            .some((p) => p.id === id && !p.isSolved)
+                        ? nextPlayer.activeArc.plotPoints.some((p) => p.id === id && !p.isSolved)
                         : false;
                     if (hasUnresolved) {
                         resolvedCount += 1;
@@ -779,17 +867,19 @@ export const useGameState = ({
                 safeAudioOperation(() => AudioService.playSfx('fail'), '音效播放失败');
             }
 
-            // 庇护所低概率亚空间侵蚀。
+            // 庇护所低概率亚空间侵蚀：侵蚀度越高，锚点越不稳定。
             let sanctuaryBreach = false;
             if (gameState === GameState.SANCTUARY && Math.random() < 0.05) {
-                const erosion = safeNumber(finalPlayer.sanctuary.erosion, 0);
-                const morale = safeNumber(finalPlayer.sanctuary.morale, 100);
-                const stability = clamp(100 - erosion + (morale - 50) * 0.2, 0, 100);
+                const erosion = safeNumber(finalPlayer.sanctuary.erosion);
+                const stability = clamp(100 - erosion, 0, 100);
                 if (stability < 50 && Math.random() > stability / 100) {
                     sanctuaryBreach = true;
                     finalPlayer = {
                         ...finalPlayer,
-                        sanctuary: updateSanctuaryResource(finalPlayer.sanctuary, 'erosion', 5),
+                        sanctuary: {
+                            ...finalPlayer.sanctuary,
+                            erosion: Math.min(100, erosion + 5),
+                        },
                     };
                 }
             }
@@ -809,8 +899,7 @@ export const useGameState = ({
 
     /**
      * 音频状态同步：根据 gameState 与玩家精神状态动态调整音频管线。
-     * 探索主题严格取自 ThemeType：威胁 > 15 → 'dangerous'，
-     * 否则回落当前叙事链主题（NarrativeTheme ∈ ThemeType）。
+     * 探索主题严格取自 ThemeType：威胁 > 15 → 'dangerous'，否则 'sanctuary'。
      */
     useEffect(() => {
         if (!initializedAudio.current && AudioService.isReady()) {
@@ -847,7 +936,7 @@ export const useGameState = ({
                     return;
                 }
                 const sanity = safeNumber(dynamicState.sanity, 100);
-                const threat = safeNumber(node.threatLevel, 0);
+                const threat = getNodeThreatLevel(node);
                 const threatRatio = threatToRatio(threat);
 
                 if (sanity < 20) {
@@ -861,9 +950,9 @@ export const useGameState = ({
                 } else {
                     clearPanic();
                     AudioService.removeMuffleEffect();
-                    const arcTheme = (playerRef.current.activeArc?.config.theme.id ??
-                        'cosmic_horror') as ThemeType;
-                    AudioService.setTheme(threat > 15 ? 'dangerous' : arcTheme, threatRatio);
+                    // 探索环境音只按功能性主题选择：高威胁 → dangerous，否则 sanctuary。
+                    // 叙事美学（HorrorAesthetic）自 v2.1 起不再属于 ThemeType，不参与音轨选择。
+                    AudioService.setTheme(threat > 15 ? 'dangerous' : 'sanctuary', threatRatio);
                 }
             }
         }, '音频管线装载失败');
@@ -871,7 +960,7 @@ export const useGameState = ({
         gameState,
         currentNodeId,
         currentZone?.id,
-        currentZone?.nodes?.[currentNodeId]?.threatLevel,
+        getNodeThreatLevel(currentZone?.nodes?.[currentNodeId]),
         player.dynamic.sanity,
     ]);
 
@@ -996,13 +1085,256 @@ export const useGameState = ({
         [deleteFromLibrary]
     );
 
+    // ==========================================================================
+    // 玩家自建叙事库（恐怖域 / 元 / 美学）
+    //
+    // 职责：持有自建内容的内存状态并在变更后写入文件系统；提供「预设 + 自建」
+    // 的合并视图；写入前执行元契约校验，删除前执行引用校验（强校验策略）。
+    // 与上面的归档索引互不相干：那边是已落盘的叙事产物，这边是玩家创作的素材。
+    // ==========================================================================
+
+    const [customNarrativeLibrary, setCustomNarrativeLibrary] =
+        useState<NarrativeLibrary>(EMPTY_NARRATIVE_LIBRARY);
+    const [isNarrativeLibraryLoading, setIsNarrativeLibraryLoading] = useState(true);
+    const [isNarrativeLibrarySaving, setIsNarrativeLibrarySaving] = useState(false);
+
+    // 合并视图：预设为底、自建覆盖，供 UI 一次性取用。
+    const narrativeDomains = useMemo(
+        () => mergeNarrativeLibrary(HORROR_DOMAINS, customNarrativeLibrary.domains),
+        [customNarrativeLibrary.domains]
+    );
+    const narrativeAtoms = useMemo(
+        () => mergeNarrativeLibrary(HORROR_ATOMS, customNarrativeLibrary.atoms),
+        [customNarrativeLibrary.atoms]
+    );
+    const narrativeAesthetics = useMemo(
+        () => mergeNarrativeLibrary(HORROR_AESTHETICS, customNarrativeLibrary.aesthetics),
+        [customNarrativeLibrary.aesthetics]
+    );
+
+    // 引用校验与 id 查重都必须基于合并视图，否则自建内容会与预设撞 id。
+    const takenDomainIds = useMemo(() => narrativeDomains.map((d) => d.id), [narrativeDomains]);
+    const takenAtomIds = useMemo(() => narrativeAtoms.map((a) => a.id), [narrativeAtoms]);
+    const takenAestheticIds = useMemo(
+        () => narrativeAesthetics.map((a) => a.id),
+        [narrativeAesthetics]
+    );
+
+    useEffect(() => {
+        let active = true;
+
+        void PersistenceService.loadNarrativeLibrary().then((loaded) => {
+            if (!active) return;
+            setCustomNarrativeLibrary(sanitizeNarrativeLibrary(loaded));
+            setIsNarrativeLibraryLoading(false);
+        });
+
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    /** 落盘并同步内存状态；落盘失败时保持内存状态不变，避免界面与磁盘不一致。 */
+    const commitNarrativeLibrary = useCallback(
+        async (next: NarrativeLibrary, action: string): Promise<boolean> => {
+            setIsNarrativeLibrarySaving(true);
+            const success = await PersistenceService.saveNarrativeLibrary(next);
+            setIsNarrativeLibrarySaving(false);
+
+            if (!success) {
+                addLog(`[叙事库] ${action}失败：本地文件系统不可用。`, 'warning');
+                return false;
+            }
+
+            setCustomNarrativeLibrary(next);
+            addLog(`[叙事库] ${action}成功。`, 'success');
+            return true;
+        },
+        [addLog]
+    );
+
+    /**
+     * 组装校验上下文。
+     *
+     * @param selfId 编辑既有条目时传入自身 id，使其不参与查重。
+     */
+    const buildNarrativeDraftContext = useCallback(
+        (selfId: string | undefined, takenIds: string[]): NarrativeDraftContext => ({
+            selfId,
+            takenIds,
+            domains: narrativeDomains,
+            atoms: narrativeAtoms,
+        }),
+        [narrativeDomains, narrativeAtoms]
+    );
+
+    const upsertNarrativeDomain = useCallback(
+        async (draft: HorrorDomain, isNew: boolean): Promise<NarrativeMutationResult> => {
+            const issues = validateDomain(
+                draft,
+                buildNarrativeDraftContext(isNew ? undefined : draft.id, takenDomainIds)
+            );
+            if (issues.length > 0) return { ok: false, issues };
+
+            if (!isNew && !customNarrativeLibrary.domains.some((item) => item.id === draft.id)) {
+                return { ok: false, issues: [PRESET_READONLY_ISSUE] };
+            }
+
+            const next: NarrativeLibrary = {
+                ...customNarrativeLibrary,
+                domains: isNew
+                    ? [...customNarrativeLibrary.domains, draft]
+                    : customNarrativeLibrary.domains.map((item) =>
+                        item.id === draft.id ? draft : item
+                    ),
+            };
+
+            return {
+                ok: await commitNarrativeLibrary(
+                    next,
+                    `${isNew ? '新增' : '更新'}恐怖域「${draft.id}」`
+                ),
+                issues: [],
+            };
+        },
+        [buildNarrativeDraftContext, commitNarrativeLibrary, customNarrativeLibrary, takenDomainIds]
+    );
+
+    const upsertNarrativeAtom = useCallback(
+        async (draft: HorrorAtom, isNew: boolean): Promise<NarrativeMutationResult> => {
+            const issues = validateAtom(
+                draft,
+                buildNarrativeDraftContext(isNew ? undefined : draft.id, takenAtomIds)
+            );
+            if (issues.length > 0) return { ok: false, issues };
+
+            if (!isNew && !customNarrativeLibrary.atoms.some((item) => item.id === draft.id)) {
+                return { ok: false, issues: [PRESET_READONLY_ISSUE] };
+            }
+
+            const next: NarrativeLibrary = {
+                ...customNarrativeLibrary,
+                atoms: isNew
+                    ? [...customNarrativeLibrary.atoms, draft]
+                    : customNarrativeLibrary.atoms.map((item) =>
+                        item.id === draft.id ? draft : item
+                    ),
+            };
+
+            return {
+                ok: await commitNarrativeLibrary(
+                    next,
+                    `${isNew ? '新增' : '更新'}恐怖元「${draft.id}」`
+                ),
+                issues: [],
+            };
+        },
+        [buildNarrativeDraftContext, commitNarrativeLibrary, customNarrativeLibrary, takenAtomIds]
+    );
+
+    const upsertNarrativeAesthetic = useCallback(
+        async (draft: HorrorAesthetic, isNew: boolean): Promise<NarrativeMutationResult> => {
+            const issues = validateAesthetic(
+                draft,
+                buildNarrativeDraftContext(isNew ? undefined : draft.id, takenAestheticIds)
+            );
+            if (issues.length > 0) return { ok: false, issues };
+
+            if (!isNew && !customNarrativeLibrary.aesthetics.some((item) => item.id === draft.id)) {
+                return { ok: false, issues: [PRESET_READONLY_ISSUE] };
+            }
+
+            const next: NarrativeLibrary = {
+                ...customNarrativeLibrary,
+                aesthetics: isNew
+                    ? [...customNarrativeLibrary.aesthetics, draft]
+                    : customNarrativeLibrary.aesthetics.map((item) =>
+                        item.id === draft.id ? draft : item
+                    ),
+            };
+
+            return {
+                ok: await commitNarrativeLibrary(
+                    next,
+                    `${isNew ? '新增' : '更新'}恐怖美学「${draft.id}」`
+                ),
+                issues: [],
+            };
+        },
+        [
+            buildNarrativeDraftContext,
+            commitNarrativeLibrary,
+            customNarrativeLibrary,
+            takenAestheticIds,
+        ]
+    );
+
+    /**
+     * 删除前的引用检查。
+     *
+     * 强校验策略：只要仍有美学引用该域 / 元，就拒绝删除并回报引用者名称，
+     * 保证库内不存在指向不存在条目的悬空引用。
+     */
+    const assertNarrativeUnreferenced = useCallback(
+        (kind: 'domain' | 'atom', id: string): NarrativeMutationResult | null => {
+            const referenced = findAestheticReferences(narrativeAesthetics, { kind, id });
+            if (referenced.length === 0) return null;
+
+            const blockedBy = referenced.map((a) => a.name);
+            return {
+                ok: false,
+                issues: [{ field: 'id', message: `仍被「${blockedBy.join('、')}」引用，无法删除。` }],
+                blockedBy,
+            };
+        },
+        [narrativeAesthetics]
+    );
+
+    const removeNarrativeDomain = useCallback(
+        async (id: string): Promise<NarrativeMutationResult> => {
+            const blocked = assertNarrativeUnreferenced('domain', id);
+            if (blocked) return blocked;
+
+            const next: NarrativeLibrary = {
+                ...customNarrativeLibrary,
+                domains: customNarrativeLibrary.domains.filter((d) => d.id !== id),
+            };
+            return { ok: await commitNarrativeLibrary(next, `删除恐怖域「${id}」`), issues: [] };
+        },
+        [assertNarrativeUnreferenced, commitNarrativeLibrary, customNarrativeLibrary]
+    );
+
+    const removeNarrativeAtom = useCallback(
+        async (id: string): Promise<NarrativeMutationResult> => {
+            const blocked = assertNarrativeUnreferenced('atom', id);
+            if (blocked) return blocked;
+
+            const next: NarrativeLibrary = {
+                ...customNarrativeLibrary,
+                atoms: customNarrativeLibrary.atoms.filter((a) => a.id !== id),
+            };
+            return { ok: await commitNarrativeLibrary(next, `删除恐怖元「${id}」`), issues: [] };
+        },
+        [assertNarrativeUnreferenced, commitNarrativeLibrary, customNarrativeLibrary]
+    );
+
+    const removeNarrativeAesthetic = useCallback(
+        async (id: string): Promise<NarrativeMutationResult> => {
+            const next: NarrativeLibrary = {
+                ...customNarrativeLibrary,
+                aesthetics: customNarrativeLibrary.aesthetics.filter((a) => a.id !== id),
+            };
+            return { ok: await commitNarrativeLibrary(next, `删除恐怖美学「${id}」`), issues: [] };
+        },
+        [commitNarrativeLibrary, customNarrativeLibrary]
+    );
+
     const narrativePreview = useMemo(() => {
         const analysis = player ? ChainNarrativeService.analyzeChainNarrative(player) : undefined;
-        const activePlots: PlotPoint[] = (player.activeArc?.plotPoints ?? [[], []])
-            .flat()
+        const activePlots: PlotPoint[] = (player.activeArc?.plotPoints ?? [])
             .filter((p) => !p.isSolved);
-        const mainPlots = activePlots.filter((p) => p.type === 'main');
-        const sidePlots = activePlots.filter((p) => p.type === 'side');
+        const mainPlots = activePlots.filter((p) => p.type === 'M');
+        const sidePlots = activePlots.filter((p) => p.type === 'S');
 
         const gen = analysis?.output?.ppToGenerate;
         const pendingConfig = buildStoryConfigFromPending(
@@ -1068,7 +1400,7 @@ export const useGameState = ({
             flowAdvance(
                 'mode',
                 { id: mode, prompt: mode },
-                mode === 'episodic' ? 'theme' : 'pacing'
+                mode === 'episodic' ? 'aesthetic' : 'pacing'
             );
         },
         [flowAdvance]
@@ -1076,16 +1408,22 @@ export const useGameState = ({
 
     const handleNarrativeFlowPacingConfirm = useCallback(
         (pacing: NarrativePacing) => {
-            flowAdvance('pacing', { id: pacing, prompt: pacing }, 'theme');
+            flowAdvance('pacing', { id: pacing, prompt: pacing }, 'aesthetic');
         },
         [flowAdvance]
     );
 
-    const handleNarrativeFlowThemeConfirm = useCallback(
-        (themeId: string) => {
+    /**
+     * 美学定标确认。
+     *
+     * 入参必须携带完整的美学 id 与 prompt：prompt 是喂给 LLM 的美学约束，
+     * 预设美学有独立撰写的提示词，不能拿 id 顶替。
+     */
+    const handleNarrativeFlowAestheticConfirm = useCallback(
+        (aesthetic: StoryConfig['aesthetic']) => {
             flowAdvance(
-                'theme',
-                { id: themeId, prompt: themeId },
+                'aesthetic',
+                aesthetic,
                 narrativeFlowPendingConfig.mode?.id === 'episodic' ? 'details' : 'config'
             );
         },
@@ -1134,19 +1472,17 @@ export const useGameState = ({
                     const resumed = ChainNarrativeService.resumeChainArc(prev);
                     const arc = resumed.activeArc;
                     if (arc) {
-                        const length = Math.max(
+                        const nodesCount = Math.max(
                             1,
-                            safeNumber(arc.length, payload.nodeCount || DEFAULT_NODE_COUNT)
+                            safeNumber(arc.config?.nodesCount, payload.nodesCount || DEFAULT_NODE_COUNT)
                         );
-                        confirmedConfig = { ...payload, nodeCount: length };
+                        confirmedConfig = { ...payload, nodesCount };
                         next = {
                             ...resumed,
                             activeArc: {
                                 ...arc,
-                                id: `${payload.theme.id || 'none'}_${payload.motif?.id ?? 'nomotif'}_${payload.mainAxis?.id ?? 'noaxis'
-                                    }_${length}`,
+                                id: `${payload.aesthetic.id || 'none'}_${payload.motif?.id ?? 'nomotif'}_${payload.mainAxis?.id ?? 'noaxis'}`,
                                 config: confirmedConfig,
-                                length,
                                 status: 'ongoing',
                             },
                         };
@@ -1158,7 +1494,7 @@ export const useGameState = ({
                 }
             } else {
                 // 单元剧模式：挂起当前链式叙事，避免宏观链式引擎继续接管。
-                const arcName = prev.activeArc?.config.theme.id ?? 'UNKNOWN';
+                const arcName = prev.activeArc?.config.aesthetic.id ?? 'UNKNOWN';
                 if (prev.activeArc?.status === 'ongoing') {
                     addLog(
                         `[叙事总线] 链式叙事 [${arcName}] 已挂起，可随时通过叙事面板恢复。`,
@@ -1327,6 +1663,20 @@ export const useGameState = ({
         loadNarrativeLibrary,
         deleteNarrativeArc,
         deleteEpisodicZone,
+        narrativeDomains,
+        narrativeAtoms,
+        narrativeAesthetics,
+        customNarrativeDomains: customNarrativeLibrary.domains,
+        customNarrativeAtoms: customNarrativeLibrary.atoms,
+        customNarrativeAesthetics: customNarrativeLibrary.aesthetics,
+        isNarrativeLibraryLoading,
+        isNarrativeLibrarySaving,
+        upsertNarrativeDomain,
+        upsertNarrativeAtom,
+        upsertNarrativeAesthetic,
+        removeNarrativeDomain,
+        removeNarrativeAtom,
+        removeNarrativeAesthetic,
         narrativePreview,
         narrativeFlowStep,
         narrativeFlowPendingConfig,
@@ -1341,7 +1691,7 @@ export const useGameState = ({
         handleNarrativeFlowLoadFromLibrary,
         handleNarrativeFlowModeConfirm,
         handleNarrativeFlowPacingConfirm,
-        handleNarrativeFlowThemeConfirm,
+        handleNarrativeFlowAestheticConfirm,
         handleNarrativeFlowConfigConfirm,
         handleNarrativeFlowDetailsConfirm,
         handleNarrativeFlowPreviewConfirm,

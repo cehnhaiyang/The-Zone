@@ -3,7 +3,7 @@
  * 神经终端风格 - 融合任务指令、伏笔异常与暗线协议的中央数据库
  */
 import React, { useState, useMemo } from 'react';
-import { PlayerState, PlotPointNet, PlotPoint, Quest } from '../meta';
+import { PlayerState, PlotPoint, Quest } from '../meta';
 
 interface ArchivesPanelProps {
   player: PlayerState;
@@ -13,9 +13,9 @@ const ArchivesPanel: React.FC<ArchivesPanelProps> = ({ player }) => {
   const [activeTab, setActiveTab] = useState<'directives' | 'anomalies' | 'truths'>('directives');
   const [showCompletedDirectives, setShowCompletedDirectives] = useState(false);
 
-  const extractPlots = (net?: PlotPointNet): PlotPoint[] => {
-    if (!net || !Array.isArray(net) || net.length < 2) return [];
-    return [...(net[0] || []), ...(net[1] || [])];
+  const extractPlots = (plots?: PlotPoint[]): PlotPoint[] => {
+    if (!plots || !Array.isArray(plots)) return [];
+    return plots;
   };
 
   const isResolved = (plot: PlotPoint): boolean => {
@@ -261,8 +261,8 @@ const ArchivesPanel: React.FC<ArchivesPanelProps> = ({ player }) => {
               ) : (
                 <div className="space-y-3">
                   {activePlots.map((plot) => {
-                    // 判断是否为主线异常，这里依据类型字典中 MainPlotPoint type = 'main'
-                    const isMain = plot.type === 'main';
+                    // 判断是否为主线异常，依据 PlotPoint type = 'M'
+                    const isMain = plot.type === 'M';
                     return (
                       <div
                         key={plot.id}

@@ -1,8 +1,8 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef } from 'react';
 import {
     Zone, PlayerState, Settings, ZoneGenerationContext, ChainGenerationContext, EpisodicGenerationContext,
     ItemInstance, initializeZoneRuntime, Node, LogType, DyGenerationContext, buildZoneGenerationContext,
-    Entity, NpcTemplate, NpcDynamicState, CurrentLocation
+    InteractionNpcEntity, CurrentLocation
 } from '../meta';
 import { AiService, AudioService, ChainNarrativeService, DynamicNarrativeService, PersistenceService } from '../services';
 
@@ -25,7 +25,7 @@ interface UseAiGenerationReturn {
         obj?: { name: string; id?: string; visualPrompt?: string; desc?: string; }
     ) => Promise<string | undefined>;
     generateNewNPCReaction: (
-        npc: Entity<NpcTemplate, NpcDynamicState>,
+        npc: InteractionNpcEntity,
         location: CurrentLocation,
         eventDesc: string
     ) => Promise<{ content: string; isAction: boolean } | null>;
@@ -57,28 +57,6 @@ const parseZoneJson = (text: string): unknown => {
     }
 };
 
-/**
- * 给 LLM 请求加超时兜底：网络挂起时 Promise 永不 settle，
- * 会导致 gameState 永久卡 LOADING / 动态叙事永久等待。
- * 超时抛错后由各调用点的 catch 走既有降级/回滚路径。
- */
-const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> =>
-    new Promise<T>((resolve, reject) => {
-        const timer = setTimeout(
-            () => reject(new Error(`${label} 请求超时 (${Math.floor(ms / 1000)}s)`)),
-            ms
-        );
-        promise.then(
-            (value) => {
-                clearTimeout(timer);
-                resolve(value);
-            },
-            (error: unknown) => {
-                clearTimeout(timer);
-                reject(error);
-            }
-        );
-    });
 
 export const useAiGeneration = ({
     player,
@@ -94,21 +72,8 @@ export const useAiGeneration = ({
     const lastNodeKeyRef = useRef<string | null>(null);
     const isGeneratingDyRef = useRef<boolean>(false);
     const generatingAssetKeysRef = useRef<Set<string>>(new Set());
-    const abortControllerRef = useRef<AbortController | null>(null);
     const dySessionRef = useRef<string>('');
     const lastPlayerStateRef = useRef<PlayerState | null>(null);
-
-    /**
-     * 生命周期防御
-     * 组件卸载时自动阻断进行中的网络推演请求，防止异步回调引发 React 状态更新异常。
-     */
-    useEffect(() => {
-        return () => {
-            if (abortControllerRef.current) {
-                abortControllerRef.current.abort();
-            }
-        };
-    }, []);
 
     /**
      * 动态叙事生成器
@@ -159,10 +124,6 @@ export const useAiGeneration = ({
             directives
         };
 
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-        }
-        abortControllerRef.current = new AbortController();
 
         isGeneratingDyRef.current = true;
         lastTriggerTimeRef.current = now;
@@ -176,20 +137,13 @@ export const useAiGeneration = ({
         dySessionRef.current = sessionKey;
 
         try {
-            const narrative = await withTimeout(
-                AiService.generateDyNarrative(settings, context),
-                45000,
-                '动态叙事'
-            );
+            const narrative = await AiService.generateDyNarrative(settings, context);
 
             if (dySessionRef.current === sessionKey && narrative) {
                 return narrative;
             }
         } catch (error: unknown) {
-            const err = error as Error;
-            if (err.name !== 'AbortError' && !/超时/.test(err.message ?? '')) {
-                console.warn('[系统] 动态叙事生成被外部异常中断，回退原生节点描述:', err);
-            }
+            console.warn('[系统] 动态叙事生成异常，回退原生节点描述:', error);
         } finally {
             if (dySessionRef.current === sessionKey) {
                 isGeneratingDyRef.current = false;
@@ -268,13 +222,23 @@ export const useAiGeneration = ({
 
             if (newZone && PersistenceService.isReady) {
                 try {
-                    const chainCtx = genContext as ChainGenerationContext;
-                    const arcId = genContext.base.mode.id === 'chain'
-                        ? `${chainCtx.base.theme.id}_${chainCtx.base.motif.id}_${chainCtx.base.mainAxis.id}`
+                    const isChain = genContext.base.mode.id === 'chain';
+                    const chainCtx = isChain ? (genContext as ChainGenerationContext) : undefined;
+                    const arcId = isChain
+                        ? (player.activeArc?.id || `${chainCtx?.base.theme.id}_${chainCtx?.base.motif?.id ?? 'nomotif'}_${chainCtx?.base.mainAxis?.id ?? 'noaxis'}`)
+                        : undefined;
+                    const expectedIndex = isChain
+                        ? (player.activeArc?.currentIndex || 0) + 1
                         : undefined;
 
-                    await PersistenceService.saveZone(newZone, genContext.base.mode.id as 'chain' | 'episodic', arcId);
-                    const modeText = genContext.base.mode.id === 'chain' ? `叙事链[${arcId}]` : '单元剧';
+                    const saveResult = await PersistenceService.saveZone(
+                        newZone,
+                        genContext.base.mode.id as 'chain' | 'episodic',
+                        arcId,
+                        expectedIndex
+                    );
+                    const savedIndex = saveResult.index ?? expectedIndex;
+                    const modeText = isChain ? `叙事链[${arcId}][#${savedIndex}]` : '单元剧';
                     addLog(`[系统] 区域数据已写入底层存储 (${modeText}): ${newZone.id}`, "success");
                 } catch (e: unknown) {
                     addLog(`[系统] 区域数据存档失败: ${e}`, "warning");
@@ -420,7 +384,7 @@ export const useAiGeneration = ({
     }, [currentZone.id, currentZone.name, settings, addLog, handleAsyncError]);
 
     const generateNewNPCReaction = useCallback(async (
-        npc: Entity<NpcTemplate, NpcDynamicState>,
+        npc: InteractionNpcEntity,
         location: CurrentLocation,
         eventDesc: string
     ): Promise<{ content: string; isAction: boolean } | null> => {

@@ -10,10 +10,9 @@
 import {
     EmotionalTone,
     Mood,
-    NarrativeTheme,
 } from '../../meta'
 
-import type { NoiseColor } from './tool'
+import type { NoiseColor } from './tools'
 
 import {
     base64ToBytes,
@@ -23,7 +22,7 @@ import {
     makeSoftClipCurve,
     pcm16ToAudioBuffer,
     resumeAudioContext,
-} from './tool'
+} from './tools'
 
 // =====================
 // 1. 语音效果类型
@@ -1177,19 +1176,6 @@ const EMOTIONAL_TONE_TO_VOICE_EFFECT: Record<EmotionalTone, VoiceEffect> = {
     determined: 'normal',
 }
 
-const NARRATIVE_THEME_TO_VOICE_EFFECT: Record<NarrativeTheme, VoiceEffect> = {
-    biomechanica: 'robotic',
-    cyber_occult: 'radio',
-    cosmic_horror: 'echo',
-    temporal: 'echo',
-    folk_horror: 'whisper',
-    hostile_biosphere: 'whisper',
-    cognitive_hazard: 'distorted',
-    dream_logic: 'echo',
-    parasitic_symbiosis: 'distorted',
-    industrial_entropy: 'radio',
-}
-
 /**
  * 从 Ekman 六模情绪映射语音效果。
  */
@@ -1204,13 +1190,4 @@ export function voiceEffectFromEmotionalTone(
     tone: EmotionalTone,
 ): VoiceEffect {
     return EMOTIONAL_TONE_TO_VOICE_EFFECT[tone]
-}
-
-/**
- * 从叙事主题映射语音效果。
- */
-export function voiceEffectFromNarrativeTheme(
-    theme: NarrativeTheme,
-): VoiceEffect {
-    return NARRATIVE_THEME_TO_VOICE_EFFECT[theme]
 }

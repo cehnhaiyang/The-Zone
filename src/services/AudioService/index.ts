@@ -3,7 +3,7 @@
  * 支持环境音、音效、音乐、语音和动态混音
  */
 import { ThemeType, DotSoundType, SoundType } from '../../meta';
-import { createImpulseResponse, createHallReverb, createCaveReverb, createMetallicReverb, ReverbType, MusicMood, MusicGenerator } from './tool';
+import { createImpulseResponse, createHallReverb, createCaveReverb, createMetallicReverb, ReverbType, MusicMood, MusicGenerator } from './tools';
 import { SoundPlayer } from './sound';
 import { AmbienceGenerator, } from './ambience';
 import { SpeechPlayer } from './speech';

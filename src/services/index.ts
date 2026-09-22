@@ -5,4 +5,4 @@ export { KeyService } from './KeyService';
 export { ChainNarrativeService, DynamicNarrativeService } from './NarrativeService';
 export { SocializationService } from './SocializationService';
 export { PersistenceService, PersistenceClient } from './PersistenceService';
-export type { SaveFileInfo } from './PersistenceService';
+export type { SaveFileInfo, NarrativeLibrary } from './PersistenceService';

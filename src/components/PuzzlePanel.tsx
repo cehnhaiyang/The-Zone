@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import type { Puzzle } from '../meta';
-import type { PuzzleInteractionController } from '../hooks/useInteraction';
+import type { PuzzleInteractionController } from '../hooks';
 
 interface PuzzlePanelProps {
   puzzle: Puzzle;

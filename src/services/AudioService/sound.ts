@@ -20,8 +20,8 @@ import {
     makeBitCrushCurve,
     makeDistortionCurve,
     makeSoftClipCurve,
-} from './tool'
-import type { NoiseColor } from './tool'
+} from './tools'
+import type { NoiseColor } from './tools'
 
 interface ToneOptions {
     time?: number

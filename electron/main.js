@@ -89,31 +89,38 @@ ipcMain.handle('fs:init', async () => {
 });
 
 // 区域数据
-ipcMain.handle('fs:save-zone', async (_, { ZoneTemplate, NM, arcId }) => {
+ipcMain.handle('fs:save-zone', async (_, { ZoneTemplate, NM, arcId, index }) => {
   try {
     console.log('[fs:save-zone] 接收参数:', {
       zoneId: ZoneTemplate.id,
       NM,
-      arcId
+      arcId,
+      index
     });
 
     let filePath;
+    let savedIndex;
 
     if (NM === 'chain' && arcId) {
       // 链式模式：保存到 maps/chain/{arcId}/{index}.json
       const arcDir = path.join(getAppDataPath(), 'maps', 'chain', sanitize(arcId));
       await ensureDir(arcDir);
 
-      // 获取下一个索引号
+      // 获取索引号
       const existingFiles = fsSync.existsSync(arcDir)
         ? (await fs.readdir(arcDir)).filter(f => /^\d+\.json$/.test(f))
         : [];
-      const nextIndex = existingFiles.length > 0
-        ? Math.max(...existingFiles.map(f => parseInt(f.match(/^(\d+)\.json$/)[1]))) + 1
-        : 1;
 
-      filePath = path.join(arcDir, `${nextIndex}.json`);
-      console.log('[fs:save-zone] 链式模式，保存路径:', filePath, '索引:', nextIndex);
+      if (typeof index === 'number' && Number.isFinite(index) && index > 0) {
+        savedIndex = Math.floor(index);
+      } else {
+        savedIndex = existingFiles.length > 0
+          ? Math.max(...existingFiles.map(f => parseInt(f.match(/^(\d+)\.json$/)[1]))) + 1
+          : 1;
+      }
+
+      filePath = path.join(arcDir, `${savedIndex}.json`);
+      console.log('[fs:save-zone] 链式模式，保存路径:', filePath, '索引:', savedIndex);
     } else if (NM === 'episodic') {
       // 单元剧模式：保存到 maps/episodic/{zoneId}.json
       const episodicDir = path.join(getAppDataPath(), 'maps', 'episodic');
@@ -128,7 +135,7 @@ ipcMain.handle('fs:save-zone', async (_, { ZoneTemplate, NM, arcId }) => {
 
     await fs.writeFile(filePath, JSON.stringify(ZoneTemplate, null, 2), 'utf-8');
     console.log('[fs:save-zone] 保存成功');
-    return { success: true };
+    return { success: true, index: savedIndex };
   } catch (error) {
     console.error('[fs:save-zone] 保存失败:', error);
     return { success: false, error: error.message };
@@ -770,4 +777,29 @@ ipcMain.handle('fs:delete-npc-profile', async (_, { npcName, profileId }) => {
   } catch (error) {
     return { success: false, error: error.message };
   }
-})
+});
+
+// ==================== 叙事库（玩家自建的恐怖域 / 元 / 美学） ====================
+
+const getNarrativeLibraryPath = () => path.join(getAppDataPath(), 'narrative', 'narrative_library.json');
+
+ipcMain.handle('fs:save-narrative-library', async (_, { library }) => {
+  try {
+    const dir = path.join(getAppDataPath(), 'narrative');
+    await ensureDir(dir);
+    await fs.writeFile(getNarrativeLibraryPath(), JSON.stringify(library, null, 2), 'utf-8');
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('fs:load-narrative-library', async () => {
+  try {
+    const filePath = getNarrativeLibraryPath();
+    if (!fsSync.existsSync(filePath)) return { success: true, data: null };
+    return { success: true, data: JSON.parse(await fs.readFile(filePath, 'utf-8')) };
+  } catch (error) {
+    return { success: false, error: error.message, data: null };
+  }
+});

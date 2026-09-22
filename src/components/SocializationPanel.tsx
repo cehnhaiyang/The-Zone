@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type {
-    NpcTemplate,
+    AffinityPhase,
+    CompanionTemplate,
+    InteractionNpcEntity,
+    NodeNpcTemplate,
     PlayerState,
     NPCTabMode,
     ItemInstance,
-    Entity,
-    NpcDynamicState,
+    TrustPhase,
     Words,
     PlayerWordsTag,
     NpcWordsTag,
@@ -18,9 +20,16 @@ import type {
     ZoneDate,
     NeuralLinkState
 } from '../meta';
-import { RelationshipPhase, isItemTemplate } from '../meta';
+import {
+    isItemTemplate,
+    isEquipmentInstance,
+    isWeaponInstance,
+    isConsumableInstance,
+    normalizeEquipState,
+    safeNumber
+} from '../meta';
 import { RARITY_MAP } from '../constants';
-import { AudioService, PersistenceService } from '../services';
+import { AudioService, PersistenceService, SocializationService } from '../services';
 
 const GLYPHS = {
     link: 'M9.5 14.5l5-5M7.5 12L5 14.5a3.54 3.54 0 005 5L12.5 17M16.5 12L19 9.5a3.54 3.54 0 00-5-5L11.5 7',
@@ -28,9 +37,7 @@ const GLYPHS = {
     backpack: 'M9 7V5a3 3 0 016 0v2M6 7h12a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2V9a2 2 0 012-2zM9 13h6v4H9z',
     clipboard: 'M9 4h6v3H9zM9 4.5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-12a2 2 0 00-2-2h-2M9 11.5h6M9 15h4',
     user: 'M12 11a4 4 0 100-8 4 4 0 000 8zM4.5 20.5c1.4-3.4 4.3-5 7.5-5s6.1 1.6 7.5 5',
-    users: 'M9 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM2.5 20v-1.5a6.5 6.5 0 0113 0V20M16 4.6a3.5 3.5 0 010 6M17.5 14.4a6.5 6.5 0 014 5.6V20',
     heart: 'M12 20.5S4.8 16 3 11.6A4.8 4.8 0 0112 8a4.8 4.8 0 019 3.6C19.2 16 12 20.5 12 20.5z',
-    cross: 'M9.5 4h5v5.5H20v5h-5.5V20h-5v-5.5H4v-5h5.5V4z',
     keyboard: 'M3 7h18v10H3zM6.5 10.5h.01M9.5 10.5h.01M12.5 10.5h.01M15.5 10.5h.01M18 10.5h.01M6.5 13.5h.01M18 13.5h.01M9.5 14h5',
     send: 'M3.5 11.5L20.5 4l-7.5 17-2.5-7.5-7-2zM20.5 4L10.5 13.5',
     close: 'M6 6l12 12M18 6L6 18',
@@ -99,7 +106,8 @@ const ITEM_GLYPHS: Record<ItemTemplate['type'], GlyphName> = {
     accessory: 'ring',
     consumable: 'vial',
     data: 'document',
-    material: 'box'
+    material: 'box',
+    storage: 'backpack'
 };
 
 const ITEM_TYPE_LABELS: Record<ItemTemplate['type'], string> = {
@@ -108,7 +116,8 @@ const ITEM_TYPE_LABELS: Record<ItemTemplate['type'], string> = {
     accessory: '饰品',
     consumable: '消耗品',
     data: '数据',
-    material: '材料'
+    material: '材料',
+    storage: '仓储'
 };
 
 /** Ekman 六模情绪标签与气泡色带。 */
@@ -130,41 +139,55 @@ const MOOD_BORDER: Record<Mood, string> = {
     neutral: 'border-l-zinc-400'
 };
 
-/** 信任阶段 UI 映射（仅展示层默认分段，引擎结算以 Settings.social.thresholds 为准）。 */
-const TRUST_PHASE_META: Record<RelationshipPhase, { chip: string; dot: string }> = {
-    [RelationshipPhase.HOSTILE]: {
+/**
+ * 关系阶段 UI 映射。
+ *
+ * 信任轴（猜忌 → 长盟）与好感轴（离心 → 同气）的阶段名互不重名，
+ * 因此共用同一张色带表；阶段判定一律走 SocializationService，本表只负责配色。
+ */
+const RELATION_PHASE_META: Record<TrustPhase | AffinityPhase, { chip: string; dot: string }> = {
+    // —— 信任轴 ——
+    猜忌: {
         chip: 'text-red-400 border-red-500/50 bg-red-950/40',
         dot: 'bg-red-500'
     },
-    [RelationshipPhase.GUARDED]: {
+    防备: {
         chip: 'text-orange-400 border-orange-500/50 bg-orange-950/40',
         dot: 'bg-orange-400'
     },
-    [RelationshipPhase.NEUTRAL]: {
+    审慎: {
         chip: 'text-zinc-300 border-zinc-600 bg-zinc-900/60',
         dot: 'bg-zinc-400'
     },
-    [RelationshipPhase.FAMILIAR]: {
+    浅合: {
         chip: 'text-blue-300 border-blue-500/50 bg-blue-950/40',
         dot: 'bg-blue-400'
     },
-    [RelationshipPhase.TRUSTING]: {
+    长盟: {
         chip: 'text-emerald-300 border-emerald-500/50 bg-emerald-950/40',
         dot: 'bg-emerald-400'
     },
-    [RelationshipPhase.BONDED]: {
+    // —— 好感轴 ——
+    离心: {
+        chip: 'text-red-400 border-red-500/60 bg-red-950/50',
+        dot: 'bg-red-500'
+    },
+    芥蒂: {
+        chip: 'text-orange-300 border-orange-500/50 bg-orange-950/40',
+        dot: 'bg-orange-400'
+    },
+    相敬: {
+        chip: 'text-zinc-300 border-zinc-600 bg-zinc-900/60',
+        dot: 'bg-zinc-400'
+    },
+    相得: {
+        chip: 'text-sky-300 border-sky-500/50 bg-sky-950/40',
+        dot: 'bg-sky-400'
+    },
+    同气: {
         chip: 'text-fuchsia-300 border-fuchsia-500/50 bg-fuchsia-950/40',
         dot: 'bg-fuchsia-400'
     }
-};
-
-const getTrustPhase = (trust: number): RelationshipPhase => {
-    if (trust >= 90) return RelationshipPhase.BONDED;
-    if (trust >= 75) return RelationshipPhase.TRUSTING;
-    if (trust >= 60) return RelationshipPhase.FAMILIAR;
-    if (trust >= 40) return RelationshipPhase.NEUTRAL;
-    if (trust >= 20) return RelationshipPhase.GUARDED;
-    return RelationshipPhase.HOSTILE;
 };
 
 /** 任务难度标签，对齐《数值设计规范》。 */
@@ -242,7 +265,7 @@ const VitalWave: React.FC<{ ratio: number; critical?: boolean; className?: strin
 // 分段式诊断仪表
 // =====================
 
-type GaugeType = DynamicVitalType | 'trust';
+type GaugeType = DynamicVitalType | 'relation';
 
 const DiagnosticGauge: React.FC<{
     label: string;
@@ -266,7 +289,7 @@ const DiagnosticGauge: React.FC<{
                 return 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]';
             case 'sanity':
                 return 'bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]';
-            case 'trust':
+            case 'relation':
                 return 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]';
             case 'stamina':
                 return 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]';
@@ -474,11 +497,375 @@ const PersonalityMountModal: React.FC<{
 };
 
 // =====================
+// 同伴战备管理中枢模态框
+// =====================
+
+interface CompanionManagementModalProps {
+    npc: InteractionNpcEntity;
+    player: PlayerState;
+    onClose: () => void;
+    onCompanionEquipItem?: (item: ItemInstance, slotIndex?: number) => void;
+    onCompanionUnequipItem?: (itemType: 'weapon' | 'armor' | 'accessory', slotIndex: number) => void;
+    onCompanionUseConsumable?: (item: ItemInstance) => void;
+}
+
+const LoadoutItemRow: React.FC<{
+    item: ItemInstance;
+    onUnequip?: () => void;
+}> = ({ item, onUnequip }) => (
+    <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+            <div className="text-xs font-bold text-zinc-100 truncate">{item.name}</div>
+            <div className="text-[10px] text-zinc-500 font-mono mt-0.5">
+                {ITEM_TYPE_LABELS[item.type]} // 稀有度: {item.grade}
+            </div>
+        </div>
+        {onUnequip && (
+            <button
+                onClick={() => {
+                    AudioService.playSfx('ui_click');
+                    onUnequip();
+                }}
+                className="px-3 py-1 bg-red-950/40 border border-red-800/60 hover:bg-red-900/60 text-red-400 text-[10px] font-mono font-bold rounded transition-all shrink-0 active:scale-95"
+            >
+                卸下
+            </button>
+        )}
+    </div>
+);
+
+const LoadoutSlotCard: React.FC<{
+    title: string;
+    isMounted: boolean;
+    emptyText: string;
+    children?: React.ReactNode;
+}> = ({ title, isMounted, emptyText, children }) => (
+    <div className="p-3.5 rounded border border-zinc-800 bg-black/40 relative overflow-hidden">
+        <div className="text-[9px] font-mono text-zinc-500 tracking-wider mb-1.5 uppercase flex items-center justify-between">
+            <span>{title}</span>
+            {isMounted && <span className="text-cyan-400">已装配</span>}
+        </div>
+        {isMounted ? (
+            children
+        ) : (
+            <div className="text-[10px] font-mono text-zinc-600 italic py-1 border border-dashed border-zinc-800/80 rounded text-center">
+                {emptyText}
+            </div>
+        )}
+    </div>
+);
+
+const CompanionManagementModal: React.FC<CompanionManagementModalProps> = ({
+    npc,
+    player,
+    onClose,
+    onCompanionEquipItem,
+    onCompanionUnequipItem,
+    onCompanionUseConsumable
+}) => {
+    const [activeSubTab, setActiveSubTab] = useState<'equip' | 'consumable'>('equip');
+    const companionEquipment = normalizeEquipState(npc.dynamic.equipment);
+
+    const playerEquipments = useMemo(
+        () => player.dynamic.inventory.filter(isEquipmentInstance),
+        [player.dynamic.inventory]
+    );
+
+    const playerConsumables = useMemo(
+        () => player.dynamic.inventory.filter(isConsumableInstance),
+        [player.dynamic.inventory]
+    );
+
+    const maxHp = Math.max(1, safeNumber(npc.dynamic.maxHp, 100));
+    const maxSanity = Math.max(1, safeNumber(npc.dynamic.maxSanity, 100));
+    const maxStamina = Math.max(1, safeNumber(npc.dynamic.maxStamina, 100));
+    const maxVigor = Math.max(1, safeNumber(npc.dynamic.maxVigor, 100));
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200">
+            <div className="w-full max-w-5xl bg-zinc-950 border border-cyan-500/50 rounded-lg shadow-[0_0_40px_rgba(6,182,212,0.2)] flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
+                {/* 顶部标题栏 */}
+                <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/80 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <span className="text-cyan-400">
+                            <Glyph name="backpack" className="w-5 h-5" />
+                        </span>
+                        <div>
+                            <h3 className="text-base font-bold text-zinc-100 sp-display tracking-wide flex items-center gap-2">
+                                同伴战备整备中枢 <span className="text-cyan-400 font-mono">[{npc.static.name}]</span>
+                            </h3>
+                            <div className="text-[10px] text-zinc-500 font-mono">
+                                COMPANION_LOADOUT_SYSTEM // 实时调配武器模块、防护外骨骼与补给物资
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => {
+                            AudioService.playSfx('ui_click');
+                            onClose();
+                        }}
+                        aria-label="关闭"
+                        className="text-zinc-500 hover:text-zinc-200 p-1.5 transition-colors rounded hover:bg-zinc-800/60"
+                    >
+                        <Glyph name="close" />
+                    </button>
+                </div>
+
+                {/* 快捷体征状态带 */}
+                <div className="px-6 py-3 bg-black/50 border-b border-zinc-800/80 flex flex-wrap items-center justify-between gap-4 text-xs font-mono shrink-0">
+                    <div className="flex items-center gap-6 flex-wrap">
+                        <div className="flex items-center gap-2">
+                            <span className="text-zinc-500 text-[10px] uppercase">生命 (HP):</span>
+                            <span className="text-emerald-400 font-bold">{Math.round(npc.dynamic.hp)} / {maxHp}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-zinc-500 text-[10px] uppercase">理智 (SAN):</span>
+                            <span className="text-purple-400 font-bold">{Math.round(npc.dynamic.sanity)} / {maxSanity}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-zinc-500 text-[10px] uppercase">耐力 (STA):</span>
+                            <span className="text-blue-400 font-bold">{Math.round(npc.dynamic.stamina)} / {maxStamina}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-zinc-500 text-[10px] uppercase">活力 (VIG):</span>
+                            <span className="text-orange-400 font-bold">{Math.round(npc.dynamic.vigor)} / {maxVigor}</span>
+                        </div>
+                    </div>
+                    <div className="text-[10px] text-cyan-400 border border-cyan-800/60 bg-cyan-950/30 px-2.5 py-0.5 rounded-sm">
+                        战备链路稳定
+                    </div>
+                </div>
+
+                {/* 主操作区：左右分栏 */}
+                <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-0">
+                    {/* 左侧：同伴当前装配槽位 (占5列) */}
+                    <div className="md:col-span-5 border-r border-zinc-800/80 flex flex-col bg-zinc-950/60 overflow-y-auto p-5 scrollbar-thin scrollbar-thumb-zinc-700">
+                        <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse shadow-[0_0_6px_#06b6d4]"></span>
+                            当前装配模块 (ACTIVE LOADOUT)
+                        </div>
+
+                        <div className="space-y-3.5">
+                            {/* 主手武器 */}
+                            <LoadoutSlotCard
+                                title="主手武器 (MAIN WEAPON)"
+                                isMounted={Boolean(companionEquipment.weapons.main)}
+                                emptyText="[ 空置主手武器槽 ]"
+                            >
+                                {companionEquipment.weapons.main && (
+                                    <LoadoutItemRow
+                                        item={companionEquipment.weapons.main}
+                                        onUnequip={onCompanionUnequipItem ? () => onCompanionUnequipItem('weapon', 0) : undefined}
+                                    />
+                                )}
+                            </LoadoutSlotCard>
+
+                            {/* 副手武器 */}
+                            <LoadoutSlotCard
+                                title="副手武器 (SIDE WEAPON)"
+                                isMounted={Boolean(companionEquipment.weapons.side)}
+                                emptyText="[ 空置副手武器槽 ]"
+                            >
+                                {companionEquipment.weapons.side && (
+                                    <LoadoutItemRow
+                                        item={companionEquipment.weapons.side}
+                                        onUnequip={onCompanionUnequipItem ? () => onCompanionUnequipItem('weapon', 1) : undefined}
+                                    />
+                                )}
+                            </LoadoutSlotCard>
+
+                            {/* 防具/外骨骼 */}
+                            <LoadoutSlotCard
+                                title="外骨骼护甲 (ARMOR LOADOUT)"
+                                isMounted={companionEquipment.armors.some(Boolean)}
+                                emptyText="[ 空置防具槽 ]"
+                            >
+                                <div className="space-y-2">
+                                    {companionEquipment.armors.map((armor, idx) =>
+                                        armor ? (
+                                            <LoadoutItemRow
+                                                key={armor.instanceId || idx}
+                                                item={armor}
+                                                onUnequip={onCompanionUnequipItem ? () => onCompanionUnequipItem('armor', idx) : undefined}
+                                            />
+                                        ) : null
+                                    )}
+                                </div>
+                            </LoadoutSlotCard>
+
+                            {/* 辅助饰品模块 */}
+                            <LoadoutSlotCard
+                                title="神经/辅助饰品 (ACCESSORIES)"
+                                isMounted={companionEquipment.accessories.some(Boolean)}
+                                emptyText="[ 空置饰品槽 ]"
+                            >
+                                <div className="space-y-2">
+                                    {companionEquipment.accessories.map((acc, idx) =>
+                                        acc ? (
+                                            <LoadoutItemRow
+                                                key={acc.instanceId || idx}
+                                                item={acc}
+                                                onUnequip={onCompanionUnequipItem ? () => onCompanionUnequipItem('accessory', idx) : undefined}
+                                            />
+                                        ) : null
+                                    )}
+                                </div>
+                            </LoadoutSlotCard>
+                        </div>
+                    </div>
+
+                    {/* 右侧：玩家背囊可调配战备与消耗品 (占7列) */}
+                    <div className="md:col-span-7 flex flex-col bg-zinc-900/40 overflow-hidden">
+                        {/* 顶部二级页签切换 */}
+                        <div className="h-11 border-b border-zinc-800 flex bg-black/60 shrink-0">
+                            <button
+                                onClick={() => {
+                                    AudioService.playSfx('ui_click');
+                                    setActiveSubTab('equip');
+                                }}
+                                className={`flex-1 text-[11px] font-mono uppercase tracking-widest flex items-center justify-center gap-2 border-b-2 transition-all ${activeSubTab === 'equip'
+                                    ? 'border-cyan-500 text-cyan-400 bg-zinc-900/80'
+                                    : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                                    }`}
+                            >
+                                <Glyph name="swords" className="w-3.5 h-3.5" /> 战备装备调配 ({playerEquipments.length})
+                            </button>
+                            <div className="w-[1px] bg-zinc-800 my-2"></div>
+                            <button
+                                onClick={() => {
+                                    AudioService.playSfx('ui_click');
+                                    setActiveSubTab('consumable');
+                                }}
+                                className={`flex-1 text-[11px] font-mono uppercase tracking-widest flex items-center justify-center gap-2 border-b-2 transition-all ${activeSubTab === 'consumable'
+                                    ? 'border-emerald-500 text-emerald-400 bg-zinc-900/80'
+                                    : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                                    }`}
+                            >
+                                <Glyph name="vial" className="w-3.5 h-3.5" /> 消耗补给供给 ({playerConsumables.length})
+                            </button>
+                        </div>
+
+                        {/* 列表区 */}
+                        <div className="flex-1 overflow-y-auto p-5 scrollbar-thin scrollbar-thumb-zinc-700">
+                            {activeSubTab === 'equip' ? (
+                                playerEquipments.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center py-16 text-zinc-600 font-mono text-xs">
+                                        <Glyph name="box" className="w-10 h-10 mb-3 opacity-30" />
+                                        玩家背囊中当前没有可调配的战备装备
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2.5">
+                                        {playerEquipments.map((item) => (
+                                            <div
+                                                key={item.instanceId}
+                                                className="p-3 border border-zinc-800 bg-black/50 hover:border-zinc-700 hover:bg-zinc-900/60 rounded flex items-center justify-between gap-3 transition-all"
+                                            >
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="w-8 h-8 rounded border border-zinc-700 bg-black/60 flex items-center justify-center text-zinc-400 shrink-0">
+                                                        <Glyph name={ITEM_GLYPHS[item.type] || 'box'} className="w-4 h-4" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="text-xs font-bold text-zinc-200 truncate">{item.name}</div>
+                                                        <div className="text-[10px] text-zinc-500 font-mono">
+                                                            {ITEM_TYPE_LABELS[item.type]} // {item.grade}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    {isWeaponInstance(item) ? (
+                                                        <>
+                                                            <button
+                                                                onClick={() => {
+                                                                    AudioService.playSfx('ui_click');
+                                                                    onCompanionEquipItem?.(item, 0);
+                                                                }}
+                                                                className="px-2.5 py-1 bg-cyan-950/60 border border-cyan-600/60 hover:bg-cyan-900/80 text-cyan-300 text-[10px] font-mono rounded transition-all active:scale-95"
+                                                            >
+                                                                装主手
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    AudioService.playSfx('ui_click');
+                                                                    onCompanionEquipItem?.(item, 1);
+                                                                }}
+                                                                className="px-2.5 py-1 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 text-zinc-300 text-[10px] font-mono rounded transition-all active:scale-95"
+                                                            >
+                                                                装副手
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => {
+                                                                AudioService.playSfx('ui_click');
+                                                                onCompanionEquipItem?.(item);
+                                                            }}
+                                                            className="px-3 py-1 bg-cyan-950/60 border border-cyan-600/60 hover:bg-cyan-900/80 text-cyan-300 text-[10px] font-mono font-bold rounded transition-all active:scale-95"
+                                                        >
+                                                            装配给同伴
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )
+                            ) : (
+                                playerConsumables.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center py-16 text-zinc-600 font-mono text-xs">
+                                        <Glyph name="vial" className="w-10 h-10 mb-3 opacity-30" />
+                                        玩家背囊中当前没有可供给的消耗品
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2.5">
+                                        {playerConsumables.map((item) => (
+                                            <div
+                                                key={item.instanceId}
+                                                className="p-3 border border-zinc-800 bg-black/50 hover:border-zinc-700 hover:bg-zinc-900/60 rounded flex items-center justify-between gap-3 transition-all"
+                                            >
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="w-8 h-8 rounded border border-emerald-900/50 bg-emerald-950/30 flex items-center justify-center text-emerald-400 shrink-0">
+                                                        <Glyph name="vial" className="w-4 h-4" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="text-xs font-bold text-zinc-200 truncate flex items-center gap-2">
+                                                            <span>{item.name}</span>
+                                                            {item.quantity !== undefined && item.quantity > 1 && (
+                                                                <span className="text-[10px] font-mono text-zinc-500">x{item.quantity}</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-[10px] text-zinc-500 font-mono truncate">
+                                                            {(item.effects ?? []).map(eff => `${eff[0]}: ${eff[1] > 0 ? '+' : ''}${eff[1]}`).join(' | ') || '常规消耗品'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        AudioService.playSfx('ui_click');
+                                                        onCompanionUseConsumable?.(item);
+                                                    }}
+                                                    className="px-3 py-1 bg-emerald-950/60 border border-emerald-600/60 hover:bg-emerald-900/80 text-emerald-300 text-[10px] font-mono font-bold rounded transition-all shrink-0 active:scale-95"
+                                                >
+                                                    注入使用
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// =====================
 // 左侧：生物监测与视觉数据中枢
 // =====================
 
 const BioMonitorSection: React.FC<{
-    npc: Entity<NpcTemplate, NpcDynamicState>;
+    npc: InteractionNpcEntity;
     isRecruited: boolean;
     isGenerating: boolean;
     onRecruit: () => void;
@@ -488,7 +875,7 @@ const BioMonitorSection: React.FC<{
     onGenerateNpcImage?: () => void;
     onRandomSwitchNpcImage?: () => Promise<string | null>;
     hasMultipleNpcVariants?: () => Promise<boolean>;
-    intimacyTrustThreshold: number;
+    onOpenCompanionManagement?: () => void;
 }> = ({
     npc,
     isRecruited,
@@ -500,7 +887,7 @@ const BioMonitorSection: React.FC<{
     onGenerateNpcImage,
     onRandomSwitchNpcImage,
     hasMultipleNpcVariants,
-    intimacyTrustThreshold
+    onOpenCompanionManagement
 }) => {
         const [showMountModal, setShowMountModal] = useState(false);
         const [canSwitchVariant, setCanSwitchVariant] = useState(false);
@@ -513,8 +900,15 @@ const BioMonitorSection: React.FC<{
         const maxVigor = Math.max(1, npc.dynamic.maxVigor);
         const hpRatio = npc.dynamic.hp / maxHp;
         const isDead = npc.dynamic.hp <= 0;
-        const phase = getTrustPhase(npc.dynamic.trust);
-        const phaseMeta = TRUST_PHASE_META[phase];
+
+        // 关系轴快照：节点 NPC 走信任轴，同伴走好感轴。
+        const relation = SocializationService.resolveRelation(npc.dynamic);
+        const phaseMeta = RELATION_PHASE_META[relation.phase];
+        // 好感为负时，同伴每个 absoluteTick 都有离队概率（契约的离队判定）。
+        const leaveChance =
+            relation.axis === 'affinity'
+                ? SocializationService.getCompanionLeaveChance(relation.score)
+                : 0;
 
         useEffect(() => {
             let active = true;
@@ -704,12 +1098,11 @@ const BioMonitorSection: React.FC<{
                                 color="text-orange-400"
                             />
                             <DiagnosticGauge
-                                type="trust"
-                                label="同步比率 (TRUST)"
-                                value={npc.dynamic.trust}
-                                max={100}
+                                type="relation"
+                                label={`${relation.label}读数 (${relation.axis === 'trust' ? 'TRUST' : 'AFFINITY'})`}
+                                value={relation.score}
+                                max={relation.range.max}
                                 color="text-amber-400"
-                                marker={intimacyTrustThreshold}
                             />
                         </div>
                         <div className="flex items-center justify-between pt-1">
@@ -720,9 +1113,22 @@ const BioMonitorSection: React.FC<{
                                 className={`px-2.5 py-1 text-[10px] font-mono font-bold border rounded-sm flex items-center gap-1.5 transition-all ${phaseMeta.chip}`}
                             >
                                 <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${phaseMeta.dot}`}></span>
-                                {phase}
+                                {relation.label} · {relation.phase}
                             </span>
                         </div>
+                        {leaveChance > 0 && (
+                            <div className="flex items-center justify-between pt-1">
+                                <span className="text-[10px] text-red-400 font-mono uppercase tracking-[0.2em] animate-pulse">
+                                    离心离队风险 (DESERTION)
+                                </span>
+                                <span className="px-2.5 py-1 text-[10px] font-mono font-bold text-red-300 border border-red-900/60 bg-red-950/40 rounded-sm">
+                                    {Math.round(leaveChance * 100)}% / TICK
+                                </span>
+                            </div>
+                        )}
+                        <p className="pt-2 mt-1 text-[10px] text-zinc-500 font-serif italic leading-relaxed border-t border-zinc-800/60 text-justify">
+                            {relation.behavior}
+                        </p>
                     </div>
 
                     {/* 深度档案 */}
@@ -793,22 +1199,35 @@ const BioMonitorSection: React.FC<{
                     </div>
                 </div>
 
-                <div className="shrink-0 p-5 border-t border-zinc-800/80 bg-zinc-950/90 backdrop-blur-xl grid grid-cols-2 gap-3 relative z-30">
+                <div className="shrink-0 p-5 border-t border-zinc-800/80 bg-zinc-950/90 backdrop-blur-xl flex flex-col gap-2.5 relative z-30">
                     {!isRecruited ? (
                         <button
                             onClick={() => {
                                 AudioService.playSfx('ui_click');
                                 onRecruit();
                             }}
-                            className="p-3.5 border border-emerald-500/40 bg-emerald-950/30 text-emerald-400 hover:bg-emerald-500 hover:text-zinc-950 hover:border-emerald-400 text-[10px] font-mono font-bold tracking-[0.2em] uppercase transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] rounded-sm active:scale-[0.98]"
+                            className="w-full p-3.5 border border-emerald-500/40 bg-emerald-950/30 text-emerald-400 hover:bg-emerald-500 hover:text-zinc-950 hover:border-emerald-400 text-[10px] font-mono font-bold tracking-[0.2em] uppercase transition-all duration-300 shadow-[0_0_15px_rgba(16,185,129,0.15)] hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] rounded-sm active:scale-[0.98]"
                         >
                             [ 建立连接协议 ]
                         </button>
                     ) : (
-                        <div className="col-span-2 p-3.5 flex items-center justify-center gap-3 text-[10px] text-emerald-400 border border-emerald-900/50 bg-emerald-950/30 font-mono tracking-[0.2em] uppercase rounded-sm shadow-[inset_0_0_15px_rgba(16,185,129,0.1)]">
-                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]"></span>
-                            协议连通中 (ACTIVE)
-                        </div>
+                        <>
+                            <div className="p-2.5 flex items-center justify-center gap-3 text-[10px] text-emerald-400 border border-emerald-900/50 bg-emerald-950/30 font-mono tracking-[0.2em] uppercase rounded-sm shadow-[inset_0_0_15px_rgba(16,185,129,0.1)]">
+                                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]"></span>
+                                协议连通中 (ACTIVE)
+                            </div>
+                            {onOpenCompanionManagement && (
+                                <button
+                                    onClick={() => {
+                                        AudioService.playSfx('ui_click');
+                                        onOpenCompanionManagement();
+                                    }}
+                                    className="w-full p-3 bg-cyan-950/60 border border-cyan-500/60 hover:bg-cyan-900/80 hover:border-cyan-400 text-cyan-300 hover:text-white text-[11px] font-mono font-bold tracking-[0.2em] uppercase transition-all duration-300 shadow-[0_0_15px_rgba(6,182,212,0.2)] rounded-sm flex items-center justify-center gap-2 active:scale-[0.98]"
+                                >
+                                    <Glyph name="backpack" className="w-4 h-4" /> [ 同伴战备整备 ]
+                                </button>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
@@ -1017,7 +1436,7 @@ const CommandHeader: React.FC<{
 
 interface SocializationPanelProps {
     /** NPC 实体数据 */
-    npc: Entity<NpcTemplate, NpcDynamicState>;
+    npc: InteractionNpcEntity;
     /** 玩家状态数据 */
     player: PlayerState;
     /** 发送消息回调 */
@@ -1032,12 +1451,18 @@ interface SocializationPanelProps {
     isGenerating: boolean;
     /** 是否已完成招募 / 建立深入连接 */
     isRecruited: boolean;
-    /** 本地基础动作回调 */
-    onLocalAction: (actionType: 'hug' | 'heal') => void;
     /** 取走物品回调 */
     onTakeItem: (item: ItemInstance) => void;
-    /** 亲密 / 核心共振互动回调 */
-    onIntimacy?: () => void;
+    /** 同伴专属谈心互动回调 */
+    onHeartToHeart?: () => void;
+    /** 节点 NPC 专属委托请求回调 */
+    onRequestQuest?: () => void;
+    /** 为同伴装备物品回调 */
+    onCompanionEquipItem?: (item: ItemInstance, slotIndex?: number) => void;
+    /** 为同伴卸下装备回调 */
+    onCompanionUnequipItem?: (itemType: 'weapon' | 'armor' | 'accessory', slotIndex: number) => void;
+    /** 对同伴使用消耗品回调 */
+    onCompanionUseConsumable?: (item: ItemInstance) => void;
     /** 触发生成 NPC 视觉图像回调 */
     onGenerateNpcImage?: () => void;
     /** 随机切换 NPC 肖像回调 */
@@ -1052,8 +1477,6 @@ interface SocializationPanelProps {
     onDeleteProfile?: (profileId: string) => Promise<void>;
     /** 接取委托 */
     onAcceptQuest?: (questId: string, questData: Partial<Quest>) => void;
-    /** 亲密交互信任阈值 */
-    intimacyTrustThreshold?: number;
 }
 
 const SocializationPanel: React.FC<SocializationPanelProps> = ({
@@ -1065,22 +1488,25 @@ const SocializationPanel: React.FC<SocializationPanelProps> = ({
     onClose,
     isGenerating,
     isRecruited,
-    onLocalAction,
     onTakeItem,
-    onIntimacy,
+    onHeartToHeart,
+    onRequestQuest,
+    onCompanionEquipItem,
+    onCompanionUnequipItem,
+    onCompanionUseConsumable,
     onGenerateNpcImage,
     onRandomSwitchNpcImage,
     hasMultipleNpcVariants,
     onMountProfile,
     onUnmountCreateNewProfile,
     onDeleteProfile,
-    onAcceptQuest,
-    intimacyTrustThreshold = 75
+    onAcceptQuest
 }) => {
     const [activeTab, setActiveTab] = useState<NPCTabMode>('interaction');
     const [inputValue, setInputValue] = useState('');
     const [isSending, setIsSending] = useState(false);
     const [showFreeChat, setShowFreeChat] = useState(false);
+    const [showCompanionModal, setShowCompanionModal] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -1093,7 +1519,28 @@ const SocializationPanel: React.FC<SocializationPanelProps> = ({
         return words;
     }, [player.dialogue]);
 
-    const npcQuests = useMemo<QuestTemplate[]>(() => npc.static.initialState.quest ?? [], [npc.static.initialState.quest]);
+    // 关系轴快照：节点 NPC 走信任轴，同伴走好感轴
+    const relation = SocializationService.resolveRelation(npc.dynamic);
+
+    /**
+     * 委托 / 需求列表。
+     *
+     * 节点 NPC 走 `initialState.quests`（信任轴），同伴走 `needs`（好感轴）；
+     * 两者结构一致，共用同一套渲染与顺序解锁规则。
+     */
+    const npcQuests = useMemo<QuestTemplate[]>(() => {
+        const nodeNpcQuests = (npc.static as NodeNpcTemplate).initialState.quests ?? [];
+        if (nodeNpcQuests.length > 0) return nodeNpcQuests;
+
+        const companionNeeds =
+            'needs' in npc.dynamic && Array.isArray(npc.dynamic.needs)
+                ? npc.dynamic.needs
+                : ('needs' in npc.static.initialState && Array.isArray(npc.static.initialState.needs)
+                    ? npc.static.initialState.needs
+                    : []);
+
+        return companionNeeds;
+    }, [npc.static, npc.dynamic]);
 
     const isQuestAccepted = useCallback(
         (questId: string) => (player.questAccepted ?? []).some(q => q.id === questId),
@@ -1107,6 +1554,10 @@ const SocializationPanel: React.FC<SocializationPanelProps> = ({
         (questId: string) => (player.questArchived ?? []).some(q => q.id === questId && q.status === 'done'),
         [player.questArchived]
     );
+
+    const hasActiveOrPendingQuests = useMemo(() => {
+        return npcQuests.some(q => !isQuestDone(q.id));
+    }, [npcQuests, isQuestDone]);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -1146,7 +1597,30 @@ const SocializationPanel: React.FC<SocializationPanelProps> = ({
         }
     };
 
-    const renderQuestEntity = (entity: ItemTemplate | NpcTemplate, index: number) => {
+    /**
+     * 委托条目渲染。
+     *
+     * 契约允许目标项为「节点 NPC id 字符串」（不得内联 NPC 模板），
+     * 奖励项为物品模板或完整同伴模板，这里统一收敛为同一种卡片。
+     */
+    const renderQuestEntity = (
+        entity: ItemTemplate | NodeNpcTemplate | CompanionTemplate | string,
+        index: number
+    ) => {
+        if (typeof entity === 'string') {
+            return (
+                <div
+                    key={`${entity}-${index}`}
+                    className="flex items-center gap-2 px-2.5 py-1.5 border border-zinc-800 bg-black/40 rounded-sm text-[10px] text-zinc-300 font-mono hover:border-zinc-600 transition-colors"
+                >
+                    <span className="text-amber-400">
+                        <Glyph name="user" className="w-3.5 h-3.5" />
+                    </span>
+                    <span className="truncate">关键人员 · {entity}</span>
+                </div>
+            );
+        }
+
         const isItem = isItemTemplate(entity);
         return (
             <div
@@ -1193,6 +1667,17 @@ const SocializationPanel: React.FC<SocializationPanelProps> = ({
                     onClose={onClose}
                 />
 
+                {showCompanionModal && isRecruited && (
+                    <CompanionManagementModal
+                        npc={npc}
+                        player={player}
+                        onClose={() => setShowCompanionModal(false)}
+                        onCompanionEquipItem={onCompanionEquipItem}
+                        onCompanionUnequipItem={onCompanionUnequipItem}
+                        onCompanionUseConsumable={onCompanionUseConsumable}
+                    />
+                )}
+
                 <div className="flex-1 flex overflow-hidden">
                     <BioMonitorSection
                         npc={npc}
@@ -1205,7 +1690,7 @@ const SocializationPanel: React.FC<SocializationPanelProps> = ({
                         onGenerateNpcImage={onGenerateNpcImage}
                         onRandomSwitchNpcImage={onRandomSwitchNpcImage}
                         hasMultipleNpcVariants={hasMultipleNpcVariants}
-                        intimacyTrustThreshold={intimacyTrustThreshold}
+                        onOpenCompanionManagement={() => setShowCompanionModal(true)}
                     />
 
                     <div className="flex-1 flex flex-col bg-[#0b0b0d]/90 relative overflow-hidden">
@@ -1257,7 +1742,8 @@ const SocializationPanel: React.FC<SocializationPanelProps> = ({
                                     : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/40'
                                     }`}
                             >
-                                <Glyph name="clipboard" className="w-4 h-4" /> 委托协议
+                                <Glyph name="clipboard" className="w-4 h-4" />{' '}
+                                {relation.axis === 'trust' ? '委托协议' : '同伴需求'}
                                 {activeTab === 'quest' && (
                                     <div className="absolute bottom-0 left-0 w-full h-[2px] bg-amber-500 shadow-[0_0_15px_#f59e0b]"></div>
                                 )}
@@ -1310,46 +1796,42 @@ const SocializationPanel: React.FC<SocializationPanelProps> = ({
                                     <div className="bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800/80 p-6 shadow-[0_-20px_40px_rgba(0,0,0,0.6)] z-20">
                                         {!showFreeChat ? (
                                             <div className="grid grid-cols-4 md:grid-cols-6 xl:grid-cols-7 gap-3">
-                                                {npc.dynamic.trust >= intimacyTrustThreshold && onIntimacy ? (
+                                                {!isRecruited ? (
                                                     <ActionButton
-                                                        glyph="heart"
-                                                        label="深联"
-                                                        subLabel="核心共振"
-                                                        onClick={() => void onIntimacy()}
-                                                        color="pink"
+                                                        glyph="clipboard"
+                                                        label="委托"
+                                                        subLabel={hasActiveOrPendingQuests && npcQuests.length > 0 ? "已有委托" : "请求任务"}
+                                                        onClick={() => {
+                                                            if (hasActiveOrPendingQuests && npcQuests.length > 0) {
+                                                                AudioService.playSfx('ui_click');
+                                                                setActiveTab('quest');
+                                                            }
+                                                            onRequestQuest?.();
+                                                        }}
+                                                        color="amber"
                                                         disabled={isGenerating || isSending}
                                                     />
                                                 ) : (
                                                     <ActionButton
-                                                        glyph="users"
-                                                        label="安抚"
-                                                        subLabel="体感交互"
-                                                        onClick={() => onLocalAction('hug')}
-                                                        color="amber"
+                                                        glyph="heart"
+                                                        label="谈心"
+                                                        subLabel="心智交流"
+                                                        onClick={() => onHeartToHeart?.()}
+                                                        color="purple"
                                                         disabled={isGenerating || isSending}
                                                     />
                                                 )}
                                                 <ActionButton
-                                                    glyph="cross"
-                                                    label="分配"
-                                                    subLabel="药物供给"
-                                                    onClick={() => onLocalAction('heal')}
-                                                    color="emerald"
-                                                    disabled={isGenerating || isSending}
-                                                />
-                                                <button
+                                                    glyph="keyboard"
+                                                    label="对话"
+                                                    subLabel="Manual Sync"
                                                     onClick={() => {
                                                         AudioService.playSfx('ui_click');
                                                         setShowFreeChat(true);
                                                     }}
+                                                    color="blue"
                                                     disabled={isGenerating || isSending}
-                                                    className="py-4 px-2 border border-zinc-700/60 bg-zinc-900/60 hover:bg-emerald-950/30 hover:border-emerald-500/60 text-zinc-500 hover:text-emerald-400 hover:shadow-[0_0_20px_rgba(16,185,129,0.15)] transition-all duration-300 flex flex-col items-center justify-center group rounded-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                                                >
-                                                    <span className="mb-2 group-hover:scale-110 transition-transform duration-300 text-zinc-400 group-hover:text-emerald-400 drop-shadow-md">
-                                                        <Glyph name="keyboard" className="w-6 h-6" strokeWidth={1.5} />
-                                                    </span>
-                                                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest">Manual</span>
-                                                </button>
+                                                />
                                             </div>
                                         ) : (
                                             <div className="flex gap-3 items-stretch h-14 animate-in slide-in-from-bottom-2 duration-300">
@@ -1396,11 +1878,11 @@ const SocializationPanel: React.FC<SocializationPanelProps> = ({
                                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                                             {npc.dynamic.inventory.length > 0 ? (
                                                 npc.dynamic.inventory.map((item: ItemInstance, idx: number) => {
-                                                    const rarity = RARITY_MAP[item.rarity];
+                                                    const rarity = RARITY_MAP[item.grade];
                                                     return (
                                                         <div
                                                             key={item.instanceId}
-                                                            data-rarity={item.rarity}
+                                                            data-rarity={item.grade}
                                                             data-intensity={rarity.intensity}
                                                             style={{ ...stagger(idx), ...rarity.vars } as React.CSSProperties}
                                                             className="rarity-cell flex items-center justify-between border border-zinc-800/80 bg-zinc-900/50 p-4 hover:bg-zinc-800/60 hover:-translate-y-0.5 transition-all duration-300 group/item rounded-md relative overflow-hidden shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300"
@@ -1457,16 +1939,38 @@ const SocializationPanel: React.FC<SocializationPanelProps> = ({
                                         </div>
                                     </div>
                                     <div className="p-6 border-t border-zinc-800/80 bg-zinc-950/95 shrink-0 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
-                                        <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 bg-emerald-500/60 rounded-full animate-pulse shadow-[0_0_8px_#10b981]"></span>
-                                            背囊转移 (TRANSFER_FROM_PLAYER)
+                                        {isRecruited && (
+                                            <div className="mb-4 flex items-center justify-between p-3 border border-cyan-800/50 bg-cyan-950/20 rounded-md">
+                                                <div className="text-[11px] font-mono text-cyan-300 flex items-center gap-2">
+                                                    <Glyph name="backpack" className="w-4 h-4 text-cyan-400 shrink-0" />
+                                                    已建立同伴战备链路，可直接调配同伴装备槽位与消耗物资
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        AudioService.playSfx('ui_click');
+                                                        setShowCompanionModal(true);
+                                                    }}
+                                                    className="px-3.5 py-1.5 bg-cyan-950/80 border border-cyan-500/60 hover:bg-cyan-900/80 hover:border-cyan-400 text-cyan-300 hover:text-white text-[10px] font-mono font-bold rounded transition-all flex items-center gap-1.5 shadow-sm active:scale-95 shrink-0"
+                                                >
+                                                    打开同伴战备整备
+                                                </button>
+                                            </div>
+                                        )}
+                                        <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-[0.2em] mb-4 flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-1.5 h-1.5 bg-emerald-500/60 rounded-full animate-pulse shadow-[0_0_8px_#10b981]"></span>
+                                                {isRecruited ? '随身物资转交 (TRANSFER_TO_COMPANION)' : '物资馈赠 (GIFT_TO_ESTABLISH_TRUST)'}
+                                            </div>
+                                            <span className="text-[9px] text-zinc-500 font-mono hidden sm:inline">
+                                                {isRecruited ? '转交至同伴随身货舱' : '增进目标信任与好感'}
+                                            </span>
                                         </div>
                                         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
                                             {player.dynamic.inventory.map((item: ItemInstance) => (
                                                 <button
                                                     key={item.instanceId}
-                                                    data-rarity={item.rarity}
-                                                    style={{ ...RARITY_MAP[item.rarity].vars } as React.CSSProperties}
+                                                    data-rarity={item.grade}
+                                                    style={{ ...RARITY_MAP[item.grade].vars } as React.CSSProperties}
                                                     onClick={() => {
                                                         AudioService.playSfx('ui_click');
                                                         onGift(item);

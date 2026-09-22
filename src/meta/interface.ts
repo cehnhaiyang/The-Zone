@@ -1,40 +1,3 @@
-import type { Dispatch, SetStateAction } from 'react'
-
-import {
-    QuestStatus,
-    Mood,
-    LogType,
-    AttributeType,
-    VitalType,
-    DynamicVitalType,
-    ItemRarity,
-    AccessoryEffectType,
-    ConsumableEffectType,
-    WeaponType,
-    WeaponDamageType,
-    RelationshipPhase,
-    AttackResult,
-    DefenseResult,
-    ActionEffectType,
-    Target,
-    CombatStyle,
-    IntentType,
-    AttackTacticEffectType,
-    DefenseTacticEffectType,
-    NarrativePacing,
-    NarrativeMode,
-    StoryArcStatus,
-    NarrativePhase,
-    GameState,
-    SanctuaryState,
-    NarrativeTheme,
-    StateTrend,
-    EmotionalTone,
-    _Array,
-    VisualMode,
-    SoundType
-} from './type'
-
 /**
  * 核心接口契约 (interface.ts)
  *
@@ -48,11 +11,44 @@ import {
  * - LLM 生成上下文
  * - React 状态桥接
  *
- * 所有枚举、字面量联合类型与状态机指令均来自 {@link ./type.ts}。
- *
  * @version 2.1.0
  * @see ./type.ts
  */
+
+import type { Dispatch, SetStateAction } from 'react'
+
+import {
+    TacticType,
+    AffinityPhase,
+    QuestStatus,
+    Mood,
+    LogType,
+    AttributeType,
+    VitalType,
+    DynamicVitalType,
+    ItemGrade,
+    AccessoryEffectType,
+    ConsumableEffectType,
+    WeaponType,
+    WeaponDamageType,
+    TrustPhase,
+    AttackResult,
+    DefenseResult,
+    Target,
+    CombatStyle,
+    IntentType,
+    TacticEffectType,
+    NarrativePacing,
+    NarrativeMode,
+    StoryArcStatus,
+    NarrativePhase,
+    GameState,
+    StateTrend,
+    EmotionalTone,
+    _Array,
+    VisualMode,
+    SoundType
+} from './type'
 
 // ==========================
 // 1. 核心配置
@@ -82,7 +78,6 @@ export interface Settings {
     useProxyQwenstudio?: boolean
     useProxyVolcengine?: boolean
     useProxyNvidia?: boolean
-    // 模型路由
     /** 区域生成模型 */
     zoneModel: {
         provider: string
@@ -152,13 +147,33 @@ export interface Settings {
     screenBrightness: number
     /** 游戏平衡性动态配置。 */
     gameConfig: {
-        /** 遇敌与搜查风险配置。 */
+        /**
+         * 遇敌与搜查风险配置。
+         *
+         * 遇敌渠道只有两条：
+         * - 搜查：按本配置的曲线掷遭遇骰；
+         * - 伏击节点（`isDangerous` 为 `{ isAmbushed, level }`）：进入即战，不掷骰。
+         * 进入普通节点与执行交互都不会随机遇敌。
+         */
         enemyEncounter: {
-            /** 基础遇敌概率。 */
+            /** 与威胁无关的搜查基础遇敌概率。 */
             baseChance: number
 
-            /** 威胁等级除数，用于将 threatLevel 转化为概率修正。 */
+            /**
+             * 威胁归一化上限。
+             *
+             * `isDangerous` 数值形态的取值区间为 1-50，故默认 50：
+             * 使 1-50 全程落在 0~1 的比例区间内，威胁越高搜查遇敌概率越大。
+             */
             threatDivisor: number
+
+            /**
+             * 满级威胁贡献的遇敌概率上限（在 baseChance 之上叠加）。
+             *
+             * 实际威胁项 = threatMaxChance × (threatLevel / threatDivisor) ^ 曲线指数，
+             * 曲线指数在引擎侧固定为 1.5，低威胁段平缓、高威胁段陡峭。
+             */
+            threatMaxChance: number
 
             /** 搜查基础风险。 */
             searchBaseRisk: number
@@ -354,62 +369,6 @@ export interface CurrentTime {
     currentGameRound: GameRound
 }
 
-// ==========================
-// 2. 位置、资产、统计与体征
-// ==========================
-
-/**
- * 位置模板
- */
-export interface Loc {
-    zone: {
-        id: Zone['id']
-        name: Zone['name']
-        desc: {
-            background: Zone['background']
-            topology: Zone['topology']
-            nodesCount: Zone['nodesCount']
-            visualStyle: Zone['visualStyle']
-        }
-        /**
-         * 处于庇护所则携带
-         */
-        isSanctuary?: SanctuaryState
-    }
-    node: {
-        /** 
-         * 节点键值 
-         */
-        id: string
-        name: Node['name']
-        desc: Node['desc']
-        /**
-         * 节点有威胁度则携带
-         */
-        isDangerous?: Node['threatLevel']
-    }
-}
-
-/**
- * 先前位置
- */
-export interface PrevLocation extends Loc { }
-
-/**
- * 当前位置
- */
-export interface CurrentLocation extends Loc { }
-
-/**
- * 位置信息
- *
- * 保存玩家从何处来、现在何处。
- */
-export interface Location {
-    prevLocation: PrevLocation | null
-    currentLocation: CurrentLocation
-}
-
 /**
  * 媒体资产
  *
@@ -432,9 +391,100 @@ export interface Stats {
 }
 
 /**
- * 基础属性集合
+ * 必要资源
  */
-export type Attribute = Record<AttributeType, number>
+export interface NecessaryResource {
+    food: number
+    water: number
+}
+
+/**
+ * 独特资源
+ */
+export interface UniqueResource {
+    /**
+     * 资源唯一标识
+     */
+    id: string
+    /**
+     * 资源名称
+     */
+    name: string
+    /**
+     * 描述资源是什么，有什么用
+     */
+    desc: string
+    /**
+     * SVG图标
+     */
+    icon: string
+    /**
+     * 当前数量
+     * 
+     * 大于0的浮点数
+     */
+    value: number
+    /**
+     * 是否会自动消耗？
+     * 
+     * 以每人每天为单位
+     */
+    consumptionRate?: number
+}
+
+// ==========================
+// 2. 位置、体征、状态
+// ==========================
+
+/**
+ * 位置模板
+ */
+export interface Loc {
+    zone: {
+        id: Zone['id']
+        name: Zone['name']
+        desc: {
+            background: Zone['background']
+            topology: Zone['topology']
+            nodesCount: Zone['nodesCount']
+            visualStyle: Zone['visualStyle']
+        }
+        /**
+         * 处于庇护所则携带
+         */
+        isSanctuary?: {
+            lackingResource?: number
+        }
+    }
+    node: {
+        /** 
+         * 节点键值 
+         */
+        id: string
+        name: Node['name']
+        desc: Node['desc']
+        isDangerous: boolean
+    }
+}
+/**
+ * 先前位置
+ */
+export interface PrevLocation extends Loc {
+}
+/**
+ * 当前位置
+ */
+export interface CurrentLocation extends Loc {
+}
+/**
+ * 位置信息
+ *
+ * 保存玩家从何处来、现在何处。
+ */
+export interface Location {
+    prevLocation: PrevLocation | null
+    currentLocation: CurrentLocation
+}
 
 /**
  * 最大体征集合
@@ -456,6 +506,24 @@ export interface VitalRecord {
         currentTick: GameRound['absoluteTick']
         currentVital: Vital
     }
+}
+
+/**
+ * 状态
+ */
+export interface State {
+    /**
+     * 基于 0-100 的百分比阈值
+     */
+    threshold: number
+    /**
+     * 基于当前值与上限生成状态描述
+     */
+    description: (val: number, max: number) => string
+    /**
+     * 基于百分比生成叙事描述
+     */
+    narrative: (percent: number) => string
 }
 
 /**
@@ -492,16 +560,21 @@ export interface OriginTemplate {
     desc: string
     player: PlayerTemplate
     sanctuary: SanctuaryTemplate
-    companion?: NpcTemplate[]
+    companion?: CompanionTemplate[]
+
 }
 
 /**
  * 装备状态
  */
 export interface EquipState {
-    weapons?: [WeaponInstance | null, WeaponInstance | null]
-    armors?: (ArmorInstance | null)[]
-    accessories?: (AccessoryInstance | null)[]
+    weapons?: {
+        main: WeaponInstance | null
+        side: WeaponInstance | null
+    }
+    armors?: ArmorInstance | (ArmorInstance | null)[]
+    accessories?: AccessoryInstance | (AccessoryInstance | null)[]
+    storage?: StorageInstance | (StorageInstance | null)[]
 }
 
 /**
@@ -530,7 +603,7 @@ export interface CombatIntent {
 export interface CombatStatus {
     sourceId: string;
     sourceName: string;
-    type: ActionEffectType;
+    type: TacticEffectType;
     value: number;
     duration: number;
 }
@@ -543,7 +616,7 @@ export interface InstanceId {
 }
 
 // ==========================
-// 3. 话语、记忆、关系与状态
+// 3. 话语、记忆、信任、好感度
 // ==========================
 
 /**
@@ -552,7 +625,6 @@ export interface InstanceId {
 export interface WordsTag {
     speaker: string
 }
-
 /**
  * 玩家话语标签
  */
@@ -561,7 +633,6 @@ export interface PlayerWordsTag extends WordsTag {
     location: Location['currentLocation']
     currentTime: CurrentTime['currentZoneTime']
 }
-
 /**
  * NPC 话语标签
  */
@@ -576,7 +647,6 @@ export interface NpcWordsTag extends WordsTag {
      */
     thought: string
 }
-
 /**
  * 话语
  */
@@ -584,7 +654,6 @@ export interface Words<T extends WordsTag = WordsTag> {
     text: string
     tag: T
 }
-
 /**
  * 对话记录
  *
@@ -719,34 +788,67 @@ export interface MemoryPyramid {
 }
 
 /**
- * 关系阶段。
- *
- * 信任度阶段标记，作为对话树分支判断的前提条件，
- * 决定 NPC 的行为模型、资源倾斜度与交互权限。
+ * 关系元
  */
-export interface Relationship {
-    phase: RelationshipPhase
+export interface _Relationship {
+    /** 
+     * 阶段
+     */
+    phase: string
+    /**
+     * 行为
+     */
     behavior: string
-
-    trustRange: {
+    /**
+     * 范围
+     */
+    range: {
         min: number
         max: number
     }
 }
-
 /**
- * 状态配置。
- *
- * 用于根据当前数值百分比生成描述性文本与叙事文本。
+ * 信任阶段
+ * 
+ * {@link NodeNpcTemplate.initialState.trust} 
+ * {@link NodeNpcDynamicState.trust} 
+ * 
+ * 信任是实体衡量玩家是否可靠、是否具备合作价值的【社会性】、【契约性】标值
+ * 
+ * 在这个阶段，实体逐渐对玩家产生信任，愿意合作、相信对方的主张
  */
-export interface StateConfig {
-    /** 基于 0-100 的百分比阈值。 */
-    threshold: number
-    /** 基于当前值与上限生成状态描述。 */
-    description: (val: number, max: number) => string
-    /** 基于百分比生成叙事描述。 */
-    narrative: (percent: number) => string
+export interface Trust extends _Relationship {
+    phase: TrustPhase
 }
+/**
+ * 好感阶段
+ * 
+ * {@link CompanionTemplate.initialState.affinity} 
+ * {@link CompanionDynamicState.affinity} 
+ * 
+ * 好感是同伴衡量玩家是否在乎自身感受、相处是否融洽的【情绪性】、【偏好性】标值
+ * 
+ * 在这个阶段，实体逐渐对玩家产生积极情绪与偏好，提高同行留存意愿与交互宽容度
+ */
+export interface Affinity extends _Relationship {
+    phase: AffinityPhase
+}
+/**
+ * 亲密阶段
+ * 
+ * 愿意与玩家分享私人空间、情感与脆弱面。
+ */
+//export interface Intimacy extends _Relationship {
+//    phase: IntimacyPhase
+//}
+/**
+ * 爱阶段
+ * 
+ * 与玩家产生深度情感绑定。
+ */
+//export interface Love extends _Relationship {
+//    phase: LovePhase
+//}
 
 // ==========================
 // 4. 物品系统
@@ -759,9 +861,21 @@ export interface BaseItemTemplate {
     id: string
     name: string
     desc: string
-    rarity: ItemRarity
+    size: [number, number]
+    grade: ItemGrade
+    /**
+     * 血肉融合状态
+     */
+    fleshFusionState?: number
+    /**
+     * 认知侵蚀状态
+     */
+    cognitiveErosionState?: number
+    /**
+     * 因果倒错状态
+     */
+    causalInversionState?: number
 }
-
 /**
  * 武器模板
  */
@@ -770,29 +884,81 @@ export interface WeaponTemplate extends BaseItemTemplate {
     weaponType: WeaponType
     weaponDamageType: WeaponDamageType
     /**
-     * 攻击距离（单位：战线格数）
-     *
-     * 与目标的空间距离不超过该值时，才能对其使用攻击战术。
+     * 有效攻击范围
+     * 
+     * 非负整数
      */
     range: number
-    maxUses: number
+    /**
+     * 伤害
+     * 
+     * 正整数
+     * 
+     * 擦伤时，武器伤害在 0~damage 的范围内波动
+     * 命中时，武器伤害为 damage
+     */
     damage: number
+    /**
+     * 暴击
+     */
+    crit: {
+        /**
+         * 暴击概率
+         * 
+         * 0~1的浮点数
+         */
+        chance: number
+        /**
+         * 暴击加成
+         * 
+         * 正整数
+         * 
+         * 暴击时，武器伤害在 damage~(damage + bonus) 的范围内波动
+         */
+        bonus: number
+    }
+    /**
+     * 最大耐久
+     * 
+     * 正整数
+     * 
+     * 每次攻击消耗 1 点耐久
+     */
+    maxUses: number
+    /**
+     * 防御效率
+     * 
+     * 由对应的武器类型决定防御效率，不在武器模板里显式定义
+     * 
+     * 这件武器作为防御道具的效率。
+     * 持有防御效率低下的武器时，实体的防御序列质量会降低。
+     * 如匕首之类的轻型武器没有该字段，不会影响防御序列质量；
+     * both_wave、both_prick、sniper_rifle 之类的武器会显著降低防御序列质量；
+     * shield、both_shield 会显著提升防御序列中出现高额 `partial` 的概率，并可使 `partial` 的值达到 1，但会显著降低 `dodge` 出现的概率；当 `partial` 的值为 1 时，将只消耗 shield、both_shield 的耐久，不会消耗实体装备的护甲的耐久。
+     */
 }
-
 /**
  * 护甲模板
  */
 export interface ArmorTemplate extends BaseItemTemplate {
     type: 'armor'
     /** 
-     * 减伤比
+     * 防御力
      * 
-     * 作为全局常驻减伤存在。
+     * -1~1的浮点数
+     * 
+     * 提供恒定的减伤比。负防御会提高伤害。
      */
-    partialReduction: number
+    defense: number
+    /**
+     * 最大耐久
+     * 
+     * 正整数
+     * 
+     * 每次受击消耗 1 点耐久
+     */
     maxUses: number
 }
-
 /**
  * 饰品模板
  */
@@ -807,7 +973,13 @@ export interface AccessoryTemplate extends BaseItemTemplate {
      */
     effects: Array<[AccessoryEffectType, number]>
 }
-
+/**
+ * 储物品模板
+ */
+export interface StorageTemplate extends BaseItemTemplate {
+    type: 'storage'
+    size: [number, number]
+}
 /**
  * 消耗品模板
  */
@@ -826,7 +998,6 @@ export interface ConsumableTemplate extends BaseItemTemplate {
      */
     effects: Array<[ConsumableEffectType, number, number?]>
 }
-
 /**
  * 数据模板
  */
@@ -835,18 +1006,16 @@ export interface DataTemplate extends BaseItemTemplate {
     documentContent?: string
     audioScript?: string
 }
-
 /**
  * 材料模板
  */
 export interface MaterialTemplate extends BaseItemTemplate {
     type: 'material'
 }
-
 /**
  * 物品模板联合类型
  */
-export type ItemTemplate = WeaponTemplate | ArmorTemplate | AccessoryTemplate | ConsumableTemplate | DataTemplate | MaterialTemplate
+export type ItemTemplate = WeaponTemplate | ArmorTemplate | AccessoryTemplate | StorageTemplate | ConsumableTemplate | DataTemplate | MaterialTemplate
 
 /**
  * 物品基类
@@ -861,51 +1030,48 @@ export interface BaseItem extends BaseItemTemplate {
     /**
      * 发现阈值
      *
-     * 若未设置，视为搜查时立刻获得。
+     * 无则视为搜查时立刻获得。
      */
     discoveryThreshold?: number
     /**
      * 数量
      *
-     * 不设置则为1。
+     * 不设则为1。
      */
     quantity?: number
 }
-
 /**
  * 武器
  */
 export interface Weapon extends BaseItem, WeaponTemplate { }
-
 /**
  * 护甲
  */
 export interface Armor extends BaseItem, ArmorTemplate { }
-
 /**
  * 饰品
  */
 export interface Accessory extends BaseItem, AccessoryTemplate { }
-
+/**
+ * 储物品
+ */
+export interface Storage extends BaseItem, StorageTemplate { }
 /**
  * 消耗品
  */
 export interface Consumable extends BaseItem, ConsumableTemplate { }
-
 /**
  * 数据
  */
 export interface Data extends BaseItem, DataTemplate { }
-
 /**
  * 材料
  */
 export interface Material extends BaseItem, MaterialTemplate { }
-
 /**
  * 地图层物品联合类型
  */
-export type Item = Weapon | Armor | Accessory | Consumable | Data | Material
+export type Item = Weapon | Armor | Accessory | Storage | Consumable | Data | Material
 
 /**
  * 物品实例基类
@@ -919,56 +1085,74 @@ export interface BaseItemInstance extends Asset, InstanceId {
      * 卸下 / 丢弃时按此快照回收，避免"扣不满 / 退不回"的属性漂移。
      */
     appliedEffectDeltas?: Partial<Record<AccessoryEffectType, number>>
+    /**
+     * 背包网格落位
+     */
+    gridPlacement?: {
+        /** 锚点列坐标，0 起 */
+        x: number
+        /** 锚点行坐标，0 起 */
+        y: number
+        /**
+         * 是否旋转 90°
+         *
+         * 旋转态下宽高互换（2×3 ↔ 3×2）
+         * 物品默认将长边水平放置
+         */
+        rotated?: boolean
+    }
 }
-
 /**
  * 武器实例
  */
 export interface WeaponInstance extends Weapon, BaseItemInstance {
     currentUses: number
 }
-
 /**
  * 护甲实例
  */
 export interface ArmorInstance extends Armor, BaseItemInstance {
     currentUses: number
 }
-
 /**
  * 饰品实例
  */
-export interface AccessoryInstance extends Accessory, BaseItemInstance { }
-
+export interface AccessoryInstance extends Accessory, BaseItemInstance {
+}
+/**
+ * 储物品实例
+ */
+export interface StorageInstance extends Storage, BaseItemInstance {
+}
 /**
  * 消耗品实例
  */
-export interface ConsumableInstance extends Consumable, BaseItemInstance { }
-
+export interface ConsumableInstance extends Consumable, BaseItemInstance {
+}
 /**
  * 数据实例
  */
-export interface DataInstance extends Data, BaseItemInstance { }
-
+export interface DataInstance extends Data, BaseItemInstance {
+}
 /**
  * 材料实例
  */
-export interface MaterialInstance extends Material, BaseItemInstance { }
-
+export interface MaterialInstance extends Material, BaseItemInstance {
+}
 /**
- * 运行时物品实例联合类型
+ * 物品实例联合类型
  */
-export type ItemInstance = WeaponInstance | ArmorInstance | AccessoryInstance | ConsumableInstance | DataInstance | MaterialInstance
+export type ItemInstance = WeaponInstance | ArmorInstance | AccessoryInstance | StorageInstance | ConsumableInstance | DataInstance | MaterialInstance
 
 // ==========================
 // 5. 战术系统
 // ==========================
 
 /**
- * 防御战术
+ * 战术元
  */
-export interface DefenseTactic {
-    type: 'defense'
+export interface _Tactic {
+    type: TacticType
     id: string
     name: string
     desc: string
@@ -976,32 +1160,31 @@ export interface DefenseTactic {
     /**
      * 每项为：
      * - 效果目标
-     * - 效果类型
-     * - 效果值，负为减益，正为增益
-     */
-    tacticEffect?: Array<[Target, DefenseTacticEffectType, number]>
-}
-
-/**
- * 攻击战术
- */
-export interface AttackTactic extends Omit<DefenseTactic, 'type' | 'tacticEffect'> {
-    type: 'attack'
-    /**
-     * 每项为：
-     * - 效果目标
      * - 效果属性类型
      * - 效果值，负为减益，正为增益
      * - 效果持续回合数，0 表示仅在本次结算中生效
+     * 
+     * 并非所有的战术都要有额外效果收益，战术触发攻击、防御本身就是收益。
      */
-    tacticEffect?: Array<[Target, AttackTacticEffectType, number, number]>
+    tacticEffect?: Array<[Target, TacticEffectType, number, number]>
+}
+/**
+ * 武器专属战术
+ * 
+ * 定义于constants/tactic/weapon.ts下，直接绑定到对应的武器类型上
+ */
+export interface WeaponOwnTactic extends _Tactic {
+    weaponOwn: WeaponType
+}
+/**
+ * 常规战术
+ */
+export interface Tactic extends _Tactic {
+    /**
+     * 战术是否需要特定的武器类型才能使用？
+     */
     requireWeapon?: WeaponType
 }
-
-/**
- * 战术
- */
-export type Tactic = DefenseTactic | AttackTactic
 
 // ==========================
 // 6. 任务系统
@@ -1016,15 +1199,15 @@ export interface QuestTemplate {
     /**
      * 目标
      *
-     * 可要求收集特定物品，或找到 / 护送特定同伴。
+     * 可要求收集特定物品，或找到特定NPC。
      */
-    goals: Array<ItemTemplate | NpcTemplate>
+    goals: Array<ItemTemplate | NodeNpcTemplate['id']>
     /**
      * 奖励
      *
      * 可给予特定物品，或让同伴永久加入队伍。
      */
-    rewards: Array<ItemTemplate | NpcTemplate>
+    rewards: Array<ItemTemplate | CompanionTemplate>
     /**
      * 难度
      *
@@ -1063,7 +1246,6 @@ export interface ClozePuzzle {
      */
     answer: string[]
 }
-
 /**
  * 选项谜题
  */
@@ -1078,7 +1260,6 @@ export interface ChoicePuzzle {
      */
     answer: string
 }
-
 /**
  * 键入谜题
  */
@@ -1089,7 +1270,6 @@ export interface TypePuzzle {
      */
     answer: string
 }
-
 /**
  * 谜题
  *
@@ -1166,24 +1346,14 @@ export interface EntityTemplate {
 }
 
 /**
- * 角色模板
- *
- * 玩家与 NPC 的共同模板基础。
- */
-export interface CharacterTemplate extends EntityTemplate {
-    initialState: {
-        attribute: Attribute
-        vital: Vital
-        inventory?: ItemTemplate[]
-        equipState?: EquipState
-    }
-}
-
-/**
  * 玩家模板
  */
-export interface PlayerTemplate extends CharacterTemplate {
-    initialState: CharacterTemplate['initialState'] & {
+export interface PlayerTemplate extends EntityTemplate {
+    initialState: {
+        attribute: Record<AttributeType, number>
+        vital: Vital
+        equipState?: EquipState
+        inventory?: ItemTemplate[]
         uniqueTactic?: Tactic[]
     }
     /**
@@ -1193,32 +1363,28 @@ export interface PlayerTemplate extends CharacterTemplate {
 }
 
 /**
- * NPC 模板
- *
- * 在 `PlayerTemplate` 基础上扩展 NPC 专属字段：
- * - 信任、任务系统
+ * 节点 NPC 模板
  */
-export interface NpcTemplate extends PlayerTemplate {
+export interface NodeNpcTemplate extends PlayerTemplate {
     initialState: PlayerTemplate['initialState'] & {
-        trust?: number
         /**
-         * NPC初始可提供的任务在列表里的排列顺序决定了接取的先后顺序；
+         * 信任
+         * 
+         * 0~100的整数
+         */
+        trust: number
+        /**
+         * 任务
+         * 
+         * 初始提供的任务在列表里的顺序决定了接取的先后顺序；
          * 必须完成前一个任务，后一个任务才会显示并且可接取。 
          */
-        quest?: QuestTemplate[]
+        quests?: QuestTemplate[]
     }
-}
-
-/**
- * 节点 NPC 模板
- *
- * 在 `NpcTemplate` 基础上扩展 `canBeInvited`、`willRoam` 字段。
- */
-export interface NodeNpcTemplate extends NpcTemplate {
     /**
-     * 节点NPC邀请条件
+     * 邀请条件
      *
-     * 无该字段即表示该 NPC 不可被邀请。
+     * 无则不可被邀请入队
      */
     canBeInvited?: {
         trust?: number
@@ -1261,10 +1427,8 @@ export interface NodeNpcTemplate extends NpcTemplate {
          * 只有当前庇护所各项资源均不低于此阈值时，NPC 才同意离开。
          * 
          * 只用于庇护所NPC。
-         * 
-         * key 为 SanctuaryState 的字段名，value 为最低允许值。
          */
-        isSanctuarySafe?: Partial<Record<keyof SanctuaryState, number>>
+        isSanctuarySafe?: Record<keyof NecessaryResource | UniqueResource['id'], number>
     }
     /**
      * 节点NPC游荡行为配置
@@ -1303,18 +1467,37 @@ export interface NodeNpcTemplate extends NpcTemplate {
 }
 
 /**
+ * 同伴模板
+ */
+export interface CompanionTemplate extends PlayerTemplate {
+    initialState: PlayerTemplate['initialState'] & {
+        /**
+         * 好感
+         * 
+         * <=100的整数
+         * 
+         * 节点npc入队后，其好感度从 0 开始增长；
+         * 玩家做出同伴不喜欢的行为时好感度会降低，且可降为负值；
+         * 好感度为负值时，每个 absoluteTick 同伴都有概率离开玩家，且负值越大，概率越高；
+         * 离开玩家后，同伴会在当前节点变为节点NPC，玩家需从0开始培养其信任度，然后重新邀请入队；
+         * 反复离队会加大再次邀请的难度，信任度增长也会变得更加困难、缓慢。
+         */
+        affinity: number
+        /**
+         * 需求
+         * 
+         * 与任务不同，需求涵盖了各方面，目前暂时归一化为任务，待后续扩展。
+         */
+        needs: QuestTemplate[]
+    }
+}
+
+/**
  * 敌人模板
+ * 
+ * 敌人的最大生命值等于敌人四维/三维的比例加总
  */
 export interface BaseEnemyTemplate extends EntityTemplate {
-    /**
-     * 限定敌人可出现的区域或庇护所
-     *
-     * 仅本地预定义敌人需要该字段。
-     * 若未设置，则不限区域。
-     * 
-     * 不要在预定义的庇护所常量里为specificEnemy添加zoneId字段！不需要而且会导致游戏崩溃！
-     */
-    zoneId?: string[]
     /**
      * 掉落表
      */
@@ -1331,7 +1514,33 @@ export interface BaseEnemyTemplate extends EntityTemplate {
      * 有效攻击范围
      */
     range: number
+    /**
+     * 生成限制
+     *
+     * 仅本地预定义敌人需要该字段。
+     * 
+     * 不要在预定义的庇护所常量里为enemy添加该字段！不需要而且会导致游戏崩溃！
+     */
+    generationLimit?: {
+        /**
+         * 危险度
+         */
+        danger?:
+        | number // 只会在该危险度生成 
+        | [number, number] // 只会在该危险度区间生成
+        | ['<' | '>', number] // 只会在低于或高于该危险度阈值时生成
+        /**
+         * 只会这些区域生成
+         */
+        zone?: string[]
+    }
 }
+/**
+ * 人类敌人模板
+ */
+//export interface HumanoidEnemyTemplate {
+//    type: 'huamnoid'
+//}
 
 /**
  * 克苏鲁敌人模板
@@ -1347,29 +1556,29 @@ export interface CthulhuEnemyTemplate extends BaseEnemyTemplate {
     /**
      * 攻击伤害
      * 
-     * 即CombatDynamicState.baseAttack
+     * 即CombatDynamicState.attack
      */
     damage: number
     /**
-     * 闪避力
-     * 
-     * 影响最大免伤
-     * 
-     * 可以为任意负数，可以为0，可以为任意正数，引擎会自动百分化
-     */
-    evasion: number
-    /**
      * 防御力
      * 
-     * 影响最小免伤，即CombatDynamicState.basePartialReduction
+     * 最小免伤，即CombatDynamicState.defense
      * 
-     * 可以为任意负数，可以为0，可以为任意正数，引擎会自动百分化
+     * 非负整数；
+     * 在参与引擎计算时会被百分化（除以100）
      */
     defense: number
     /**
-     * 最大生命值
+     * 闪避力
+     * 
+     * 额外免伤，即CombatDynamicState.evasion
+     * 
+     * 非负整数；
+     * 在参与引擎计算时会被百分化（除以100）
+     * 
+     * 在基础免伤上叠加的额外免伤，防御力加闪避力即为最大免伤
      */
-    // maxHp: number
+    evasion: number
 }
 /**
  * 不可移动的敌人
@@ -1396,17 +1605,22 @@ export interface BaseDynamicState extends Asset, Record<VitalType | DynamicVital
  */
 export interface PlayerDynamicState extends BaseDynamicState, Record<AttributeType, number> {
     equipment: EquipState
-    xp: number
-    level: number
     tactics: Tactic[]
     inventory: ItemInstance[]
+    /**
+     * 储物大小
+     * 
+     * 与人物的力量值正相关
+     */
+    storageSize: [number, number]
+    level: number
+    xp: number
 }
 
 /**
  * NPC 动态状态
  */
 export interface NpcDynamicState extends PlayerDynamicState {
-    trust: number
     /**
      * 与该 NPC 的总对话轮数
      */
@@ -1420,15 +1634,72 @@ export interface NpcDynamicState extends PlayerDynamicState {
      */
     mountedProfileId?: string
 }
+/**
+ * 节点NPC动态状态
+ */
+export interface NodeNpcDynamicState extends NpcDynamicState {
+    trust: number
+    quests: QuestTemplate[]
+}
+/**
+ * 同伴动态状态
+ */
+export interface CompanionDynamicState extends NpcDynamicState {
+    affinity: number
+    needs: QuestTemplate[]
+}
 
 /**
  * 实体容器
- *
- * 将静态模板与运行时动态状态分离。
  */
-export interface Entity<TStatic extends EntityTemplate, TDynamic extends BaseDynamicState,> {
-    static: TStatic
-    dynamic: TDynamic
+export interface Entity<S extends EntityTemplate, D extends BaseDynamicState,> {
+    static: S
+    dynamic: D
+}
+
+/**
+ * 反击
+ *
+ * 1. 实体攻击时，无论该攻击判定结果如何，都会在所有速度值大于该实体的敌方实体间积累基于双方速度差绝对值的「蓄反值」，该值存储与「蓄反槽」中。
+ *    任意实体与另一实体间的「蓄反槽」的值达到 5n 时，引擎将询问该槽拥有者是否消耗该槽 5n 点「蓄反值」、
+ *    预支下回合 n 点 AP 开启「立即行动」窗口，称为「蓄反」。
+ * 
+ * 2. 实体攻击时，速度值不小于 10 的敌方实体可选择是否预支下回合 2n 点 AP 开启「立即行动」窗口，称为「差反」（2n 的值由该角色决定）
+ *
+ * 3. 「立即行动」窗口期间，实体拥有的可支配 AP 总量等于 n、每次行动消耗的 AP 值完全等于该行动本身的 AP 消耗、在 n 耗尽前可重复行动；n 耗尽则窗口关闭，实体也可随时主动关闭窗口。
+ *
+ * 4. 己方回合开始时，上回合未进行过「蓄反」或「差反」的己方实体，除基础的每回合 AP 回复外，还将额外获得 1 AP。
+ * 
+ * 5. 「蓄反」与「差反」共享同一预支额度，其加值不得超过实体 actionPoint.base + actionPoint.current 的值；
+ *    额度耗尽时，引擎不对实体发起「蓄反」与「差反」询问；
+ *    每次预支优先消耗 actionPoint.current，后消耗 actionPoint.base。
+ *
+ * 6. 同时满足「蓄反」与「差反」条件时，引擎优先询问「蓄反」，后询问「差反」。
+ * 
+ * 7. 敌方回合结束时，实体拥有的所有「蓄反槽」中的所有「蓄反值」将清空，且其加总的十分之一转化为额外 AP，向上取整；
+ *    单位阵亡时，以它为 owner / trigger 的「蓄反槽」立即清除。
+ * 
+ * 「蓄反」、「差反」有利有弊，对敌人默认关闭，后续接入 LLM 时可选择开启；本注释中的敌方、己方皆为相对视角，以“当前行动角色”为准，非绝对定位。
+ * 
+ * export interface Counter {
+ * }
+ */
+/**
+ * 蓄反槽
+ */
+export interface AccumulateCounter {
+    /** 
+     * 拥有该「蓄反槽」的实体 owner 
+     */
+    ownerId: string
+    /** 
+     * 触发该「蓄反槽」持续累积的实体 trigger 
+     */
+    triggerId: string
+    /** 
+     * 在 owner 与 trigger 间维护的该「蓄反槽」已积累了多少「蓄反值」 
+     */
+    value: number
 }
 
 /**
@@ -1442,6 +1713,43 @@ export interface CombatDynamicState extends BaseDynamicState {
      */
     speed: number
     /**
+     * 攻击力
+     *
+     * - 敌人方 = damage
+     * - 玩家方 近程（melee） = combatBonus × (力量值 + 武器近程伤害)
+     * - 玩家方 远程（range） = combatBonus × 武器远程伤害
+     */
+    attack: number
+    /**
+     * 防御力
+     * 
+     * 即常驻免伤
+     * 
+     * - 敌人方 = defense
+     * - 玩家方 = 实体装备的护甲提供的免伤值的加总
+     */
+    defense: number
+    /**
+     * 闪避力
+     * 
+     * 即额外免伤
+     * 
+     * - 敌人方（克苏鲁类） = evasion
+     * - 敌人方（不可移动类） = null
+     * - 玩家方由实体自身的敏捷值决定
+     */
+    evasion: number
+    /**
+     * 有效攻击范围
+     */
+    range: number
+    /**
+     * 护盾
+     *
+     * 伤害结算顺序中，护盾位于防御结果之后、生命值之前。
+     */
+    shield: number
+    /**
      * 行动点
      */
     actionPoint: {
@@ -1454,118 +1762,20 @@ export interface CombatDynamicState extends BaseDynamicState {
          */
         current: number
         /** 
-         * 下回合已被蓄反 / 差反预支 
+         * 下回合已预支 
          */
         advanced: number
     }
-    /**
-     * 蓄反槽
-     * 
-     * 规则：
-     *
-     * 1. 当前行动角色速度低于某个敌方角色时，
-     *    每次攻击会在该行动角色与该敌方角色之间积累基于双方速度差绝对值的蓄反值。
-     *    当积累了 5n 点蓄反值后，引擎将询问该敌方角色是否预支下回合 n 点行动点行动 n 次，称为「蓄反」。
-     *
-     * 2. 当前角色进行攻击时，速度不小于 10 的敌方角色可选择是否预支下回合 2 行动点行动 1 次，
-     *    称为「差反」。
-     * 
-     * 3. 己方回合开始时，上回合未进行过蓄反 / 差反的己方角色，
-     *    除基础每回合回复行动点外，还将额外获得 1 行动点。
-     *
-     * 4. 同时满足蓄反与差反条件时，引擎优先询问蓄反，后询问差反。
-     *
-     * 5. 蓄反或差反时会优先消耗当前行动点；若进行本次蓄反或差反将导致下回合行动为负，则引擎不发起询问。
-     *
-     * 6. 回合结束时，所有未消耗蓄反值的十分之一转化为额外行动点，向上取整。
-     * 
-     * 蓄/差反有利有弊，对敌人默认关闭，后续接入 LLM 时可选择开启。
-     * 本注释中的敌方、己方皆为相对视角，以“当前行动角色”为准，非绝对定位。
-     */
-    accumulateCounter: Array<{
-        ownerId: string   // 拥有该蓄反槽的实体id“owner”
-        triggerId: string // 触发该蓄反槽持续累积的实体id“trigger”
-        value: number     // 在“owner”与“trigger”间维护的该“蓄反槽”已积累了多少“蓄反值”
-    }>
+    accumulateCounter: Array<AccumulateCounter>
     /**
      * 反击预支请求
      * 
      * 当特定蓄反槽累积的蓄反值达标后，引擎将向蓄反槽拥有者发起蓄反预支询问；
      * 或当速度要求满足时，引擎将持续询问差反预支。
-     * 
-     * counterAdvanceRequest: {}
-     * 
-     * 本机制接口定义由实际钩子文件自行维护。
      */
-    /**
-     * 护盾
-     *
-     * 伤害结算顺序中，护盾位于防御结果之后、生命值之前。
-     */
-    shield: number
-    /**
-     * 基础攻击力
-     *
-     * - 敌人 = damage
-     * - 非敌人 近程（melee） = combatBonus × (力量值 + 武器近程伤害)
-     * - 非敌人 远程（range） = combatBonus × 武器远程伤害
-     */
-    baseAttack: number
-    /**
-     * 基础免伤比 = 角色装备的护甲提供的免伤值的加总
-     * 裁定免伤比 = 防御序列的裁定值（0~0.999）
-     * 最终免伤比 = 基础值 + 判定值（0~0.999）
-     */
-    basePartialReduction: number
-    /**
-     * 结果序列
-     *
-     * 进入战斗时，根据实体阵营，引擎进行以下处理：
-     *  - 玩家方：根据实体五维，预生成长度为 stamina <= 0 ? 0 : floor(stamina / 10) 的序列
-     *  - 敌人方：根据实体意图分布表，在战斗中动态生成意图序列。对于不同的敌人类型，有不同的序列生成方式
-     *    - cthulhu：根据 speed、damage、defense、evasion 生成
-     *    - immovable：根据 speed、damage、defense 生成，这种敌人没有闪避能力，只有基础免伤，意图只有observe与attack
-     *
-     * 玩家方结果序列分为攻击结果序列、防御结果序列。
-     *  - 使用攻击/防御战术将触发结果序列判定，随后同时推进攻击结果序列与防御结果序列。
-     *
-     * 实体数值在战斗中因增益 / 减益发生**临时**变化时，不重新生成序列，而是叠加最终结算增益/减益。
-     *  - 玩家方实体各自维护独立的结果序列，除非自身必要数值发生变化，否则序列样貌永远不变
-     *  - 玩家方序列耗尽时，扣除一定量 stamina ，随后重新生成
-     *  - 序列长度为 0 时，实体无法行动
-     *
-     * 玩家方实体可预测自身 n 次行动的结果，在ui上表现为自身序列结果可见
-     *  - n 的大小由自身灵力（spiritual）大小决定
-     *  - 每 5 点灵力可预测 1 次行动
-     *  - 灵力为 0 时不可预测
-     *
-     * 攻击结果生效后即刻执行，防御结果生效后储存进pendingDefense字段待消费。
-     * 
-     * instant伤害不参与任何正常结算，直接对目标造成 floor(
-     *    MagicWeapon.damage
-     *    × (1 + floor(spiritual / 10) × 0.5)
-     *    × combatBonus
-     *    × 0.75
-     *  )
-     * 的真实伤害。
-     */
-    resultSequence: {
-        /**
-         * - miss = 0
-         * - graze 的值在 0 与 baseAttack 间浮动
-         * - hit = baseAttack
-         * - crit 的值在 baseAttack 与 critMultiplier × baseAttack 间浮动
-         *
-         * - critMultiplier = clamp(1.5 + PER / (PER + K) × 2.0, 1.5, 3.5)，其中 K = 10。
-         */
-        attackResult: AttackResult[]
-        /**
-         * - fail = 0
-         * - partial 的值在 basePartialReduction 与 finalPartialReduction 间浮动，最大不超过 0.999。
-         * - dodge = 1
-         */
-        defenseResult: DefenseResult[]
-    }
+    //counterAdvanceRequest: {
+    //    type: CounterType
+    //}
     /**
      * 状态
      */
@@ -1579,17 +1789,79 @@ export interface CombatDynamicState extends BaseDynamicState {
      * ['免伤',0]，即闪避失败
      */
     pendingDefense: ['免伤', number][]
+    /**
+     * 位于战斗地图的什么位置
+     */
+    location: {
+        x: number
+        y: number
+    }
 }
 
 /**
  * 战斗敌人
+ * 
+ * 战斗中根据敌人实体意图分布表，在战斗中动态生成意图序列。对于不同的敌人类型，有不同的序列生成方式
+ *    - cthulhu：根据 speed、damage、defense、evasion 生成
+ *    - immovable：根据 speed、damage、defense 生成，这种敌人没有闪避能力，只有基础免伤，意图只有observe与attack
  */
-export type CombatEnemy = CombatDynamicState & EnemyTemplate & InstanceId
+export interface CombatEnemy extends BaseEnemyTemplate, CombatDynamicState, InstanceId {
+    type: 'cthulhu' | 'immovable'
+}
 
 /**
  * 战斗友方
  */
-export interface CombatAlly extends EntityTemplate, CombatDynamicState, Omit<PlayerDynamicState, 'xp' | 'level'> {
+export interface CombatAlly extends EntityTemplate, CombatDynamicState, Omit<PlayerDynamicState, 'storageSize' | 'xp' | 'level'> {
+    /**
+     * 结果序列
+     *
+     * 进入战斗时，根据玩家方所有实体的五维，预生成长度为 stamina <= 0 ? 0 : floor(stamina / 10) 的序列
+     *
+     * 结果序列分为攻击结果序列、防御结果序列。
+     *  - 使用攻击/防御战术将触发结果序列判定，随后同时推进攻击结果序列与防御结果序列。
+     *
+     * 实体数值在战斗中因增益 / 减益发生**临时**变化时，不重新生成序列，而是叠加最终结算增益/减益。
+     *  - 玩家方实体各自维护独立的结果序列，除非自身必要数值发生变化，否则序列样貌永远不变
+     *  - 玩家方序列耗尽时，扣除一定量 stamina ，随后重新生成
+     *  - 序列长度为 0 时，实体无法行动
+     *
+     * 玩家方实体可预测自身 n 次行动的结果，在ui上表现为自身序列结果可见
+     *  - will 为 50 时 n 为 1，此后每 5 点 will 可使 n 的值额外 +1
+     *  - will 小于 50 时 n 为 0
+     *
+     * 攻击结果生效后即刻执行，防御结果生效后储存进pendingDefense字段待消费。
+     * 
+     * instant伤害不参与任何正常结算，直接对目标造成 floor(
+     *    MagicWeapon.damage
+     *    × (1 + floor(spiritual / 10) × 0.5)
+     *    × combatBonus
+     *    × 0.75
+     *  )
+     * 的真实伤害。
+     */
+    resultSequence: {
+        /**
+         * 主手攻击序列
+         */
+        main?: AttackResult[]
+        /**
+         * 副手攻击序列
+         */
+        side?: AttackResult[]
+        /**
+         * 统一攻击序列
+         * 
+         * 主、副手皆无武器装备时使用
+         */
+        attack?: AttackResult[]
+        /**
+         * 统一防御序列
+         * 
+         * 常驻，不分主副手
+         */
+        defense: DefenseResult[]
+    }
     /**
      * 战斗增益 = clamp(1.0 + (KNO - 3) × 0.05, 0.5, 2.0)
      */
@@ -1653,6 +1925,17 @@ export type Exit = Local | ZoneTransfer | SanctuaryReturn
  */
 export interface Interaction {
     desc: string
+    /**
+     * 是否可重复交互？
+     * 
+     * 非负整数
+     * 
+     * 无该字段仅可交互 1 次；
+     * number = 0 时可交互无限次；
+     * number = 1 时不可交互（依旧会显示在交互列表中，可用于特殊叙事）；
+     * number > 1 时可交互 number 次
+     */
+    canRepeat?: number
     results: {
         timeCost: GameRound['absoluteTick']
         soundEffect: SoundType
@@ -1675,7 +1958,7 @@ export interface Interaction {
              *
              * 失去只需 ID，而获得需要完整模板。
              */
-            gain?: Array<ItemTemplate | NpcTemplate>
+            gain?: Array<ItemTemplate | CompanionTemplate>
             /** 
              * 生成的敌人
              */
@@ -1710,6 +1993,93 @@ export interface Interaction {
 }
 
 /**
+ * 掩体模板
+ */
+export interface CoverTemplate {
+    id: string
+    name: string
+    desc: string
+    /** 
+     * 掩体覆盖率（0.0 ~ 1.0）
+     * 
+     * 攻击处于掩体后方的单位时，受到命中与伤害减益，覆盖率越高减益越高
+     * 
+     * 实体从自身紧贴的掩体 a 后，对不被 a 遮挡（即对方并非与自己一样紧贴掩体的另一个面）的目标发起攻击时，不受到来自 a 的攻击减益
+     */
+    coverRate: number
+    /** 
+     * 是否可通行?
+     * 
+     * 有该字段则实体可移动到掩体所处的格子上
+     * 
+     * number定义移入掩体所需的额外AP消耗
+     */
+    passable?: number
+    /** 
+     * 是否能被摧毁？
+     * 
+     * 有该字段则掩体可被攻击摧毁
+     * 
+     * number定义掩体的最大耐久
+     */
+    canBeDestoryed?: number
+}
+/**
+ * 掩体
+ */
+export interface Cover extends CoverTemplate {
+    /** 
+     * hp为0即视为被摧毁
+     */
+    hp?: number
+}
+/**
+ * 环境修正
+ */
+export interface EnvironmentModifier {
+    /** 
+     * 移动消耗修正（如积水地块 +1）
+     */
+    moveCostDelta?: number
+    /** 
+     * 全局命中率修正（如大雾 -0.1）
+     */
+    accuracyBonus?: number
+    /** 
+     * 特定武器类型的乘区修正
+     */
+    weaponTypeModifier?: Partial<Record<WeaponType, {
+        damageMultiplier?: number
+        accuracyDelta?: number
+    }>>
+}
+/**
+ * 战场地图
+ */
+export interface BattleMap {
+    /** 
+     * 地图拓扑与环境描述
+     */
+    desc?: string
+    /** 
+     * 战线纵深范围 [minX, maxX]
+     */
+    depthRange: [number, number]
+    /** 
+     * 轨道数量
+     */
+    laneCount: number
+    /** 
+     * 掩体列表
+     */
+    covers?: Array<[CoverTemplate['id'], x: number, y: number]>
+    /** 
+     * 环境修正
+     */
+    modifiers?: EnvironmentModifier
+}
+
+/**
  * 节点模板
  */
 export interface NodeTemplate {
@@ -1717,15 +2087,45 @@ export interface NodeTemplate {
     desc: string
     visualPrompt: string
     /**
-     * 危险等级
+     * 是否有危险？
      *
-     * 影响搜查遇敌速度及敌人生成数量；
-     * 必须是 1-50 的整数；
-     * 若不设置，则视为安全节点，搜查不会遇敌；
-     * 威胁度为1遇敌1~2；
-     * 为2遇敌1~3、为3遇敌2~4、为4遇敌3~5。以此类推。
+     * 有三种定义方式。
+     * 
+     * 无该字段视为安全节点，永远不会遇敌。
      */
-    threatLevel?: number
+    isDangerous?: {
+        /**
+         * 被伏击
+         * 
+         * 玩家一旦进入节点便触发战斗，且敌我双方的部署区间更加不利于我方，number为可调节的不利系数（0~1）。
+         */
+        isAmbushed: number
+        /**
+         * 定义此节点的危险等级
+         *
+         * - 影响搜查遇敌速度及敌人生成数量；
+         * - 必须是 1-50 的整数；
+         * - 威胁度为1遇敌1~2；
+         * - 为2遇敌1~3、为3遇敌2~4、为4遇敌3~5。以此类推。
+         */
+        level: number
+    } |
+    /**
+     * 直接写危险等级
+     * 
+     * 无isAmbushed字段，战斗为正常的遭遇战，部署区间正常。
+     */
+    number |
+    /**
+     * 定义此节点敌人的数据
+     *
+     * 战斗结束后，引擎会将该字段从当前节点的数据结构中清除；
+     * 之后在此节点不会再遇敌。
+     * 
+     * 这是特殊的叙事型战斗。
+     * 由于机制极为复杂，暂未做完，此处与常规战斗共享一套逻辑，待后续扩展。
+     */
+    EnemyTemplate[]
     /**
      * 子节点列表
      *
@@ -1736,17 +2136,6 @@ export interface NodeTemplate {
     interactions?: Interaction[]
     nodeNpc?: NodeNpcTemplate
     items?: Item[]
-    /**
-     * 节点特定敌人
-     * 
-     * 节点数据结构中若有该字段，则遇敌时（不论是何种方式），必然只遇到data中定义的敌人；
-     * 战斗结束后，引擎会将该字段从当前节点的数据结构中清除；
-     * 此后才会正常根据节点的“威胁等级”字段遇敌。
-     */
-    specificEnemy?: {
-        data: EnemyTemplate[]
-        spawnCondition: 'on_enter' | 'on_search' | 'on_interact'
-    }
     /**
      * 出口列表
      *
@@ -1761,8 +2150,18 @@ export interface NodeTemplate {
      * 彼此之间都必须显式定义出口。
      */
     exits?: Exit[]
+    /**
+     * 战场地图
+     *
+     * 决定该节点触发战斗时所加载的战场空间拓扑（纵深、轨道、掩体与修正器）。
+     *
+     * 寻址规则与加载优先级：
+     * 1. 显式指定：若配置了该字段（如 `map: 'sterilization_room'`），引擎优先在本次寻找与当前区域的当前节点的名字匹配的地图；若匹配失败则抛出警告并回退到全局默认地图；
+     * 2. 自动匹配：若未配置该字段，引擎将按约定扫描当前区域名 (zoneId) 与当前节点键名 (nodeId) 寻找同名专属地图；
+     * 3. 全局保底：若未找到节点同名地图，自动回退至系统全局默认地图。
+     */
+    map?: string
 }
-
 /**
  * 运行时节点
  */
@@ -1788,10 +2187,20 @@ export interface FacilityTemplate {
     id: string
     name: string
     desc: string
-    nodeMounted: string    // 挂载节点
-    production: Partial<SanctuaryState>   // 每日产出，允许设施每日产出侵蚀度
+    /** 
+     * 挂载节点
+     */
+    nodeMounted: string
+    /** 
+     * 作用
+     * 
+     * 包含消耗与产出，负为消耗、正为产出
+     */
+    function: Record<
+        string, // 即资源id
+        number  // 值
+    >
 }
-
 /** 
  * 运行时设施
  * 
@@ -1823,7 +2232,6 @@ export interface ZoneTemplate {
     dilationFactor: number
     nodes: Record<string, NodeTemplate>
 }
-
 /**
  * 运行时区域
  */
@@ -1839,26 +2247,35 @@ export interface Zone extends ZoneTemplate {
  * 庇护所模板
  */
 export interface SanctuaryTemplate extends ZoneTemplate {
-    initialState: SanctuaryState & {
+    initialState: {
+        necessaryResource: NecessaryResource
+        uniqueResource: UniqueResource[]
+        /** 
+         * 人口
+         */
+        population: number
+        /** 
+         * 侵蚀度
+         */
+        erosion: number
+        /** 
+         * 设施列表
+         */
         facility: FacilityTemplate[]
     }
 }
-
 /**
  * 运行时庇护所
  */
-export interface Sanctuary extends Omit<SanctuaryTemplate, 'initialState'>, SanctuaryState {
+export interface Sanctuary extends ZoneTemplate {
+    population: number
+    erosion: number
+    necessaryResource: NecessaryResource
+    uniqueResource: UniqueResource[]
     facility: Facility[]
     storage: ItemInstance[]
     /**
      * 在册居民池
-     *
-     * 与 SanctuaryState.population（宏观幸存者数字）解耦：population 描述庇护所
-     * 整体人口规模（影响口粮消耗与仓储容量），residents 描述可被事件系统
-     * 点名操作的具体个体（恢复/消耗 hp、san，获得/失去）。
-     *
-     * 由引擎注入，非模板字段；初始为空数组，
-     * 通过 SanctuaryEvent 的 residents 变更逐步填充。
      */
     residents: Resident[]
 }
@@ -1884,51 +2301,55 @@ export interface Resident extends ResidentTemplate {
 }
 
 /**
+ * 选择影响
+ */
+export interface ChoiceImpact {
+    erosion?: number // 负为减少，正为增加
+    resource?: Record<keyof NecessaryResource | UniqueResource['id'], number>
+    residents?: number // 负为随机失去、正为从居民库随机生成
+    | Array<
+        | Resident // 获得新居民
+        | Resident['id'] // 失去已有居民
+        |
+        [Resident['id'],
+            (
+                | 1 // hp恢复
+                | 2 // hp消耗
+                | 3 // san恢复
+                | 4 // san消耗
+            ), number // 值
+        ]>
+    /**
+     * 从本地常量中随机抽取 number 个允许出现在当前区域的敌人
+     */
+    spawnEnemy?: number
+}
+
+/**
  * 庇护所事件
  */
 export interface SanctuaryEvent {
     desc: string
     choices: Array<{
         desc: string
-        stateChange: {
-            food?: number
-            water?: number
-            medicine?: number
-            electricity?: number
-            scraps?: number
-            morale?: number
-            erosion?: number
-            residents?: number // 负为随机失去、正为从居民库随机生成
-            | Array<
-                | Resident // 获得新居民
-                | Resident['id'] // 失去已有居民
-                |
-                [Resident['id'],
-                    (
-                        | 1 // hp恢复
-                        | 2 // hp消耗
-                        | 3 // san恢复
-                        | 4 // san消耗
-                    ), number // 值
-                ]>
-            spawnEnemy?: boolean
-        }
+        impact: ChoiceImpact
     }>
 }
-
-/**
- * 庇护所事件抉择的 stateChange 类型（choices 内每一项）。
- */
-export type SanctuaryEventChange = NonNullable<SanctuaryEvent['choices'][number]['stateChange']>
 
 // ==========================
 // 11. 叙事系统
 // ==========================
 
 /**
- * 伏笔基类
+ * 伏笔
  */
-export interface PP {
+export interface PlotPoint {
+    /**
+     * 类型
+     * 
+     * M为主线伏笔，S为支线伏笔
+     */
+    type: 'M' | 'S'
     id: string
     content: string
     /**
@@ -1957,71 +2378,152 @@ export interface PP {
 }
 
 /**
- * 主线伏笔
+ * 叙事元
+ * 
+ * 另为所有叙事概念提供统一基底
  */
-export interface MainPlotPoint extends PP {
-    type: 'main'
-}
-
-/**
- * 支线伏笔
- */
-export interface SidePlotPoint extends PP {
-    type: 'side'
-}
-
-/**
- * 伏笔联合类型
- */
-export type PlotPoint = MainPlotPoint | SidePlotPoint
-
-/**
- * 伏笔网络
- *
- * 第一项为主线伏笔，第二项为支线伏笔。
- */
-export type PlotPointNet = [MainPlotPoint[], SidePlotPoint[]]
-
-/**
- * 叙事主旨
- */
-export interface NarrativeMotif {
+export interface _Nar {
+    /**
+     * 唯一标识
+     */
     id: string
-    /** 子主题 / 子主旨。 */
-    sub: string
-    /** 主色。 */
-    mainColor: string
-    /** 辅色。 */
-    subColor: string
-    /** 生成提示词。 */
+    /**
+     * 名称
+     */
+    name: string
+    /**
+     * 描述
+     */
+    desc: string
+    /**
+     * 提示词
+     */
     prompt: string
 }
 
-/**
- * 叙事模式。
+/** 
+ * 叙事模式
  */
-export interface NarMode extends NarrativeMotif {
+export interface NarMode extends _Nar {
     id: NarrativeMode
 }
-
 /**
- * 叙事节奏。
+ * 叙事节奏
  */
-export interface NarPac extends NarrativeMotif {
+export interface NarPacing extends _Nar {
     id: NarrativePacing
 }
 
 /**
- * 子叙事主题。
+ * 恐怖元
+ * 
+ * 单个素材
+ * 可无限枚举、可复数、不承担唯一性
+ *
+ * 预定义的元库维护于 `src/constants/narrative/atoms.ts`
  */
-export interface NarrativeThemeSub extends NarrativeMotif {
-    belong: NarrativeTheme
+export interface HorrorAtom extends _Nar {
+}
+/**
+ * 恐怖域
+ * 
+ * 预定义的象限库维护于 `src/constants/narrative/domains.ts`
+ */
+export interface HorrorDomain extends _Nar {
+    /** 
+     * 域偏转规约(Deflection Convention)
+     * 
+     * 任何 Atom 处于该域下时，其表现形式必须经过该滤镜的折射
+     * 
+     * 不引入新字段，但必须在desc、prompt中反映这种域的偏转规约
+     * 
+     * @example "所有反光表面都会渗出浑浊的人体胆汁"、"结果发生于起因之前"、"非欧几何，走廊长度取决于心跳频率"、"一切无机物均有向坏死脂肪转变的倾向"
+     * 虽然以中文为示例，但提示词必须是英文
+     */
+}
+/**
+ * 恐怖美学
+ * 
+ * 由元、象限调配而成
+ * 
+ * 预定义的美学库维护于 `src/constants/narrative/aesthetics.ts`
+ */
+export interface HorrorAesthetic extends _Nar {
+    /** 
+     * 主控域
+     */
+    primaryDomain: HorrorDomain['id']
+    /**
+     * 渗透/干涉域
+     */
+    interferingDomains?: HorrorDomain['id'][]
+    /**
+     * 构造
+     */
+    structure: {
+        /**
+         * 骨架
+         */
+        skeleton: Array<{
+            atomId: HorrorAtom['id']
+            /** 
+             * 在空间中的主导度 (0.0 ~ 1.0)
+             * 
+             * 所有元相加须为 1.0
+             */
+            dominance: number
+        }>
+        /** 
+         * 血肉
+         */
+        flesh: Array<{
+            atomId: HorrorAtom['id']
+            /** 
+             * 显化阶段：如 'setup' 仅可见其残片，'climax' 全面显露
+             * 
+             * 仅对链式叙事有效
+             */
+            revealPhase?: NarrativePhase
+        }>
+        /**
+         * 共鸣
+         * 
+         * 元与元之间的本体论作用机制
+         * 
+         * | 'symbiosis'    // 共生融合：A、B、C、... 结合涌现出超常意象（A + B + C + ... -> D）
+         * | 'polarization' // 认知拮抗：A、B、C、... 产生强烈的概念排异，制造不可调和的惊悚张力
+         * | 'parasitism'   // 寄生重写：A、B、... 寄生在 α、β、... 上，篡改 α、β、... 的原有本质
+         * | 'herald'       // 因果先兆：A、B、... 是 α、β、... 降临或发生的时空痕迹与物理前兆
+         */
+        resonance?: Array<{
+            atomId: HorrorAtom['id'][]
+            type: 'symbiosis' | 'polarization'
+        } | {
+            source: HorrorAtom['id'][]
+            target: HorrorAtom['id'][]
+            type: 'parasitism' | 'herald'
+        }>
+        /**
+         * 深度梯度：随探索深度或张力演进的质变
+         * 
+         * depthProgression?: Array<{
+         * threshold: number // 深度/张力阈值 (0 - 1000)
+         * shiftNarrativePrompt: string // 触发质变时的环境叙事指令
+         * }>
+         */
+    }
 }
 
 /**
- * 叙事主轴。
+ * 叙事主旨
  */
-export interface NarrativeMainAxis extends NarrativeMotif { }
+export interface NarMotif extends _Nar {
+}
+/**
+ * 叙事主轴
+ */
+export interface NarMainAxis extends _Nar {
+}
 
 /**
  * 叙事配置
@@ -2031,30 +2533,28 @@ export interface StoryConfig {
         id: NarMode['id']
         prompt: NarMode['prompt']
     }
-
     pacing: {
-        id: NarPac['id']
-        prompt: NarPac['prompt']
+        id: NarPacing['id']
+        prompt: NarPacing['prompt']
     }
-
-    theme: {
-        id: NarrativeThemeSub['id']
-        prompt: NarrativeThemeSub['prompt']
+    aesthetic: {
+        id: HorrorAesthetic['id']
+        prompt: HorrorAesthetic['prompt']
     }
-
     motif?: {
-        id: NarrativeMotif['id']
-        prompt: NarrativeMotif['prompt']
+        id: NarMotif['id']
+        prompt: NarMotif['prompt']
     }
-
     mainAxis?: {
-        id: NarrativeMainAxis['id']
-        prompt: NarrativeMainAxis['prompt']
+        id: NarMainAxis['id']
+        prompt: NarMainAxis['prompt']
     }
-
-    nodeCount: number
-
-    /** 张力，范围 0-1000。 */
+    nodesCount: number
+    /** 
+     * 张力
+     * 
+     * 取值范围 0-1000
+     */
     tension: number
 }
 
@@ -2063,41 +2563,49 @@ export interface StoryConfig {
  */
 export interface StoryArc {
     /**
-     * 叙事链唯一 ID。
+     * 叙事链唯一标识
      *
-     * 建议格式：
-     * `${theme}_${motif}_${mainAxis}_${length}`
+     * 格式：`${aesthetic}_${motif}_${mainAxis}`
+     * 
+     * 叙事链保存到本地时，直接用id作为文件夹保存名，即：
+     * `.../the-zone-data/maps/chain/${id}/1.json`
+     * `.../the-zone-data/maps/chain/${id}/2.json`
+     * ...
+     * `.../the-zone-data/maps/chain/${id}/n.json`
      */
     id: string
-
     config: StoryConfig
-
     /**
-     * 叙事进度，范围 0-1000。
-     *
-     * 达到 90% 以上且张力 >= 85% 时，可触发结局。
+     * 叙事进度
+     * 
+     * 取值范围 0-1000。
+     * 
+     * 进度 >= 90% 且张力 >= 85% 时，可触发结局。
      */
     progress: number
-
-    /** 严格限定该条叙事链将贯穿多少个区域。 */
-    length: number
-
     status: StoryArcStatus
-
-    /** 叙事链下的所有伏笔。 */
-    plotPoints: PlotPointNet
-
-    /** 叙事链当前索引。 */
+    /** 
+     * 当前叙事链下的所有伏笔
+     */
+    plotPoints: PlotPoint[]
+    /** 
+     * 当前索引
+     * 
+     * 决定本叙事链下一张地图的索引，也决定其保存到本地时的n.json的n值。
+     */
     currentIndex: number
-
-    /** 暗线。 */
+    /** 
+     * 暗线
+     */
     hiddenAxis: {
-        /** 前一次暗线描述，由 LLM 结合所有伏笔生成。 */
+        /** 
+         * 前一次暗线描述，由 LLM 结合所有伏笔生成
+         */
         prevDesc: string
-
-        /** 结合新伏笔与上一次暗线描述生成的新版描述。 */
+        /**
+         * 结合新伏笔与上一次暗线描述生成的新版描述
+         */
         newDesc: string
-
         /**
          * 暗线是否已被玩家推理出来。
          *
@@ -2111,7 +2619,6 @@ export interface StoryArc {
          */
         isRevealed: boolean
     }
-
     startTime: {
         zone: ZoneDate
         tick: GameRound['absoluteTick']
@@ -2126,8 +2633,9 @@ export interface ArchivedStoryArc extends StoryArc {
         zone: ZoneDate
         tick: GameRound['absoluteTick']
     }
-
-    /** 由 LLM 生成的叙事链总结。 */
+    /**
+     * 由 LLM 生成的叙事链总结
+     */
     summary: string
 }
 
@@ -2148,106 +2656,126 @@ export interface HiddenAxis {
  */
 export interface ChainNarrative {
     /**
-     * 规则。
+     * 规则
      *
      * 用于链式叙事调整张力、伏笔生成等底层公式的系数。
      */
     rule: {
-        /** 各种玩家状态在计算张力时的权重系数。 */
+        /**
+         * 各种玩家状态在计算张力时的权重系数
+         */
         pacingWeights: {
             health: number
             sanity: number
-
-            /** 伏笔积压带来的压力权重。 */
+            /**
+             * 伏笔积压带来的压力权重
+             */
             plots: number
-
-            /** 深度带来的环境压力权重。 */
+            /**
+             * 深度带来的环境压力权重
+             */
             depth: number
-
-            /** 队友伤病带来的焦虑权重。 */
+            /**
+             * 队友伤病带来的焦虑权重
+             */
             companions: number
         }
-
-        /** 伏笔生成的概率基数。 */
+        /**
+         * 伏笔生成的概率基数
+         */
         foreshadowingRules: {
             earlyGameChance: number
             midGameChance: number
             lateGameChance: number
-
-            /** 允许同时存在未解决的最大伏笔数。 */
+            /**
+             * 允许同时存在未解决的最大伏笔数
+             */
             maxConcurrent: number
         }
-
-        /** 触发与计算高潮阶段的临界参数。 */
+        /**
+         * 触发与计算高潮阶段的临界参数
+         */
         climaxParameters: {
             depthMultiplier: number
             sanityThreshold: number
             companionImpact: number
             plotPressureMax: number
         }
-
-        /** 区域生成时的节点数量合理区间。 */
+        /**
+         * 区域生成时的节点数量合理区间
+         */
         nodeCountRange: {
             min: number
             max: number
             base: number
         }
     }
-
     /**
-     * 分析。
+     * 分析
      *
      * 引擎进行深度分析后得出的结果，用于链式叙事生成。
      */
     analysis: {
-        /** 传入参数。 */
+        /**
+         * 传入参数
+         */
         params: {
-            /** 叙事阶段。 */
+            /**
+             * 叙事阶段
+             */
             progress: {
                 /**
-                 * 宏观进度。
+                 * 宏观进度
                  */
                 macro: NarrativePhase
-
                 /**
-                 * 微观进度。
+                 * 微观进度
                  *
                  * 引擎层取值为 0-1000，
                  * UI 层与提交给 AI 时应显示为百分比。
                  */
                 micro: number
             }
-
             /**
-             * 张力。
+             * 张力
              *
              * 引擎层取值为 0-1000，
              * UI 层与提交给 AI 时应显示为百分比。
              */
             tension: number
-
-            /** 是否应触发结局。 */
+            /**
+             * 是否应触发结局
+             */
             shouldTriggerEnding: boolean
-
-            /** 活跃伏笔。 */
-            activePlotPoints: PlotPointNet
+            /**
+             * 活跃伏笔
+             */
+            activePlotPoints: PlotPoint[]
         }
-
-        /** 返回结果。 */
+        /**
+         * 返回结果
+         */
         output: {
-            /** 需要生成的伏笔数量。 */
+            /**
+             * 需要生成的伏笔数量
+             */
             ppToGenerate: {
-                /** 主线伏笔数量。 */
+                /**
+                 * 主线伏笔数量
+                 */
                 m: number
-
-                /** 支线伏笔数量。 */
+                /**
+                 * 支线伏笔数量
+                 */
                 s: number
             }
-
-            /** 需要生成的节点数量。 */
+            /**
+             * 需要生成的节点数量
+             */
             nodeToGenerate: number
-
-            /** 需要解决的伏笔数量。 */
+            /**
+             * 需要解决的伏笔数量
+             */
             ppToSolve: number
         }
     }
@@ -2258,7 +2786,8 @@ export interface ChainNarrative {
  *
  * 当前暂无额外字段，后续可扩展。
  */
-export interface EpisodicNarrative { }
+export interface EpisodicNarrative {
+}
 
 /**
  * 动态叙事状态
@@ -2301,7 +2830,7 @@ export interface PlayerState extends Entity<PlayerTemplate, PlayerDynamicState>,
     vitalRecord: VitalRecord
     sanctuary: Sanctuary
     neuralLink: NeuralLinkState
-    companions: Array<Entity<NpcTemplate, NpcDynamicState>>
+    companions: Entity<CompanionTemplate, CompanionDynamicState>[]
     /** 
      * 对话记录
      */
@@ -2335,8 +2864,8 @@ export interface PlayerState extends Entity<PlayerTemplate, PlayerDynamicState>,
 /**
  * NPC 对话生成上下文
  */
-export interface NpcDialogueGenerationContext {
-    npc: Entity<NpcTemplate, NpcDynamicState>
+export interface NpcDialogueGenerationContext<S extends PlayerTemplate, D extends NpcDynamicState> {
+    npc: Entity<S, D>
     player: Entity<PlayerTemplate, PlayerDynamicState>
     location: Location['currentLocation']
     dialogue: Dialogue
@@ -2352,8 +2881,8 @@ export interface GenerationContext {
             prompt: StoryConfig['mode']['prompt']
         }
         theme: {
-            id: StoryConfig['theme']['id']
-            prompt: StoryConfig['theme']['prompt']
+            id: StoryConfig['aesthetic']['id']
+            prompt: StoryConfig['aesthetic']['prompt']
         }
     }
     extra: {
@@ -2376,7 +2905,7 @@ export interface EpisodicGenerationContext extends GenerationContext {
     }
     extra: GenerationContext['extra'] & {
         player: Entity<PlayerTemplate, PlayerDynamicState>
-        companions: Array<Entity<NpcTemplate, NpcDynamicState>>
+        companions: Array<Entity<CompanionTemplate, CompanionDynamicState>>
     }
 }
 

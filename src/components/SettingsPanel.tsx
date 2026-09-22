@@ -609,15 +609,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
                 {/* 第三列：社交、战斗与机制限制 */}
                 <div className="space-y-6">
-                    {createGroup('社交关系平衡 (信任阈值)', 'purple', 'social.thresholds', [
-                        { label: '极高信任阈值', k: 'trustHigh', min: 0, max: 100, step: 1 },
-                        { label: '中等信任阈值', k: 'trustMedium', min: 0, max: 100, step: 1 },
-                        { label: '低信任阈值', k: 'trustLow', min: 0, max: 100, step: 1 },
-                        { label: '极低信任阈值', k: 'trustVeryLow', min: 0, max: 100, step: 1 },
-                        { label: '最小信任阈值', k: 'trustMinimal', min: 0, max: 100, step: 1 },
-                        { label: '初始默认信任', k: 'trustDefault', min: 0, max: 100, step: 1 },
-                        { label: '信任上限', k: 'trustMax', min: 0, max: 100, step: 1 },
-                        { label: '信任下限', k: 'trustMin', min: 0, max: 100, step: 1 },
+                    {createGroup('社交关系平衡 (信任 / 好感)', 'purple', 'social.thresholds', [
+                        { label: '长盟边界 (trustHigh)', k: 'trustHigh', min: 0, max: 100, step: 1 },
+                        { label: '浅合边界 (trustMedium)', k: 'trustMedium', min: 0, max: 100, step: 1 },
+                        { label: '审慎边界 (trustLow)', k: 'trustLow', min: 0, max: 100, step: 1 },
+                        { label: '防备边界 (trustVeryLow)', k: 'trustVeryLow', min: 0, max: 100, step: 1 },
+                        { label: '最小信任阈值 (trustMinimal)', k: 'trustMinimal', min: 0, max: 100, step: 1 },
+                        { label: '初始默认信任 (trustDefault)', k: 'trustDefault', min: 0, max: 100, step: 1 },
+                        { label: '信任 / 好感上限 (trustMax)', k: 'trustMax', min: 0, max: 100, step: 1 },
+                        { label: '信任下限 (trustMin)', k: 'trustMin', min: 0, max: 100, step: 1 },
                     ])}
                     {createGroup('行为交互收益 (增益/损耗)', 'amber', 'social.benefits', [
                         { label: '高级拥抱理智增益', k: 'hugSanityGainHigh', min: 0, max: 50, step: 1 },
@@ -643,13 +643,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                             checked={settings.accumulateCounterEnabled}
                             onChange={(v) => handleChange('accumulateCounterEnabled', v)}
                             label="敌方蓄反询问"
-                            desc="允许引擎在敌方蓄反槽达 5n 且预支可承受时向敌方发起询问。有利有弊，默认建议关闭；当前敌方决策恒为拒绝，待接入 LLM 后真正生效。"
+                            desc="允许引擎在敌方与任意角色的蓄反值达 5n 时向敌方发起询问：消耗 5n 点蓄反值、预支 n 点行动力（与差反共享单回合预支额度，加值合计不超过其行动点基础值与当前行动点之和），换得可用 n 点行动点的立即行动窗口（行动按自身消耗扣减）。有利有弊，默认建议关闭；当前敌方决策恒为拒绝，待接入 LLM 后真正生效。"
                         />
                         <ToggleRow
                             checked={settings.differentialCounterEnabled}
                             onChange={(v) => handleChange('differentialCounterEnabled', v)}
                             label="敌方差反询问"
-                            desc="允许引擎在敌方速度满足差反且可承受 2 点预支时向敌方发起询问。有利有弊，默认建议关闭；当前敌方决策恒为拒绝，待接入 LLM 后真正生效。"
+                            desc="允许引擎在遭攻击时向速度不小于 10 的敌方发起差反询问：由其自选预支 2n 点行动力（与蓄反共享单回合预支额度，加值合计不超过其行动点基础值与当前行动点之和），换得可用 n 点行动点的立即行动窗口（行动按自身消耗扣减）。有利有弊，默认建议关闭；当前敌方决策恒为拒绝，待接入 LLM 后真正生效。"
                         />
                     </div>
                     {createGroup('媒体信号加载延迟 (ms)', 'blue', 'mediaLoading', [

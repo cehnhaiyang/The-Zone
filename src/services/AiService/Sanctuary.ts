@@ -25,12 +25,31 @@ const buildSanctuaryEventPrompt = (input: SanctuaryEventGenerationContext): stri
 
     const dailyProduction = (sanctuary.facility ?? [])
         .map((f) => {
-            const parts = Object.entries(f.production ?? {})
-                .map(([key, value]) => `${key} ${value > 0 ? '+' : ''}${value}`)
+            const parts = Object.entries(f.function ?? {})
+                .map(([key, value]) => {
+                    const amount = value ?? 0;
+                    return `${key} ${amount > 0 ? '+' : ''}${amount}`;
+                })
                 .join('，');
             return `【${f.name}】Lv.${f.level}（挂载：${f.nodeMounted}）—— 每日 ${parts}`;
         })
         .join('\n');
+
+    // 资源清单 = 必要资源（food / water）+ 独特资源，impact.resource 只允许使用这里的键。
+    const necessaryText =
+        `- 食物（id: food）当前 ${sanctuary.necessaryResource.food}\n` +
+        `- 饮水（id: water）当前 ${sanctuary.necessaryResource.water}`;
+
+    const uniqueText = sanctuary.uniqueResource
+        .map((entry) => {
+            const rate = (entry.consumptionRate ?? 0) > 0
+                ? `，每人每日消耗 ${entry.consumptionRate}`
+                : '，不随日常消耗';
+            return `- ${entry.name}（id: ${entry.id}）当前 ${entry.value}${rate}：${entry.desc}`;
+        })
+        .join('\n');
+
+    const resourceText = [necessaryText, uniqueText].filter(Boolean).join('\n');
 
     const residentsText = (sanctuary.residents ?? []).length > 0
         ? (sanctuary.residents ?? []).map((r) => `- ${r.name}（hp ${r.hp} / san ${r.san}）`).join('\n')
@@ -44,9 +63,9 @@ const buildSanctuaryEventPrompt = (input: SanctuaryEventGenerationContext): stri
 # 当前庇护所状态
 - 名称：${sanctuary.name}
 - 第 ${time.day} 天，时段 ${time.cycle} / ${time.tick}
-- 食物 ${sanctuary.food} / 水 ${sanctuary.water} / 药品 ${sanctuary.medicine}
-- 电力 ${sanctuary.electricity} / 废料 ${sanctuary.scraps}
-- 人口 ${sanctuary.population} / 士气 ${sanctuary.morale} / 侵蚀度 ${sanctuary.erosion}
+- 人口 ${sanctuary.population} / 侵蚀度 ${sanctuary.erosion}
+- 资源清单：
+${resourceText || '（该庇护所暂无资源）'}
 
 # 设施与每日产出
 ${dailyProduction || '（暂无设施）'}
@@ -60,7 +79,8 @@ ${residentsText}
 
 # 事件设计规则
 1. 事件必须贴合庇护所资源与居民池现状，是有据可依的"运转问题"，而非凭空灾难。
-2. choices 提供 2~3 个抉择，每个抉择的 stateChange 必须明确具体数字。
+2. choices 提供 2~3 个抉择，每个抉择的 impact 必须明确具体数字；
+   impact.resource 的键只能是上方资源清单中出现过的 id。
 3. residents 变更与居民池强相关：只有居民池非空时才能写下失去/点名操作；
    居民池为空时请用正数（自然增长）或省略 residents。
 4. 保持宇宙恐怖基调：即使是日常事件，也要有潜伏的诡异感。
@@ -133,13 +153,10 @@ export const generateSanctuaryEvent = async (
 
         BaseProvider.logInfo('SanctuaryEvent', `大模型响应成功，IO 耗时: ${elapsed}ms`);
 
-        const { data, success } = BaseProvider.safeJSONParseWithInfo<{
-            desc: string;
-            choices: Array<{
-                desc: string;
-                stateChange: Record<string, unknown>;
-            }>;
-        }>(result.text, { desc: '', choices: [] });
+        const { data, success } = BaseProvider.safeJSONParseWithInfo<SanctuaryEvent>(
+            result.text,
+            { desc: '', choices: [] }
+        );
 
         if (!success || !data || !data.desc) {
             BaseProvider.logWarn('SanctuaryEvent', '事件解析失败或为空，返回降级空事件');
@@ -160,6 +177,6 @@ export const generateSanctuaryEvent = async (
             'Sanctuary Event Generation',
             { model: modelToUse },
             { desc: '', choices: [] }
-        ) as { desc: string; choices: Array<{ desc: string; stateChange: Record<string, unknown> }> };
+        ) as SanctuaryEvent;
     }
 };

@@ -7,13 +7,11 @@ import type {
     ConsumableInstance,
     DataInstance,
     EnemyTemplate,
-    Entity,
     EquipState,
+    InteractionNpcEntity,
     ItemInstance,
     NeuralLinkState,
     Node,
-    NpcDynamicState,
-    NpcTemplate,
     PlayerState,
     Puzzle,
     Settings,
@@ -43,10 +41,13 @@ import {
     clampDynamicVitals,
     collectAccessoryEffects,
     createItemInstance,
-    createNpcEntity,
+    createNodeNpcEntity,
     equipItem,
     getAppliedAccessoryDeltas,
     getEffectValueByType,
+    getNodeAmbushRate,
+    getNodeSpecificEnemies,
+    getNodeThreatLevel,
     hasItemInInventory,
     isAccessoryInstance,
     isArmorInstance,
@@ -55,6 +56,7 @@ import {
     isDataInstance,
     isEquipmentInstance,
     isVitalType,
+    normalizeEquipState,
     isWeaponInstance,
     negateEffectDeltas,
     normalizeEquipmentWithOverflow,
@@ -69,13 +71,16 @@ import {
     unequipItem,
     writeEquipEffectSnapshot,
 } from '../meta';
-import type { EffectDeltas } from '../meta';
+import type { EffectDeltas, GridSize } from '../meta';
+import { getBackpackGridSize, getItemGridFootprint, getItemGridSize } from '../meta';
 import { AiService, AudioService, PersistenceService } from '../services';
+import type { BattleStartContext } from './useCombat';
 
 type PuzzleStatus = 'idle' | 'success' | 'error';
 type PuzzleStatusMsg = 'AWAITING_INPUT' | 'ACCESS_GRANTED' | 'ACCESS_DENIED' | 'TIME_EXPIRED';
 type EquipmentSlotType = 'weapon' | 'armor' | 'accessory';
-type EncounterCondition = 'on_enter' | 'on_search' | 'on_interact';
+/** 遭遇裁定的触发渠道：进入节点（仅伏击节点）与搜查。 */
+type EncounterCondition = 'on_enter' | 'on_search';
 
 interface ConsumableEffectApplication {
     attributeUpdates: Partial<Record<AttributeType, number>>;
@@ -120,23 +125,23 @@ const applyConsumableEffects = (
         });
 
         switch (effectType) {
-            case 'heal_hp':
+            case 'hp':
                 result.hpDelta += value;
                 break;
 
-            case 'heal_sanity':
+            case 'sanity':
                 result.sanityDelta += value;
                 break;
 
-            case 'heal_stamina':
+            case 'stamina':
                 result.staminaDelta += value;
                 break;
 
-            case 'heal_vigor':
+            case 'vigor':
                 result.vigorDelta += value;
                 break;
 
-            case 'restore_battery': {
+            case 'battery': {
                 const currentBattery =
                     result.neuralLinkUpdates.battery ?? safeNumber(player.neuralLink.battery);
 
@@ -148,7 +153,7 @@ const applyConsumableEffects = (
                 break;
             }
 
-            case 'repair_integrity': {
+            case 'integrity': {
                 const currentIntegrity =
                     result.neuralLinkUpdates.integrity ?? safeNumber(player.neuralLink.integrity);
 
@@ -191,8 +196,13 @@ interface UseInteractionParams {
     updatePlayer: (sanityDelta: number, hpDelta: number) => void;
     setShowCutscene: (show: boolean) => void;
     triggerCompanionReactions: (eventName: string, context?: string) => void;
-    spawnEnemy: (enemyTemplate?: EnemyTemplate, zoneId?: string, threatLevel?: number) => void;
-    setActiveInteractionNPC: (npc: Entity<NpcTemplate, NpcDynamicState>) => void;
+    spawnEnemy: (
+        enemyTemplate?: EnemyTemplate,
+        zoneId?: string,
+        threatLevel?: number,
+        context?: BattleStartContext
+    ) => void;
+    setActiveInteractionNPC: (npc: InteractionNpcEntity) => void;
     settings: Settings;
     updateCompanion: (npcId: string, sanityDelta: number, hpDelta: number) => void;
 }
@@ -213,9 +223,10 @@ interface UseInteractionReturn {
     closePuzzle: () => void;
     puzzleStats: { solved: number; failed: number; hints: number };
     puzzleController: PuzzleInteractionController;
-    handleUseItem: (item: ItemInstance, npc?: Entity<NpcTemplate, NpcDynamicState>) => Promise<void>;
+    handleUseItem: (item: ItemInstance, npc?: InteractionNpcEntity) => Promise<void>;
     handleEquipItem: (item: ItemInstance) => void;
     handleDiscardItem: (item: ItemInstance) => void;
+    inventoryGrid: InventoryGridReturn;
     loadingAudioId: string | null;
 }
 
@@ -255,7 +266,6 @@ interface PuzzleRuntime {
 }
 
 const DEFAULT_MAX_PUZZLE_ATTEMPTS = 3;
-const DEFAULT_SANITY_CRITICAL_PERCENT = 15;
 
 const normalizeAnswer = (value: unknown): string => String(value ?? '').trim().toLowerCase();
 
@@ -275,14 +285,380 @@ const createPuzzleRuntime = (puzzle: Puzzle | null, clozeCells: string[]): Puzzl
     patternInput: puzzle?.body.type === 'cloze' ? clozeCells.map(String) : [],
 });
 
+/**
+ * 装备槽位序列（主手 → 副手 / 护甲槽 / 饰品槽）。
+ *
+ * 槽位契约允许 weapons 为对象、armors / accessories 为单件或数组，
+ * 这里统一走 normalizeEquipState，保证序号与 equipItem / unequipItem 的槽位语义一致。
+ */
 const getEquipmentSlots = (
     equipment: EquipState,
     slotType: EquipmentSlotType
 ): Array<WeaponInstance | ArmorInstance | AccessoryInstance | null> => {
-    if (slotType === 'weapon') return equipment.weapons ?? [null, null];
-    if (slotType === 'armor') return equipment.armors ?? [];
-    return equipment.accessories ?? [];
+    const normalized = normalizeEquipState(equipment);
+    if (slotType === 'weapon') return [normalized.weapons.main, normalized.weapons.side];
+    if (slotType === 'armor') return normalized.armors;
+    return normalized.accessories;
 };
+
+//-------------------------------------------------------------------------
+// 背包网格（生化危机式格子仓储）
+//-------------------------------------------------------------------------
+
+/**
+ * 网格落位
+ *
+ * 直接取自元契约 {@link BaseItemInstance.gridPlacement} 的内联结构，
+ * 不另行定义第二套模型。
+ */
+type GridPlacement = NonNullable<ItemInstance['gridPlacement']>;
+
+/** 落位表：instanceId → 落位 */
+type GridPlacementMap = Record<string, GridPlacement>;
+
+/** 单个待渲染的网格单元 */
+interface InventoryGridTile {
+    item: ItemInstance;
+    /** 锚点列坐标 */
+    x: number;
+    /** 锚点行坐标 */
+    y: number;
+    /** 实际占位宽度（含旋转态） */
+    width: number;
+    /** 实际占位高度（含旋转态） */
+    height: number;
+    rotated: boolean;
+}
+
+/** 占位板：以扁平数组记录每一格被哪个实例占用 */
+interface GridBoard {
+    cols: number;
+    rows: number;
+    cells: Array<string | null>;
+}
+
+const createGridBoard = ([cols, rows]: GridSize): GridBoard => ({
+    cols,
+    rows,
+    cells: new Array<string | null>(cols * rows).fill(null),
+});
+
+const canOccupyGrid = (
+    board: GridBoard,
+    [width, height]: GridSize,
+    x: number,
+    y: number
+): boolean => {
+    if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
+    if (x < 0 || y < 0) return false;
+    if (x + width > board.cols || y + height > board.rows) return false;
+
+    for (let row = y; row < y + height; row += 1) {
+        for (let col = x; col < x + width; col += 1) {
+            if (board.cells[row * board.cols + col] !== null) return false;
+        }
+    }
+
+    return true;
+};
+
+const occupyGrid = (
+    board: GridBoard,
+    [width, height]: GridSize,
+    x: number,
+    y: number,
+    owner: string
+): void => {
+    for (let row = y; row < y + height; row += 1) {
+        for (let col = x; col < x + width; col += 1) {
+            board.cells[row * board.cols + col] = owner;
+        }
+    }
+};
+
+/** 落位构造：非旋转态不写 rotated 字段，保持存档干净 */
+const toGridPlacement = (x: number, y: number, rotated: boolean): GridPlacement =>
+    rotated ? { x, y, rotated: true } : { x, y };
+
+/** 从左到右、从上到下找首个可容纳位；先试默认朝向，再试旋转态 */
+const findFirstGridFit = (
+    board: GridBoard,
+    footprint: GridSize
+): GridPlacement | null => {
+    const [width, height] = footprint;
+    const rotatedFootprint: GridSize = [height, width];
+    const canRotate = width !== height;
+
+    for (let y = 0; y < board.rows; y += 1) {
+        for (let x = 0; x < board.cols; x += 1) {
+            if (canOccupyGrid(board, footprint, x, y)) return { x, y };
+            if (canRotate && canOccupyGrid(board, rotatedFootprint, x, y)) {
+                return { x, y, rotated: true };
+            }
+        }
+    }
+
+    return null;
+};
+
+const putOnGridBoard = (
+    board: GridBoard,
+    item: ItemInstance,
+    placement: GridPlacement
+): boolean => {
+    const footprint = getItemGridFootprint(item, placement.rotated === true);
+    if (!canOccupyGrid(board, footprint, placement.x, placement.y)) return false;
+
+    occupyGrid(board, footprint, placement.x, placement.y, item.instanceId);
+    return true;
+};
+
+/** 按落位表重建占位板，可排除某个实例以试算它的新位置 */
+const buildGridBoard = (
+    inventory: ItemInstance[],
+    placements: GridPlacementMap,
+    size: GridSize,
+    excludeInstanceId?: string
+): GridBoard => {
+    const board = createGridBoard(size);
+
+    inventory.forEach((item) => {
+        if (item.instanceId === excludeInstanceId) return;
+
+        const placement = placements[item.instanceId];
+        if (!placement) return;
+
+        putOnGridBoard(board, item, placement);
+    });
+
+    return board;
+};
+
+interface GridLayoutResult {
+    placements: GridPlacementMap;
+    overflow: ItemInstance[];
+    usedCells: number;
+    totalCells: number;
+}
+
+/**
+ * 求解背包布局
+ *
+ * 两轮扫描：先原地保留已持久化且仍然合法的落位（保证玩家的手动摆放稳定），
+ * 再按背包顺序为其余物品补首个可容纳位；两轮都放不下的进溢出区。
+ */
+const resolveGridPlacements = (
+    inventory: ItemInstance[],
+    size: GridSize
+): GridLayoutResult => {
+    const board = createGridBoard(size);
+    const placements: GridPlacementMap = {};
+    const overflow: ItemInstance[] = [];
+    const pending: ItemInstance[] = [];
+
+    inventory.forEach((item) => {
+        const stored = item.gridPlacement;
+
+        if (stored && !placements[item.instanceId] && putOnGridBoard(board, item, stored)) {
+            placements[item.instanceId] = toGridPlacement(
+                stored.x,
+                stored.y,
+                stored.rotated === true
+            );
+            return;
+        }
+
+        pending.push(item);
+    });
+
+    pending.forEach((item) => {
+        const fit = findFirstGridFit(board, getItemGridSize(item));
+
+        if (fit && putOnGridBoard(board, item, fit)) {
+            placements[item.instanceId] = fit;
+            return;
+        }
+
+        overflow.push(item);
+    });
+
+    const usedCells = board.cells.reduce<number>(
+        (count, owner) => (owner === null ? count : count + 1),
+        0
+    );
+
+    return { placements, overflow, usedCells, totalCells: size[0] * size[1] };
+};
+
+/** 把落位写回物品实例；无变化的实例原样返回，避免无谓的对象重建 */
+const applyGridPlacements = (
+    inventory: ItemInstance[],
+    placements: GridPlacementMap
+): ItemInstance[] => {
+    let changed = false;
+
+    const next = inventory.map((item) => {
+        const placement = placements[item.instanceId];
+        const current = item.gridPlacement;
+
+        if (!placement) {
+            if (!current) return item;
+
+            changed = true;
+            const { gridPlacement: _dropped, ...rest } = item;
+            return rest as ItemInstance;
+        }
+
+        const same =
+            current !== undefined &&
+            current.x === placement.x &&
+            current.y === placement.y &&
+            (current.rotated === true) === (placement.rotated === true);
+
+        if (same) return item;
+
+        changed = true;
+        return {
+            ...item,
+            gridPlacement: toGridPlacement(
+                placement.x,
+                placement.y,
+                placement.rotated === true
+            ),
+        };
+    });
+
+    return changed ? next : inventory;
+};
+
+/** 试算拖拽：返回新的落位表，不可放置时返回 null */
+const tryMoveGrid = (
+    inventory: ItemInstance[],
+    placements: GridPlacementMap,
+    size: GridSize,
+    instanceId: string,
+    x: number,
+    y: number
+): GridPlacementMap | null => {
+    const item = inventory.find((entry) => entry.instanceId === instanceId);
+    if (!item) return null;
+
+    const rotated = placements[instanceId]?.rotated === true;
+    const board = buildGridBoard(inventory, placements, size, instanceId);
+
+    if (!canOccupyGrid(board, getItemGridFootprint(item, rotated), x, y)) return null;
+
+    return { ...placements, [instanceId]: toGridPlacement(x, y, rotated) };
+};
+
+/** 试算旋转：原位放不下时按就近顺序微调锚点，全落空则返回 null */
+const tryRotateGrid = (
+    inventory: ItemInstance[],
+    placements: GridPlacementMap,
+    size: GridSize,
+    instanceId: string
+): GridPlacementMap | null => {
+    const item = inventory.find((entry) => entry.instanceId === instanceId);
+    const current = placements[instanceId];
+    if (!item || !current) return null;
+
+    const nextRotated = current.rotated !== true;
+    const board = buildGridBoard(inventory, placements, size, instanceId);
+    const footprint = getItemGridFootprint(item, nextRotated);
+
+    const anchors: Array<[number, number]> = [
+        [current.x, current.y],
+        [current.x - 1, current.y],
+        [current.x, current.y - 1],
+        [current.x - 1, current.y - 1],
+        [current.x + 1, current.y],
+        [current.x, current.y + 1],
+    ];
+
+    for (const [x, y] of anchors) {
+        if (!canOccupyGrid(board, footprint, x, y)) continue;
+        return { ...placements, [instanceId]: toGridPlacement(x, y, nextRotated) };
+    }
+
+    return null;
+};
+
+/** 自动整理：占地降序的贪心装箱，让长武器与大件先占住完整空间 */
+const arrangeGridPlacements = (
+    inventory: ItemInstance[],
+    size: GridSize
+): GridPlacementMap => {
+    const board = createGridBoard(size);
+    const placements: GridPlacementMap = {};
+
+    const ordered = inventory
+        .map((item, index) => ({ item, index, footprint: getItemGridSize(item) }))
+        .sort((a, b) => {
+            const areaDiff =
+                b.footprint[0] * b.footprint[1] - a.footprint[0] * a.footprint[1];
+            if (areaDiff !== 0) return areaDiff;
+
+            const longDiff = Math.max(...b.footprint) - Math.max(...a.footprint);
+            if (longDiff !== 0) return longDiff;
+
+            return a.index - b.index;
+        });
+
+    ordered.forEach(({ item }) => {
+        const fit = findFirstGridFit(board, getItemGridSize(item));
+        if (!fit || !putOnGridBoard(board, item, fit)) return;
+
+        placements[item.instanceId] = fit;
+    });
+
+    return placements;
+};
+
+/**
+ * 判定物品能否被当前背包容纳
+ *
+ * 可堆叠物品（消耗品 / 材料）命中同源堆叠时不占新空间，直接视为可容纳；
+ * 其余情况按当前布局试放一次。供仓库取出等交付类操作预检。
+ */
+const canFitGridItem = (
+    inventory: ItemInstance[],
+    placements: GridPlacementMap,
+    size: GridSize,
+    item: ItemInstance
+): boolean => {
+    const stackable = item.type === 'consumable' || item.type === 'material';
+    const merged =
+        stackable &&
+        inventory.some((entry) => entry.id === item.id && entry.type === item.type);
+
+    if (merged) return true;
+
+    return findFirstGridFit(buildGridBoard(inventory, placements, size), getItemGridSize(item)) !== null;
+};
+
+/** 背包网格对外契约（由 useInteraction 出参透出，视图层只消费） */
+interface InventoryGridReturn {
+    /** 背包网格尺寸（列 × 行），随力量成长 */
+    size: GridSize;
+    /** 待渲染的网格单元 */
+    tiles: InventoryGridTile[];
+    /** 网格容纳不下的物品 */
+    overflow: ItemInstance[];
+    /** 已占用格数 */
+    usedCells: number;
+    /** 网格总格数 */
+    totalCells: number;
+    /** 拖拽落位；不可放置时返回 false，视图据此弹回 */
+    moveItem: (instanceId: string, x: number, y: number) => boolean;
+    /** 落位预检：仅试算不写入，供拖拽过程中的合法性高亮使用 */
+    canPlace: (instanceId: string, x: number, y: number) => boolean;
+    /** 收纳预检：该物品能否放进当前背包网格，供仓库取出等交付操作使用 */
+    canFit: (item: ItemInstance) => boolean;
+    /** 旋转物品；放不下时返回 false */
+    rotateItem: (instanceId: string) => boolean;
+    /** 自动整理 */
+    autoArrange: () => void;
+}
 
 const patchZoneNode = (zone: Zone, nodeId: string, updater: (node: Node) => Node): Zone => {
     const node = zone.nodes[nodeId];
@@ -299,14 +675,6 @@ const unlockZoneNode = (zone: Zone, nodeId: string): Zone =>
 
 const lockZoneNode = (zone: Zone, nodeId: string, reason: string): Zone =>
     patchZoneNode(zone, nodeId, (node) => ({ ...node, lock: reason }));
-
-const getSanityCriticalRatio = (settings: Settings): number => {
-    const percent = safeNumber(
-        settings.gameConfig.social?.vitals?.sanityCritical,
-        DEFAULT_SANITY_CRITICAL_PERCENT
-    );
-    return clamp(percent, 0, 100) / 100;
-};
 
 async function loadNodeMediaResources(
     zoneId: string,
@@ -428,12 +796,6 @@ export const useInteraction = ({
         };
     }, [clearPuzzleTimers]);
 
-    const sanityCriticalRatio = useMemo(
-        () => getSanityCriticalRatio(settings),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [settings.gameConfig.social?.vitals?.sanityCritical]
-    );
-
     const playerStateMemo = useMemo(
         () => ({
             staminaPct:
@@ -444,7 +806,7 @@ export const useInteraction = ({
                 player.dynamic.maxSanity > 0 ? player.dynamic.sanity / player.dynamic.maxSanity : 0,
             attributes: {
                 wisdom: player.dynamic.wisdom,
-                perception: player.dynamic.perception,
+                awareness: player.dynamic.awareness,
                 agility: player.dynamic.agility,
             },
         }),
@@ -456,7 +818,7 @@ export const useInteraction = ({
             player.dynamic.maxSanity,
             player.dynamic.sanity,
             player.dynamic.wisdom,
-            player.dynamic.perception,
+            player.dynamic.awareness,
             player.dynamic.agility,
         ]
     );
@@ -470,8 +832,28 @@ export const useInteraction = ({
         return currentZone.nodes[currentNodeId] ?? makeFallbackNode('未定位', '未知坐标');
     }, [currentZone, currentNodeId]);
 
+    /** 由节点构造开战上下文：节点键名决定战场地图，isAmbushed 决定部署压缩。 */
+    const buildBattleContext = useCallback(
+        (node: Node | undefined, nodeId?: string): BattleStartContext => ({
+            nodeId: nodeId ?? currentNodeId,
+            mapOverride: node?.map,
+            isAmbushed: getNodeAmbushRate(node),
+        }),
+        [currentNodeId]
+    );
+
     const scheduleEnemySpawn = useCallback(
-        (delay: number, enemyTemplate?: EnemyTemplate, customMessage?: string, threatLevel?: number) => {
+        (
+            delay: number,
+            enemyTemplate?: EnemyTemplate,
+            customMessage?: string,
+            threatLevel?: number,
+            context?: BattleStartContext
+        ) => {
+            // 开战上下文在「调度时刻」快照：延迟期间玩家可能已移动或换区。
+            // 调用方若已知本次遭遇所属节点（例如刚进入新节点的当帧），必须显式传入，
+            // 否则会读到尚未提交的旧 currentNodeId，导致战场地图回退默认地图。
+            const battleContext = context ?? buildBattleContext(getCurrentNode());
             const timer = setTimeout(
                 () => {
                     enemySpawnTimersRef.current.delete(timer);
@@ -483,19 +865,23 @@ export const useInteraction = ({
                         );
                     }
                     AudioService.playSfx('terrifying');
-                    spawnEnemy(enemyTemplate, currentZone.id, threatLevel);
+                    spawnEnemy(enemyTemplate, currentZone.id, threatLevel, battleContext);
                 },
                 Math.max(0, safeNumber(delay))
             );
             enemySpawnTimersRef.current.add(timer);
         },
-        [addLog, spawnEnemy, currentZone.id]
+        [addLog, spawnEnemy, currentZone.id, getCurrentNode, buildBattleContext]
     );
 
     /**
-     * 节点遭遇裁定。
-     * 契约：节点存在 specificEnemy 时，遇敌只可能来自 specificEnemy.data，
-     * 且仅在 spawnCondition 与当前触发条件匹配时具象化；否则按 threatLevel 走通用遭遇骰。
+     * 节点遭遇裁定（新版遇敌机制）。
+     * 契约：
+     * - isDangerous 为 EnemyTemplate[] → 该节点的遇敌只产生数组中的敌人（任一触发方式）；
+     * - isDangerous 为 { isAmbushed, level } → 进入节点即触发战斗，必定发生；
+     * - 数值威胁等级 → 随机遇敌只发生在搜查，按搜查遇敌曲线掷骰；
+     *   进入普通节点与执行交互都不会随机遇敌
+     *   （交互 / 谜题自带的 spawnEnemy 属于显式生成，不走本函数）。
      * @returns 是否实际触发了敌人生成
      */
     const tryNodeEncounter = useCallback(
@@ -504,31 +890,47 @@ export const useInteraction = ({
             condition: EncounterCondition,
             delay: number,
             searchCount = 0,
-            fallbackMessage?: string
+            fallbackMessage?: string,
+            nodeId?: string
         ): boolean => {
-            const specific = node.specificEnemy;
-            if (specific) {
-                if (specific.spawnCondition !== condition || !specific.data.length) return false;
-                specific.data.forEach((enemy) =>
-                    scheduleEnemySpawn(delay, enemy, undefined, node.threatLevel)
+            const battleContext = buildBattleContext(node, nodeId);
+            const specificEnemies = getNodeSpecificEnemies(node);
+            if (specificEnemies) {
+                if (!specificEnemies.length) return false;
+                specificEnemies.forEach((enemy) =>
+                    scheduleEnemySpawn(
+                        delay,
+                        enemy,
+                        undefined,
+                        getNodeThreatLevel(node),
+                        battleContext
+                    )
                 );
                 return true;
             }
-            const threatLevel = node.threatLevel ?? 0;
+            const threatLevel = getNodeThreatLevel(node);
             if (threatLevel <= 0) return false;
+            // 伏击节点（isDangerous 为 { isAmbushed, level }）：进入即触发战斗，必定发生；
+            // 其部署区间不利由开战上下文（isAmbushed）传给战斗引擎。
+            if (condition === 'on_enter' && getNodeAmbushRate(node) > 0) {
+                scheduleEnemySpawn(delay, undefined, fallbackMessage, threatLevel, battleContext);
+                return true;
+            }
+            // 新版遇敌机制：随机遇敌只发生在搜查；进入普通节点与交互都不掷遭遇骰。
+            if (condition !== 'on_search') return false;
             const encounterChance = calculateEncounterChance(
                 threatLevel,
                 searchCount,
                 playerStateMemo.staminaPct,
                 playerStateMemo.vigorPct,
-                condition,
+                'on_search',
                 settings.gameConfig
             );
             if (Math.random() >= encounterChance) return false;
-            scheduleEnemySpawn(delay, undefined, fallbackMessage, node.threatLevel);
+            scheduleEnemySpawn(delay, undefined, fallbackMessage, threatLevel, battleContext);
             return true;
         },
-        [scheduleEnemySpawn, playerStateMemo, settings]
+        [scheduleEnemySpawn, buildBattleContext, playerStateMemo, settings]
     );
 
     const validateMove = useCallback(
@@ -667,10 +1069,14 @@ export const useInteraction = ({
             const spawnEnemies = changes.spawnEnemies ?? [];
             if (spawnEnemies.length > 0) {
                 // processStateChange 已记录警报日志，此处静默生成
-                spawnEnemies.forEach((enemy) => scheduleEnemySpawn(spawnDelay, enemy, '', node.threatLevel));
+                const nodeContext = buildBattleContext(node, currentNodeId);
+                spawnEnemies.forEach((enemy) =>
+                    scheduleEnemySpawn(spawnDelay, enemy, '', getNodeThreatLevel(node), nodeContext)
+                );
                 return;
             }
-            tryNodeEncounter(node, 'on_interact', spawnDelay);
+            // 新版遇敌机制：交互本身不再掷遭遇骰；
+            // 交互携带的 spawnEnemy 已在上面按显式生成处理。
         },
         [
             getCurrentNode,
@@ -684,7 +1090,7 @@ export const useInteraction = ({
             scheduleEnemySpawn,
             updatePlayer,
             currentZone,
-            tryNodeEncounter,
+            buildBattleContext,
             setActivePuzzleInteractionIndex,
             setActivePuzzleNodeId,
         ]
@@ -762,7 +1168,16 @@ export const useInteraction = ({
                 });
                 setShowCutscene(true);
                 triggerCompanionReactions(`接入新坐标: ${targetNode.name}`, targetNode.desc);
-                tryNodeEncounter(targetNode, 'on_enter', spawnDelay, 0, '被动安全协议被破坏，实体接近。');
+                // 进入新节点的当帧 currentNodeId 尚未提交，必须显式传入 targetId，
+                // 否则战场地图会按上一个节点解析（回退默认地图）。
+                tryNodeEncounter(
+                    targetNode,
+                    'on_enter',
+                    spawnDelay,
+                    0,
+                    '被动安全协议被破坏，实体接近。',
+                    targetId
+                );
             } else {
                 triggerCompanionReactions(`重返坐标 ${targetNode.name}`);
             }
@@ -835,7 +1250,7 @@ export const useInteraction = ({
                 'loot'
             );
             addLog(foundItem.desc, 'info');
-            AudioService.playSfx(foundItem.rarity !== 'standard' ? 'success' : 'item_pickup');
+            AudioService.playSfx(foundItem.grade !== 'standard' ? 'success' : 'item_pickup');
             const newItem = createItemInstance(foundItem);
             setPlayer((prev) => ({
                 ...prev,
@@ -905,7 +1320,7 @@ export const useInteraction = ({
                         const existingCompanion = player.companions.find(
                             (companion) => companion.static.id === npc.id
                         );
-                        setActiveInteractionNPC(existingCompanion ?? createNpcEntity(npc));
+                        setActiveInteractionNPC(existingCompanion ?? createNodeNpcEntity(npc));
                     } else {
                         // 历史实现：maxHp<=0 时静默 return，玩家零反馈。
                         addLog(`[${npc.name}] 生命体征异常，无法建立物理链接。`, 'warning');
@@ -1068,11 +1483,16 @@ export const useInteraction = ({
 
         if (penalties?.spawnEnemy) {
             addLog('防卫例程激活：实体具象化。', 'critical');
+            // 谜题所属节点可能与当前节点不同：优先按谜题节点解析战场地图。
+            const puzzleNode = activePuzzleNodeId
+                ? currentZone.nodes[activePuzzleNodeId]
+                : undefined;
             scheduleEnemySpawn(
                 settings.gameConfig.mediaLoading.puzzleFailEnemySpawnDelay,
                 penalties.spawnEnemy,
                 undefined,
-                node?.threatLevel
+                getNodeThreatLevel(node),
+                buildBattleContext(puzzleNode ?? node, activePuzzleNodeId ?? undefined)
             );
         }
         setPuzzleStats((prev) => ({ ...prev, failed: prev.failed + 1 }));
@@ -1085,6 +1505,7 @@ export const useInteraction = ({
         addLog,
         updatePlayer,
         scheduleEnemySpawn,
+        buildBattleContext,
         setCurrentZone,
         settings,
         clearPuzzleTimers,
@@ -1497,8 +1918,135 @@ export const useInteraction = ({
         [setPlayer, addLog, player.dynamic, settings]
     );
 
+    //-------------------------------------------------------------------------
+    // 背包网格结算
+    //-------------------------------------------------------------------------
+
+    const gridSize = useMemo(
+        () =>
+            getBackpackGridSize({
+                strength: player.dynamic.strength,
+                storageSize: player.dynamic.storageSize,
+            }),
+        [player.dynamic.strength, player.dynamic.storageSize]
+    );
+
+    const gridLayout = useMemo(
+        () => resolveGridPlacements(player.dynamic.inventory, gridSize),
+        [player.dynamic.inventory, gridSize]
+    );
+
+    const gridTiles = useMemo<InventoryGridTile[]>(() => {
+        const tiles: InventoryGridTile[] = [];
+
+        player.dynamic.inventory.forEach((item) => {
+            const placement = gridLayout.placements[item.instanceId];
+            if (!placement) return;
+
+            const rotated = placement.rotated === true;
+            const [width, height] = getItemGridFootprint(item, rotated);
+
+            tiles.push({
+                item,
+                x: placement.x,
+                y: placement.y,
+                width,
+                height,
+                rotated,
+            });
+        });
+
+        return tiles;
+    }, [player.dynamic.inventory, gridLayout]);
+
+    /**
+     * 提交落位表
+     *
+     * 补丁式写入而非整份背包覆盖：界面渲染与玩家操作之间可能隔着一次拾取或消耗，
+     * 整份覆盖会把已经消耗掉的物品复活。
+     */
+    const commitGridPlacements = useCallback(
+        (placements: GridPlacementMap | null): boolean => {
+            if (!placements) return false;
+
+            setPlayer((prev) => {
+                const nextInventory = applyGridPlacements(
+                    prev.dynamic.inventory,
+                    placements
+                );
+                if (nextInventory === prev.dynamic.inventory) return prev;
+
+                return {
+                    ...prev,
+                    dynamic: { ...prev.dynamic, inventory: nextInventory },
+                };
+            });
+
+            return true;
+        },
+        [setPlayer]
+    );
+
+    const inventoryGrid = useMemo<InventoryGridReturn>(
+        () => ({
+            size: gridSize,
+            tiles: gridTiles,
+            overflow: gridLayout.overflow,
+            usedCells: gridLayout.usedCells,
+            totalCells: gridLayout.totalCells,
+            moveItem: (instanceId, x, y) =>
+                commitGridPlacements(
+                    tryMoveGrid(
+                        player.dynamic.inventory,
+                        gridLayout.placements,
+                        gridSize,
+                        instanceId,
+                        x,
+                        y
+                    )
+                ),
+            canPlace: (instanceId, x, y) =>
+                tryMoveGrid(
+                    player.dynamic.inventory,
+                    gridLayout.placements,
+                    gridSize,
+                    instanceId,
+                    x,
+                    y
+                ) !== null,
+            canFit: (item) =>
+                canFitGridItem(
+                    player.dynamic.inventory,
+                    gridLayout.placements,
+                    gridSize,
+                    item
+                ),
+            rotateItem: (instanceId) =>
+                commitGridPlacements(
+                    tryRotateGrid(
+                        player.dynamic.inventory,
+                        gridLayout.placements,
+                        gridSize,
+                        instanceId
+                    )
+                ),
+            autoArrange: () => {
+                commitGridPlacements(
+                    arrangeGridPlacements(player.dynamic.inventory, gridSize)
+                );
+            },
+        }),
+        [
+            commitGridPlacements,
+            gridLayout,
+            gridSize,
+            gridTiles,
+            player.dynamic.inventory,
+        ]
+    );
+
     const handleUseItem = useCallback(
-        async (item: ItemInstance, npc?: Entity<NpcTemplate, NpcDynamicState>) => {
+        async (item: ItemInstance, npc?: InteractionNpcEntity) => {
             // 优先作为交互钥匙消费
             const node = getCurrentNode();
             const interactionIndex =
@@ -1518,8 +2066,8 @@ export const useInteraction = ({
             if (isConsumableInstance(item)) {
                 if (npc) {
                     addLog(`注入目标 ${npc.static.name}: ${item.name}`, 'command');
-                    const sanityDelta = safeNumber(getEffectValueByType(item, 'heal_sanity'));
-                    const hpDelta = safeNumber(getEffectValueByType(item, 'heal_hp'));
+                    const sanityDelta = safeNumber(getEffectValueByType(item, 'sanity'));
+                    const hpDelta = safeNumber(getEffectValueByType(item, 'hp'));
                     if (sanityDelta) {
                         addLog(
                             `节点同步: 理智 ${sanityDelta >= 0 ? '恢复 +' : '损失 '}${sanityDelta}`,
@@ -1643,6 +2191,7 @@ export const useInteraction = ({
         handleUseItem,
         handleEquipItem,
         handleDiscardItem,
+        inventoryGrid,
         loadingAudioId,
     };
 };

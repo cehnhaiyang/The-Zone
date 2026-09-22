@@ -18,7 +18,7 @@ contextBridge.exposeInMainWorld('electron', {
     init: () => ipcRenderer.invoke('fs:init'),
 
     // 区域
-    saveZone: (ZoneTemplate, NM, arcId) => ipcRenderer.invoke('fs:save-zone', { ZoneTemplate, NM, arcId }),
+    saveZone: (ZoneTemplate, NM, arcId, index) => ipcRenderer.invoke('fs:save-zone', { ZoneTemplate, NM, arcId, index }),
     listZones: () => ipcRenderer.invoke('fs:list-zones'),
     loadRandomZone: () => ipcRenderer.invoke('fs:load-random-zone'),
 
@@ -70,6 +70,10 @@ contextBridge.exposeInMainWorld('electron', {
     saveNpcMemoryProfile: (npcName, profileId, dialogue, memory, metaName) => ipcRenderer.invoke('fs:save-npc-memory-profile', { npcName, profileId, dialogue, memory, metaName }),
     loadNpcMemoryProfile: (npcName, profileId) => ipcRenderer.invoke('fs:load-npc-memory-profile', { npcName, profileId }),
     deleteNpcProfile: (npcName, profileId) => ipcRenderer.invoke('fs:delete-npc-profile', { npcName, profileId }),
+
+    // 叙事库（玩家自建的恐怖域 / 元 / 美学）
+    saveNarrativeLibrary: (library) => ipcRenderer.invoke('fs:save-narrative-library', { library }),
+    loadNarrativeLibrary: () => ipcRenderer.invoke('fs:load-narrative-library'),
   }
 });
 

@@ -1,16 +1,14 @@
-import { safeDeepClone } from '../meta';
+import { normalizeEquipState, safeDeepClone } from '../meta';
 import type {
     PlayerState,
     PlotPoint,
-    MainPlotPoint,
-    SidePlotPoint,
     StoryConfig,
     StoryArc,
     ArchivedStoryArc,
     ChainNarrative,
     Entity,
-    NpcTemplate,
-    NpcDynamicState,
+    CompanionTemplate,
+    CompanionDynamicState,
     NarrativePacing,
     NarrativePhase,
     EmotionalTone,
@@ -21,16 +19,15 @@ import type {
 } from '../meta';
 import {
     getSeverity,
-    HP_STATE_CONFIG,
-    SANITY_STATE_CONFIG,
-    STAMINA_STATE_CONFIG,
-    VIGOR_STATE_CONFIG,
+    HP_STATE,
+    SANITY_STATE,
+    STAMINA_STATE,
+    VIGOR_STATE,
     NEURAL_LINK_CONFIG,
-    EQUIPMENT_STATE_CONFIG,
+    EQUIPMENT_STATE,
 } from '../constants';
 
 type HiddenAxisRecord = NonNullable<PlayerState['archivedHiddenAxis']>[number];
-type PlotPointNetTuple = [MainPlotPoint[], SidePlotPoint[]];
 
 interface PacingPreset {
     foreshadowMult: number;
@@ -50,7 +47,7 @@ interface RuntimeSnapshot {
     fatigueLevel: number;
     neuralStress: number;
     isWeaponBroken: boolean;
-    aliveCompanions: Array<Entity<NpcTemplate, NpcDynamicState>>;
+    aliveCompanions: Array<Entity<CompanionTemplate, CompanionDynamicState>>;
     companionDistress: number;
     companionTraumaCount: number;
     absoluteTick: number;
@@ -169,11 +166,11 @@ const PHASE_MAP: Record<NarrativePhase, string> = {
 };
 
 // ---------- 纯函数数据流管道 ----------
-function getMaxHpForCompanion(c: Entity<NpcTemplate, NpcDynamicState>): number {
+function getMaxHpForCompanion(c: Entity<CompanionTemplate, CompanionDynamicState>): number {
     return Math.max(1, safeNumber(c.dynamic.maxHp, 100));
 }
 
-function getMaxSanityForCompanion(c: Entity<NpcTemplate, NpcDynamicState>): number {
+function getMaxSanityForCompanion(c: Entity<CompanionTemplate, CompanionDynamicState>): number {
     return Math.max(1, safeNumber(c.dynamic.maxSanity, 100));
 }
 
@@ -193,8 +190,10 @@ function buildSnapshot(state: PlayerState): RuntimeSnapshot {
     const fatigueLevel = clamp(1 - (staminaRatio + vigorRatio) / 2, 0, 1);
     const neuralStress = clamp(1 - ratio(neuralLink.integrity, neuralLink.maxIntegrity), 0, 1);
 
-    const weapons = dynamic.equipment?.weapons ?? [];
-    const isWeaponBroken = !weapons.some(w => !!w && safeNumber(w.currentUses) > 0);
+    const { weapons } = normalizeEquipState(dynamic.equipment);
+    const isWeaponBroken = ![weapons.main, weapons.side].some(
+        w => !!w && safeNumber(w.currentUses) > 0
+    );
 
     const alive = companions.filter(c => safeNumber(c.dynamic.hp) > 0);
 
@@ -210,7 +209,7 @@ function buildSnapshot(state: PlayerState): RuntimeSnapshot {
 
                 if (cHpRatio < 0.3) d += 0.4;
                 if (cSanRatio < 0.3) d += 0.4;
-                if (safeNumber(c.dynamic.trust) < 30) d += 0.2;
+                if (safeNumber(c.dynamic.affinity) < 30) d += 0.2;
 
                 return sum + d;
             }, 0) / alive.length;
@@ -221,11 +220,11 @@ function buildSnapshot(state: PlayerState): RuntimeSnapshot {
     const absoluteTick = safeNumber(currentGameRound.absoluteTick);
     const activeArc = state.activeArc;
 
-    const arcLength = activeArc ? Math.max(1, safeNumber(activeArc.length, 1)) : 1;
+    const arcLength = activeArc ? Math.max(1, safeNumber(activeArc.config.nodesCount, 1)) : 1;
     const arcDepth = activeArc ? safeNumber(activeArc.currentIndex) : 0;
     const arcProgress = activeArc ? clamp(safeNumber(activeArc.progress), 0, 1000) : 0;
 
-    const plotPoints = activeArc ? [...activeArc.plotPoints[0], ...activeArc.plotPoints[1]] : [];
+    const plotPoints = activeArc ? activeArc.plotPoints : [];
     const openPlots = plotPoints.filter(p => !p.isSolved);
 
     return {
@@ -318,8 +317,8 @@ function calcChainTension(snap: RuntimeSnapshot, pacing: NarrativePacing): numbe
 function calcChainProgress(snap: RuntimeSnapshot, pacing: NarrativePacing): number {
     const preset = PACING_PRESETS[pacing];
 
-    const resolvedMain = snap.plotPoints.filter(pp => pp.type === 'main' && pp.isSolved).length;
-    const resolvedSide = snap.plotPoints.filter(pp => pp.type === 'side' && pp.isSolved).length;
+    const resolvedMain = snap.plotPoints.filter(pp => pp.type === 'M' && pp.isSolved).length;
+    const resolvedSide = snap.plotPoints.filter(pp => pp.type === 'S' && pp.isSolved).length;
 
     const lengthRatio = clamp(snap.arcDepth / snap.arcLength, 0, 1);
     const lengthScore = Math.min(450, lengthRatio * 450);
@@ -349,8 +348,8 @@ function calcChainForeshadowHints(
     const preset = PACING_PRESETS[pacing];
     const rules = DEFAULT_RULES.foreshadowingRules;
 
-    const mainCount = snap.openPlots.filter(pp => pp.type === 'main').length;
-    const sideCount = snap.openPlots.filter(pp => pp.type === 'side').length;
+    const mainCount = snap.openPlots.filter(pp => pp.type === 'M').length;
+    const sideCount = snap.openPlots.filter(pp => pp.type === 'S').length;
 
     if (mainCount + sideCount >= rules.maxConcurrent) {
         return { main: 0, side: 0 };
@@ -489,7 +488,7 @@ export class ChainNarrativeService {
                 },
                 tension,
                 shouldTriggerEnding: shouldEnd,
-                activePlotPoints: [snap.activeArc.plotPoints[0], snap.activeArc.plotPoints[1]],
+                activePlotPoints: snap.activeArc.plotPoints,
             },
             output: {
                 ppToGenerate: {
@@ -540,12 +539,11 @@ export class ChainNarrativeService {
             },
         };
 
-        const themeId = chainConfig.theme.id;
+        const themeId = chainConfig.aesthetic.id;
         const motifId = chainConfig.motif?.id ?? 'nomotif';
         const mainAxisId = chainConfig.mainAxis?.id ?? 'noaxis';
-        const length = Math.max(1, safeNumber(chainConfig.nodeCount, 1));
 
-        const id = `${themeId}_${motifId}_${mainAxisId}_${length}` as StoryArc['id'];
+        const id = `${themeId}_${motifId}_${mainAxisId}` as StoryArc['id'];
 
         const startTime = {
             zone: { ...next.currentZoneTime },
@@ -555,10 +553,9 @@ export class ChainNarrativeService {
         next.activeArc = {
             id,
             config: chainConfig,
-            length,
             status: 'ongoing',
             progress: 0,
-            plotPoints: [[], []] as PlotPointNetTuple,
+            plotPoints: [] as PlotPoint[],
             currentIndex: 0,
             hiddenAxis: {
                 prevDesc: '',
@@ -611,14 +608,13 @@ export class ChainNarrativeService {
         const next = safeDeepClone(state);
 
         if (next.activeArc) {
-            const length = safeNumber(next.activeArc.length);
             const current = safeNumber(next.activeArc.currentIndex);
             const target =
                 typeof nextIndex === 'number' && Number.isFinite(nextIndex)
                     ? nextIndex
                     : current + 1;
 
-            next.activeArc.currentIndex = clamp(Math.round(target), 0, Math.max(0, length));
+            next.activeArc.currentIndex = Math.max(0, Math.round(target));
         }
 
         return next;
@@ -641,21 +637,17 @@ export class ChainNarrativeService {
                 .toString(36)
                 .slice(2, 8)}`;
 
-        if (plot.type === 'main') {
-            const mainPlot: MainPlotPoint = {
-                ...plot,
-                id: plotId,
-                isSolved: plot.isSolved ?? false,
-            };
-            next.activeArc.plotPoints[0].push(mainPlot);
-        } else {
-            const sidePlot: SidePlotPoint = {
-                ...plot,
-                id: plotId,
-                isSolved: plot.isSolved ?? false,
-            };
-            next.activeArc.plotPoints[1].push(sidePlot);
+        const newPlot: PlotPoint = {
+            ...plot,
+            type: plot.type === 'M' ? 'M' : 'S',
+            id: plotId,
+            isSolved: plot.isSolved ?? false,
+        };
+
+        if (!Array.isArray(next.activeArc.plotPoints)) {
+            next.activeArc.plotPoints = [];
         }
+        next.activeArc.plotPoints.push(newPlot);
 
         return next;
     }
@@ -667,19 +659,13 @@ export class ChainNarrativeService {
 
         const next = safeDeepClone(state);
 
-        if (!next.activeArc) {
+        if (!next.activeArc || !Array.isArray(next.activeArc.plotPoints)) {
             return next;
         }
 
-        const resolveIn = (arr: PlotPoint[]): boolean => {
-            const target = arr.find(p => p.id === plotId && !p.isSolved);
-            if (!target) return false;
+        const target = next.activeArc.plotPoints.find(p => p.id === plotId && !p.isSolved);
+        if (target) {
             target.isSolved = true;
-            return true;
-        };
-
-        if (!resolveIn(next.activeArc.plotPoints[0])) {
-            resolveIn(next.activeArc.plotPoints[1]);
         }
 
         return next;
@@ -752,7 +738,8 @@ export class ChainNarrativeService {
         next.archivedArcs = archivedArcs;
 
         if (arc.hiddenAxis.isRevealed) {
-            const theme = arc.config.theme.id;
+            // HiddenAxis.theme 为契约字段名，其取值来自 StoryConfig.aesthetic.id。
+            const theme = arc.config.aesthetic.id;
             const motif = arc.config.motif?.id ?? '';
             const mainAxis = arc.config.mainAxis?.id ?? '';
 
@@ -823,7 +810,7 @@ export class ChainNarrativeService {
                 },
                 tension: 0,
                 shouldTriggerEnding: false,
-                activePlotPoints: [[], []],
+                activePlotPoints: [],
             },
             output: {
                 ppToGenerate: {
@@ -879,7 +866,7 @@ export class DynamicNarrativeService {
             },
         };
 
-        const armors = state.dynamic.equipment?.armors ?? [];
+        const { armors } = normalizeEquipState(state.dynamic.equipment);
 
         return {
             emotionalTone: determineTone(snap),
@@ -966,8 +953,10 @@ export class DynamicNarrativeService {
             durabilityPercent: number;
         }> = [];
 
-        const weapons = state.dynamic.equipment?.weapons ?? [];
-        for (const w of weapons) {
+        const { weapons: equippedWeapons, armors: equippedArmors } = normalizeEquipState(
+            state.dynamic.equipment
+        );
+        for (const w of [equippedWeapons.main, equippedWeapons.side]) {
             if (!w) continue;
             equipmentItems.push({
                 slot: 'weapon',
@@ -976,8 +965,7 @@ export class DynamicNarrativeService {
             });
         }
 
-        const armors = state.dynamic.equipment?.armors ?? [];
-        for (const a of armors) {
+        for (const a of equippedArmors) {
             if (!a) continue;
             equipmentItems.push({
                 slot: 'armor',
@@ -992,7 +980,7 @@ export class DynamicNarrativeService {
                 name: c.static.name,
                 hpPercent: ratio(c.dynamic.hp, getMaxHpForCompanion(c)) * 100,
                 sanityPercent: ratio(c.dynamic.sanity, getMaxSanityForCompanion(c)) * 100,
-                trust: safeNumber(c.dynamic.trust, 50),
+                affinity: safeNumber(c.dynamic.affinity, 0),
             }));
 
         const stateLayer = this.buildDynamicNarrativeStates(
@@ -1047,27 +1035,28 @@ export class DynamicNarrativeService {
             durabilityPercent: number;
         }>,
         neuralLink?: { battery: number; integrity: number; noiseLevel: number },
-        companions?: Array<{ name: string; hpPercent: number; sanityPercent: number; trust: number }>
+        companions?: Array<{
+            name: string;
+            hpPercent: number;
+            sanityPercent: number;
+            affinity: number;
+        }>
     ): string {
         const layers: Array<string | false | undefined> = [
-            HP_STATE_CONFIG[getSeverity(hpPercent, HP_STATE_CONFIG)].narrative(hpPercent),
-            SANITY_STATE_CONFIG[getSeverity(sanityPercent, SANITY_STATE_CONFIG)].narrative(
+            HP_STATE[getSeverity(hpPercent, HP_STATE)].narrative(hpPercent),
+            SANITY_STATE[getSeverity(sanityPercent, SANITY_STATE)].narrative(
                 sanityPercent
             ),
-            STAMINA_STATE_CONFIG[getSeverity(staminaPercent, STAMINA_STATE_CONFIG)].narrative(
+            STAMINA_STATE[getSeverity(staminaPercent, STAMINA_STATE)].narrative(
                 staminaPercent
             ),
-            VIGOR_STATE_CONFIG[getSeverity(vigorPercent, VIGOR_STATE_CONFIG)].narrative(
+            VIGOR_STATE[getSeverity(vigorPercent, VIGOR_STATE)].narrative(
                 vigorPercent
             ),
 
             neuralLink &&
             neuralLink.integrity < NEURAL_LINK_CONFIG.glitch.threshold &&
             NEURAL_LINK_CONFIG.glitch.narrative(neuralLink.integrity),
-
-            neuralLink &&
-            neuralLink.noiseLevel > NEURAL_LINK_CONFIG.noise.threshold &&
-            NEURAL_LINK_CONFIG.noise.narrative(neuralLink.noiseLevel),
 
             neuralLink &&
             neuralLink.battery < NEURAL_LINK_CONFIG.lowBattery.threshold &&
@@ -1092,18 +1081,18 @@ export class DynamicNarrativeService {
             equipment.forEach(e => {
                 if (e.slot === 'weapon') hasWeapon = true;
 
-                if (e.durabilityPercent < EQUIPMENT_STATE_CONFIG.broken.threshold) {
+                if (e.durabilityPercent < EQUIPMENT_STATE.broken.threshold) {
                     layers.push(
-                        EQUIPMENT_STATE_CONFIG.broken.narrative(e.name, e.durabilityPercent)
+                        EQUIPMENT_STATE.broken.narrative(e.name, e.durabilityPercent)
                     );
-                } else if (e.durabilityPercent < EQUIPMENT_STATE_CONFIG.worn.threshold) {
-                    layers.push(EQUIPMENT_STATE_CONFIG.worn.narrative(e.name, e.durabilityPercent));
+                } else if (e.durabilityPercent < EQUIPMENT_STATE.worn.threshold) {
+                    layers.push(EQUIPMENT_STATE.worn.narrative(e.name, e.durabilityPercent));
                 }
             });
 
-            if (!hasWeapon) layers.push(EQUIPMENT_STATE_CONFIG.unarmed.narrative());
+            if (!hasWeapon) layers.push(EQUIPMENT_STATE.unarmed.narrative());
         } else {
-            layers.push(EQUIPMENT_STATE_CONFIG.unarmed.narrative());
+            layers.push(EQUIPMENT_STATE.unarmed.narrative());
         }
 
         if (companions) {
@@ -1112,9 +1101,9 @@ export class DynamicNarrativeService {
                     layers.push(
                         `【同伴危急】${c.name}的生命体征正在衰竭(HP ${c.hpPercent.toFixed(0)}%)。鲜血和绝望的气味在蔓延。`
                     );
-                } else if (c.trust < 20) {
+                } else if (c.affinity < 20) {
                     layers.push(
-                        `【信任崩塌】${c.name}投来的目光如同注视一具即将尸变的残骸(信任 ${c.trust.toFixed(0)}%)。防备随时可能演变为背叛。`
+                        `【好感崩塌】${c.name}投来的目光如同注视一具即将尸变的残骸(好感 ${c.affinity.toFixed(0)})。防备随时可能演变为背叛。`
                     );
                 }
             });

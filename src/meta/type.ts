@@ -11,7 +11,7 @@
  * - 所有类型都应保持可序列化、可判别、可穷举
  *
  * @version 2.1.0
- * @see interface.copy.ts
+ * @see interface.ts
  */
 
 // =====================
@@ -28,8 +28,7 @@
  * _Array<string, 5>
  * // 等价于 [string, string, string, string, string]
  */
-export type _Array<T, N extends number, R extends unknown[] = []> =
-    R['length'] extends N ? R : _Array<T, N, [T, ...R]>
+export type _Array<T, N extends number, R extends unknown[] = []> = R['length'] extends N ? R : _Array<T, N, [T, ...R]>
 
 // =====================
 // 1. 核心状态与架构 (Core & Architecture)
@@ -145,16 +144,15 @@ export type VisualMode = 'bio' | 'camera'
 // =====================
 
 /**
- * 基础属性类型
- *
- * 决定实体的五维修正基数，直接参与检定、派生属性计算与战斗结算。
+ * 实体六维
  */
 export type AttributeType =
-    | 'strength'    // 力量：影响近战伤害、负重、物理检定
-    | 'agility'     // 敏捷：影响速度、闪避、行动顺序
-    | 'wisdom'      // 智慧：影响学习、推理、精神抗性
-    | 'perception'  // 感知：影响搜查、预警、命中与暴击
-    | 'spiritual'   // 灵性
+    | 'strength'  // 力量：影响近战伤害、背包格子
+    | 'agility'   // 敏捷：影响速度、闪避、行动顺序
+    | 'wisdom'    // 智慧：全面影响方方面面
+    | 'awareness' // 觉知：影响搜查、命中、暴击；更高的觉知会导致理智消耗更快；达到 50 后，觉醒序列预测能力
+    | 'will'      // 意志：影响各种事项的理智衰减速率及magic武器的伤害；儿童的意志在5左右，成年人10左右
+    | 'cthulhu'   // 克苏鲁/不可知力：随着区域探索、遭遇的克苏鲁敌人数量的增加而自动提升；在使用 fleshFusionState、cognitiveErosionState、causalInversionState 高的物品时获得更多加成且受到更少负面影响
 
 /**
  * 最大体征阈值键
@@ -162,9 +160,9 @@ export type AttributeType =
  * 决定实体在绝对满载状态下的生存指标上限。
  */
 export type VitalType =
-    | 'maxHp'       // 生命上限
-    | 'maxSanity'   // 理智上限
-    | 'maxStamina'  // 体力上限
+    | 'maxHp'      // 生命上限
+    | 'maxSanity'  // 理智上限
+    | 'maxStamina' // 体力上限
     | 'maxVigor'   // 精力上限
 
 /**
@@ -180,14 +178,12 @@ export type DynamicVitalType =
     | 'vigor'       // 当前精力
 
 /**
- * 实体状态变化趋势
- *
- * 提供给动态叙事模型，用以研判角色生理与心理的衰减或恢复倾向。
+ * 实体体征状态变化趋势
  */
 export type StateTrend =
-    | 'improving'   // 正在恢复 / 好转
-    | 'declining'   // 正在恶化 / 衰减
-    | 'stable'     // 基本稳定
+    | 'improving'  // 提高
+    | 'declining'  // 衰减
+    | 'stable'     // 稳定
 
 /**
  * 情感基调引擎指令
@@ -200,37 +196,6 @@ export type EmotionalTone =
     | 'anxious'     // 焦虑
     | 'numb'        // 麻木
     | 'determined'  // 坚定
-
-/**
- * 状态恶化分级
- *
- * 提供给 LLM 的离散化状态标签，用于改变文本生成的基调与紧迫感。
- */
-export enum SeverityLevel {
-    /**
-     * 危急
-     * 触发生存倒计时或理智崩溃边缘判定
-     */
-    CRITICAL = 'critical',
-
-    /**
-     * 严重
-     * 触发高优先级告警 UI 与文本渲染
-     */
-    SEVERE = 'severe',
-
-    /**
-     * 中度
-     * 常规减益，不强制中断当前操作
-     */
-    MODERATE = 'moderate',
-
-    /**
-     * 正常
-     * 无影响，维持基准运行
-     */
-    NORMAL = 'normal'
-}
 
 // =====================
 // 3. 交互与社交系统 (Interaction & Social)
@@ -259,67 +224,31 @@ export type Mood =
     | 'neutral'
 
 /**
- * 信任度阶段标记
- *
- * 作为对话树分支判断的前提条件，决定 NPC 的行为模型及资源倾斜度。
+ * 信任阶段
  */
-export enum RelationshipPhase {
-    /**
-     * 敌意
-     * 拒绝常规交互，可能主动触发敌对事件
-     */
-    HOSTILE = '敌意',
+export type TrustPhase = '猜忌' | '防备' | '审慎' | '浅合' | '长盟'
 
-    /**
-     * 戒备
-     * 信息获取受限，交易价格惩罚
-     */
-    GUARDED = '戒备',
-
-    /**
-     * 中立
-     * 标准交互基准线
-     */
-    NEUTRAL = '中立',
-
-    /**
-     * 熟识
-     * 解锁次级私人话题，解锁部分区域提示
-     */
-    FAMILIAR = '熟识',
-
-    /**
-     * 信任
-     * 解锁核心剧情伏笔，提供主动增益
-     */
-    TRUSTING = '信任',
-
-    /**
-     * 羁绊
-     * 无视理智值惩罚协助，容忍度达到最大
-     */
-    BONDED = '羁绊'
-}
+/**
+ * 好感阶段
+ */
+export type AffinityPhase = '离心' | '芥蒂' | '相敬' | '相得' | '同气'
 
 // =====================
 // 4. 物品、装备与经济系统
 // =====================
 
-/**
- * 物品稀有度
+/** 
+ * 主轴：品质
  */
-export type ItemRarity =
-    | 'salvaged'      // 回收：废墟、尸体、二手设备中扒出的失稳物资
-    | 'standard'      // 标准：安全但弱小
-    | 'reliable'      // 可靠：稳定可靠
-    | 'organized'     // 组织：组织级资源
-    | 'foundation'    // 基金会：深渊基金会受控列装
-    | 'deep'          // 深层：深层科技
-    | 'prototype'     // 原型：受控顶级科技
-    | 'ark'           // 方舟：方舟核心储备 / 降临前顶层资源
-    | 'abyssal'       // 深渊：失控深渊产物
-    | 'forbidden'     // 禁忌：认知危害与真相
-    | 'ineffable'     // 不可名状：彼侧信息实体化，理解即代价
+export type ItemGrade =
+    | 'salvaged'     // 1. 废土粗制 / 拼凑残损
+    | 'standard'     // 2. 旧世民用 / 规整标准
+    | 'reinforced'   // 3. 强治安保 / 加固特勤
+    | 'military'     // 4. 正规军工 / 军械制式
+    | 'corporate'    // 5. 寡头特材 / 尖端防务
+    | 'foundation'   // 6. 基金会机要 / 深层收容
+    | 'prototype'    // 7. 试作极境 / 奇点工程
+    | 'ark_prime'    // 8. 方舟原铸 / 文明遗珍（纯物理工造巅峰）
 
 /**
  * 饰品效果类型
@@ -329,53 +258,114 @@ export type AccessoryEffectType = AttributeType | VitalType
 /**
  * 消耗品效果类型
  */
-export type ConsumableEffectType =
-    | AccessoryEffectType
-
-    // 实体生存指标干预
-    | 'heal_hp'
-    | 'heal_sanity'
-    | 'heal_stamina'
-    | 'heal_vigor'
-
-    // 神经链接外设指标干预
-    | 'restore_battery'
-    | 'repair_integrity'
+export type ConsumableEffectType = AccessoryEffectType | DynamicVitalType
+    | 'battery'   // 补充神经链接仪电量
+    | 'integrity' // 修复神经链接仪完整度
 
 /**
  * 武器类型
  */
 export type WeaponType =
     /**
-     * 法术类
-     * 即时伤害
-     * 攻击距离无限
-     * 攻击时消耗理智而非体力
+     * 挥动类
+     * 近程伤害
+     * 单手武器
+     * 特性：
+     * 1、另一手为空则获得伤害与命中加成（攻击序列质量提升）
+     * 2、攻击时，除对主要目标造成伤害外，还同时对目标所处格子内的其他目标造成等同于`本次攻击判定值 ÷ 其他目标数`的伤害（向上取整）
      */
-    | 'magic'
+    | 'wave'
+    /**
+     * 双手挥动类
+     * 近程伤害
+     * 双手武器
+     * 特性：
+     * 1、攻击时，除对主要目标造成伤害外，还同时对目标所处格子内的其他目标造成等同于`本次攻击判定值 ÷ 其他目标数`的伤害（向上取整）
+     * 2、防御序列质量下降
+     */
+    | 'both_wave'
+    /**
+     * 刺击类
+     * 近程伤害
+     * 单手武器
+     * 特性：
+     * 1、另一手为空则获得伤害与命中加成（攻击序列质量提升）
+     * 2、攻击序列的判定结果为 `crit` 时，无视目标全部 `defense` 
+     * 3、攻击序列的 `crit` 权重提升、`hit` 权重降低、`miss` 权重不变
+     */
+    | 'prick'
+    /**
+     * 双手刺击类
+     * 近程伤害
+     * 双手武器
+     * 特性：
+     * 1、攻击序列的判定结果为 `crit` 时，无视目标全部 `defense` 
+     * 2、攻击序列的 `crit` 权重提升、`hit` 权重降低、`miss` 权重不变
+     * 3、防御序列质量下降
+     * 
+     * 任意敌方单位进入攻击范围时，立刻进行 1 次不消耗AP的攻击序列判定，并执行其结果
+     */
+    | 'both_prick'
+    /**
+     * 盾牌类
+     * 近程伤害
+     * 单手武器
+     * 特性：
+     * 1、另一手为空则获得伤害与命中加成（攻击序列质量提升）
+     * 2、装备盾牌类武器时，防御序列的 `partial` 的值可达到 1
+     */
+    | 'shield'
+    /**
+     * 双手盾牌类
+     * 近程伤害
+     * 双手武器
+     * 特性：
+     * 1、装备双手盾牌类武器时，防御序列的 `partial` 的值可达到 1
+     * 2、防御序列不再出现 `dodge` 与 `fail` 
+     */
+    | 'both_shield'
+
     /**
      * 狙击步枪类
      * 远程伤害
+     * 双手武器
+     * 特性：
+     * 1、攻击前可消耗 1 AP 瞄准，使下一次攻击序列的判定结果提升 1 档（`miss → graze → hit → crit`），若原结果为 `crit` 则伤害翻倍
+     * 2、暴击时无视目标 0.3 `defense`
+     * 3、在对攻击序列的判定结果进行实际结算时，与目标之间的距离越近，结算结果有越高概率降级（有概率直接从 `crit` 降级为 `miss`），最佳攻击距离为 12 格
      */
     | 'sniper_rifle'
     /**
      * 突击步枪类
      * 远程伤害
+     * 双手武器
+     * 特性：无
      */
     | 'assault_rifle'
     /**
      * 冲锋枪类
      * 远程伤害
+     * 双手武器
+     * 特性：攻击序列的结果判定后，若你有剩余 AP，则可消耗 1 点再进行 1 次攻击判定，此行为可重复至你的 AP 耗尽，且所有判定结果取最优者结算。
      */
     | 'smg'
     /**
      * 手枪类
      * 远程伤害
+     * 单手武器
+     * 特性：
+     * 1、另一手为空则获得命中加成（攻击序列 `hit` 与 `crit` 提升，`miss` 与 `graze` 下降）
+     * 2、首次攻击前，若你本回合尚未移动，则本次攻击不消耗 AP
      */
     | 'pistol'
     /**
      * 霰弹枪类
      * 远程伤害
+     * 双手武器
+     * 特性：
+     * 1、攻击时，对攻击范围内的所有目标同时造成伤害
+     * 2、距离目标越近，攻击伤害越高
+     * 3、
      */
     | 'shotgun'
     /**
@@ -386,8 +376,9 @@ export type WeaponType =
     /**
      * 弩类
      * 远程伤害
-     * 副手为空则获得命中加成
-     * 每次攻击后必须进行一次重装
+     * 特性：
+     * 1、另一手为空则获得命中加成（攻击序列 `hit` 与 `crit` 提升，`miss` 与 `graze` 下降）
+     * 2、每次攻击后必须消耗 1 AP 进行一次装填（`rearm`）动作，否则无法再次攻击
      */
     | 'crossbow'
     /**
@@ -398,70 +389,36 @@ export type WeaponType =
     /**
      * 双手弓类
      * 远程伤害
-     * 占据主副手
+     * 占据双手
      */
     | 'bow'
+
     /**
-     * 挥动类
-     * 近程伤害
-     * 副手为空则获得伤害加成
+     * 法术类
+     * 即时伤害
+     * 单手武器
+     * 特性：无
      */
-    | 'wave'
-    /**
-     * 双手挥动类
-     * 近程伤害
-     * 占据主副手
-     * 无视目标0.2免伤
-     */
-    | 'both_wave'
-    /**
-     * 刺击类
-     * 近程伤害
-     * 副手为空则获得伤害加成
-     */
-    | 'prick'
-    /**
-     * 双手刺击类
-     * 近程伤害
-     * 占据主副手
-     */
-    | 'both_prick'
+    | 'magic'
 
 /**
  * 武器伤害类型
  *
- * 仅决定伤害结算时攻击力受什么属性加成：
- * - cold：冷兵器，攻击力叠加力量。
- * - hot：热武器，攻击力不叠加属性。
- * - instant：即时，跳过常规结算。
- *
- * 攻击距离由武器自身的 range 字段维护，与本类型无关。
+ * 决定伤害结算时攻击力受什么属性加成
  */
 export type WeaponDamageType =
-    | 'cold'     // 冷兵器
-    | 'hot'      // 热武器
-    | 'instant'  // 即时
-
-/**
- * 庇护所状态字典键契约
- *
- * 统管庇护所内部生存资源库存与微型社会稳定性读数。
- */
-export type SanctuaryState = Record<
-    | 'food'        // 食物储备
-    | 'water'       // 水源储备
-    | 'medicine'    // 医疗物资
-    | 'electricity' // 电力
-    | 'scraps'      // 废料 / 工程材料
-    | 'population'  // 人口
-    | 'morale'      // 士气
-    | 'erosion',    // 侵蚀程度
-    number
->
+    | 'melee'    // 近程伤害
+    | 'range'    // 远程伤害
+    | 'instant'  // 即时伤害
 
 // =====================
 // 5. 战术、行动与战斗系统 (Tactics, Actions & Combat)
 // =====================
+
+export type TacticType =
+    | 'A' // 攻击战术
+    | 'D' // 防御战术
+    | 'U' // 辅助战术
 
 /**
  * 目标选择类型
@@ -474,9 +431,9 @@ export type Target =
     | 'all_teammates'    // 所有同伴
     | 'single_ally'      // 单个友方
     | 'all_allies'       // 所有友方
-    | 'enemy'            // 单个敌人
+    | 'single_enemy'     // 单个敌人
     | 'all_enemies'      // 所有敌人
-    | 'none'            // 无目标
+    | 'none'             // 无目标
 
 /**
  * 战斗风格
@@ -504,12 +461,6 @@ export type IntentType =
 
 /**
  * 攻击结果
- *
- * 元组第一项为命中等级，第二项为伤害值
- * - miss: 未命中，值通常为 0
- * - graze: 擦伤，值低于标准伤害
- * - hit: 标准命中
- * - crit: 暴击，值高于标准伤害
  */
 export type AttackResult = [
     result: 'miss' | 'graze' | 'hit' | 'crit',
@@ -530,21 +481,22 @@ export type DefenseResult = [
 ]
 
 /**
- * 攻击战术效果
+ * 战术效果类型
  */
-export type AttackTacticEffectType = AttributeType
-    | 'ap_reduce' // 减少行动点
+export type TacticEffectType = ConsumableEffectType
+    | 'ap'      // 增加或减少行动点
+    | 'shield'  // 与免伤无关，是一个独立的护盾字段
+    | 'speed'   // 速度
+    | 'damage'  // 攻击力
+    | 'defense' // 防御力
+    | 'evasion' // 闪避力
 
 /**
- * 防御战术效果
+ * 反击类型
  */
-export type DefenseTacticEffectType = AttributeType | DynamicVitalType
-    | 'shield' // 与免伤无关，是一个独立的护盾字段
-
-/**
- * 行动效果类型
- */
-export type ActionEffectType = ConsumableEffectType | AttackTacticEffectType | DefenseTacticEffectType
+export type CounterType =
+    | 'accumulate'  // 蓄反，单槽每积满 5 点即可发起一次询问
+    | 'differential' // 差反，受击且速度不小于 10 时可被询问
 
 // =====================
 // 6. 系统玩法：任务与解谜
@@ -556,8 +508,8 @@ export type ActionEffectType = ConsumableEffectType | AttackTacticEffectType | D
  * 控制节点推进是否结算奖励，或阻止已过期事件被再次触发。
  */
 export type QuestStatus =
-    | 'on'      // 进行中
-    | 'done'    // 已完成
+    | 'on'     // 进行中
+    | 'done'   // 已完成
     | 'failed' // 已失败
 
 // =====================
@@ -584,220 +536,8 @@ export type NarrativePacing =
     | 'fast'     // 快节奏：冲突更早出现
     | 'psych'   // 心理向：更强调精神压力与认知扰动
 
-/**
- * 叙事主题
- *
- * 定义世界观的美学基调与核心冲突类型。
- *
- * 设计原则：
- * - 每个主题占据唯一的「恐惧象限」，彼此在核心恐惧源上互斥
- * - 主题描述的是「世界本身的美学与规则」，而非「人际动态」或「叙事手法」
- * - 人际动态（信任瓦解、背叛、献祭）应下沉至 NarrativeMotif / NarrativeMainAxis 层
- * - 叙事手法（倒叙、多视角）由 NarrativePacing / NarrativePhase 控制
- * - 每个主题必须能独立驱动：视觉风格、敌人设计、谜题逻辑、理智机制、环境音轨
- */
-export type NarrativeTheme =
-    /**
-     * 生物机械恐怖
-     *
-     * 核心恐惧：
-     * 肉体向机械的不可逆异化——身体不再属于自己，且变化无法停止。
-     *
-     * 典型视觉：
-     * exposed gears beneath skin, pulsing cables as veins, bone-metal fusion
-     *
-     * 典型机制：
-     * 装备与肉体融合，卸下装备 = 撕裂肉体；变异不可逆
-     *
-     * 音轨映射：
-     * ThemeType → 'organic' | 'industrial'
-     *
-     * 理智触发：
-     * 目睹自身或他人的肉体异变
-     */
-    | 'biomechanica'
 
-    /**
-     * 赛博神秘学
-     *
-     * 核心恐惧：
-     * 信息 / 信号中栖居着超自然实体——数据即咒文，网络即灵界，代码即仪式。
-     *
-     * 典型视觉：
-     * glowing sigils in server rooms, static forming faces, data streams as ectoplasm
-     *
-     * 典型机制：
-     * NeuralLink 的 noiseLevel 与叙事深度绑定；信号强度 = 灵体活跃度
-     *
-     * 音轨映射：
-     * ThemeType → 'horror' | 'void'
-     *
-     * 理智触发：
-     * 接收到无法解析的信号、NeuralLink 出现幻觉叠加
-     */
-    | 'cyber_occult'
 
-    /**
-     * 宇宙恐怖
-     *
-     * 核心恐惧：
-     * 不可知的尺度碾压——人类认知在宇宙级存在面前绝对渺小，理解即疯狂。
-     *
-     * 典型视觉：
-     * non-Euclidean megastructures, indifferent celestial entities, scale vertigo
-     *
-     * 典型机制：
-     * 区域 dilationFactor 极端偏移；敌人无法被击杀只能被规避
-     *
-     * 音轨映射：
-     * ThemeType → 'void' | 'horror'
-     *
-     * 理智触发：
-     * 目击不可名状之物的轮廓、理解碎片化真相
-     */
-    | 'cosmic_horror'
-
-    /**
-     * 时间异常
-     *
-     * 核心恐惧：
-     * 因果律崩坏——未来侵蚀过去，结果先于原因，时间拓扑畸变。
-     *
-     * 典型视觉：
-     * frozen explosions, reversed rain, clocks with impossible hands, déjà vu overlays
-     *
-     * 典型机制：
-     * ZoneDate.cycle 出现非线性跳跃；节点状态在不同 tick 间不一致
-     *
-     * 音轨映射：
-     * ThemeType → 'memory' | 'void'
-     *
-     * 理智触发：
-     * 遭遇自身的未来 / 过去残影、因果倒置事件
-     */
-    | 'temporal'
-
-    /**
-     * 民俗恐怖
-     *
-     * 核心恐惧：
-     * 集体无意识中的古老契约——仪式、禁忌、献祭，规则不可质疑只能服从。
-     *
-     * 典型视觉：
-     * hand-carved totems, candlelit processions, masks with no eye-holes, woven effigies
-     *
-     * 典型机制：
-     * NPC 的 RelationshipPhase 受仪式进度驱动；违反禁忌触发区域级惩罚
-     *
-     * 音轨映射：
-     * ThemeType → 'ritual' | 'horror'
-     *
-     * 理智触发：
-     * 被迫参与仪式、目睹献祭、违反禁忌
-     */
-    | 'folk_horror'
-
-    /**
-     * 极端生态
-     *
-     * 核心恐惧：
-     * 生态系统作为主动敌意存在——环境不是背景，而是猎手。
-     *
-     * 典型视觉：
-     * bioluminescent predator flora, breathing cave walls, spore-filled corridors
-     *
-     * 典型机制：
-     * threatLevel 随 explorationStep 递增；搜查必然触发环境反击
-     *
-     * 音轨映射：
-     * ThemeType → 'organic' | 'underwater'
-     *
-     * 理智触发：
-     * 环境主动「注视」玩家、生态系统的拟人化恶意
-     */
-    | 'hostile_biosphere'
-
-    /**
-     * 认知危害
-     *
-     * 核心恐惧：
-     * 记忆 / 人格 / 自我同一性的侵蚀——你无法确定自己是否还是「自己」。
-     *
-     * 典型视觉：
-     * mirrors showing wrong reflections, text that rewrites itself, familiar faces becoming strangers
-     *
-     * 典型机制：
-     * NeuralLink.noiseLevel 影响 UI 信息可信度；NPC 对话出现矛盾记忆
-     *
-     * 音轨映射：
-     * ThemeType → 'memory' | 'horror'
-     *
-     * 理智触发：
-     * 发现自身记忆矛盾、无法辨认同伴、自我描述被系统否定
-     */
-    | 'cognitive_hazard'
-
-    /**
-     * 梦境逻辑
-     *
-     * 核心恐惧：
-     * 空间非欧、规则每回合突变——世界的基本物理法则不可信赖。
-     *
-     * 典型视觉：
-     * Escher staircases, rooms larger inside than outside, gravity shifting per node
-     *
-     * 典型机制：
-     * 节点 exits 在每回合重新洗牌；threatLevel 在相邻节点间无逻辑跳跃
-     *
-     * 音轨映射：
-     * ThemeType → 'void' | 'exploration'
-     *
-     * 理智触发：
-     * 空间悖论（回到已探索节点但布局完全不同）、规则突变导致的安全感丧失
-     */
-    | 'dream_logic'
-
-    /**
-     * 寄生共生
-     *
-     * 核心恐惧：
-     * 与异物绑定，增益即代价，分离即死亡——你依赖的东西正在吞噬你。
-     *
-     * 典型视觉：
-     * symbiotic organism wrapped around spine, glowing veins of alien origin, half-merged silhouettes
-     *
-     * 典型机制：
-     * 共生体提供战斗增益但持续消耗 sanity / vigor；移除共生体 = 即死判定
-     *
-     * 音轨映射：
-     * ThemeType → 'organic' | 'horror'
-     *
-     * 理智触发：
-     * 共生体「说话」、共生体在玩家不知情时行动、分离焦虑
-     */
-    | 'parasitic_symbiosis'
-
-    /**
-     * 工业熵寂
-     *
-     * 核心恐惧：
-     * 机械的无意义永恒运转——没有设计者，没有目的，只有锈蚀、重复与不可停止的惯性。
-     *
-     * 典型视觉：
-     * endless conveyor belts, rusted gears grinding without purpose,
-     * fluorescent-lit corridors stretching to infinity, oil-black water
-     *
-     * 典型机制：
-     * 节点布局呈强制线性（无分支）；searchCount 不影响产出（资源恒定衰减）；
-     * 敌人无 lootTable（机械不掉落有机物）
-     *
-     * 音轨映射：
-     * ThemeType → 'industrial' | 'void'
-     *
-     * 理智触发：
-     * 意识到机械运转无目的、无法关闭任何设备、重复性压迫
-     */
-    | 'industrial_entropy'
 
 /**
  * 叙事链状态
@@ -904,7 +644,6 @@ export type ThemeType =
     | 'neural_static'  // 神经链接仪底噪（大小与噪声等级有关）（仅当当前视觉模式处于camera时生效）
     | 'puzzle_ambient' // 解谜时的思考氛围
     | 'dangerous'      // 节点威胁度极高（大于15）时触发主题  
-    | NarrativeTheme   // 在不同主题大类的区域中探索时
 
 /**
  * 点（脉冲）音

@@ -7,6 +7,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import type { NodeTemplate, OriginTemplate, AttributeType, CombatStyle, OverlayType, VitalType } from '../meta';
+import { getNodeThreatLevel, isNodeDangerous } from '../meta';
 import { ORIGIN_TEMPLATES } from '../constants';
 import { AudioService } from '../services';
 
@@ -57,13 +58,14 @@ const TYPE_THEME: Record<
   zone_gen: { fog: 'rgba(24,24,27,0.30)', core: 'rgba(8,51,68,0.10)', particle: 'bg-zinc-400/15', particleCount: 12 },
 };
 
-/** 五维属性显示名，键名严格对齐 AttributeType。 */
+/** 六维属性显示名，键名严格对齐 AttributeType。 */
 const ATTRIBUTE_LABELS: Record<AttributeType, string> = {
   strength: '力量',
   agility: '敏捷',
   wisdom: '智慧',
-  perception: '感知',
-  spiritual: '灵性',
+  awareness: '感知',
+  will: '意志',
+  cthulhu: '不可知',
 };
 
 /** 最大体征显示名，键名严格对齐 VitalType。 */
@@ -382,7 +384,7 @@ const MainMenuContent: React.FC<OverlayPanelProps> = ({ onOpenSettings, onInitGa
             <p className="mt-4 text-sm leading-relaxed text-zinc-400">{selected.desc}</p>
             <p className="mt-3 text-xs italic text-zinc-600">{selectedStyle.desc}</p>
 
-            {/* 五维修正基数 */}
+            {/* 六维修正基数 */}
             <div className="mt-5 flex flex-col gap-1.5 border-t border-zinc-800/70 pt-4">
               {(Object.keys(ATTRIBUTE_LABELS) as AttributeType[]).map((key) => (
                 <ReadoutBar
@@ -507,9 +509,10 @@ const CutsceneContent: React.FC<OverlayPanelProps> = ({ node, nodeId, onCutscene
 
   if (!node) return null;
 
-  const threat = node.threatLevel;
+  const threat = getNodeThreatLevel(node);
+  const hasThreat = isNodeDangerous(node);
   /** 由威胁等级派生的现实薄膜完整度读数。 */
-  const membrane = threat === undefined ? 100 : Math.max(4, Math.round(100 - threat * 4.7));
+  const membrane = Math.max(4, Math.round(100 - threat * 4.7));
 
   return (
     <div
@@ -534,14 +537,14 @@ const CutsceneContent: React.FC<OverlayPanelProps> = ({ node, nodeId, onCutscene
       {/* 右侧威胁导轨 */}
       <div className="pointer-events-none absolute right-6 top-1/2 hidden -translate-y-1/2 md:block">
         <span
-          className={`font-mono text-[9px] uppercase tracking-[0.6em] [writing-mode:vertical-rl] ${threat === undefined
+          className={`font-mono text-[9px] uppercase tracking-[0.6em] [writing-mode:vertical-rl] ${!hasThreat
             ? 'text-emerald-700/70'
             : threat >= 10
               ? 'text-red-600/80'
               : 'text-amber-600/80'
             }`}
         >
-          {threat === undefined ? 'SAFE_NODE' : `THREAT_LEVEL ${threat.toFixed(1)}`}
+          {hasThreat ? (threat > 0 ? `THREAT_LEVEL ${threat.toFixed(1)}` : 'THREAT_DETECTED') : 'SAFE_NODE'}
         </span>
       </div>
 
@@ -567,16 +570,16 @@ const CutsceneContent: React.FC<OverlayPanelProps> = ({ node, nodeId, onCutscene
             <span className="font-mono text-[10px] tracking-[0.3em] text-zinc-600">
               {nodeId?.toUpperCase()}
             </span>
-            {threat !== undefined ? (
+            {hasThreat ? (
               <span
-                className={`border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.25em] ${threat >= 10
+                className={`border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.25em] ${threat >= 10 || threat <= 0
                   ? 'border-red-900/70 bg-red-950/30 text-red-500'
                   : threat >= 5
                     ? 'border-amber-900/70 bg-amber-950/30 text-amber-400'
                     : 'border-emerald-900/70 bg-emerald-950/30 text-emerald-400'
                   }`}
               >
-                威胁 {threat.toFixed(1)}
+                {threat > 0 ? `威胁 ${threat.toFixed(1)}` : '固定遭遇'}
               </span>
             ) : null}
             <span className="font-mono text-[9px] tracking-[0.25em] text-zinc-600">
