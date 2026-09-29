@@ -1,75 +1,69 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import {
+    DEFAULT_EPISODIC_TENSION,
+    DEFAULT_STORY_NODE_COUNT,
+    EMPTY_NARRATIVE_LIBRARY,
     GameState,
+    HALLUCINATION_TEXTS,
+    applyLevelUp,
+    buildCurrentLocation,
+    buildStoryConfigFromPending,
+    calculateNextTickState,
+    clamp,
+    extractPlotPointsFromZone,
+    findAestheticReferences,
+    getEntranceNodeId,
+    getNodeByKey,
+    getNodeThreatLevel,
+    isSanctuary,
+    markNodeVisited,
+    mergeNarrativeLibrary,
+    safeAudioOperation,
+    safeNumber,
+    sanitizeNarrativeLibrary,
+    threatToRatio,
+    validateAesthetic,
+    validateAtom,
+    validateDomain,
+} from '../meta';
+import type {
     AttributeType,
-    DotSoundType,
-    LogType,
-    NarrativeMode,
-    NarrativePacing,
-    NarrativePhase,
-    BaseDynamicState,
     ChainNarrative,
     CurrentTime,
+    DotSoundType,
     EnemyTemplate,
     GameStateData,
     GameStateUpdaters,
     HorrorAesthetic,
     HorrorAtom,
     HorrorDomain,
-    PlayerDynamicState,
+    LogType,
+    NarrativeDraftContext,
+    NarrativeDraftIssue,
+    NarrativeLibrary,
+    NarrativeMode,
+    NarrativePacing,
+    NarrativePhase,
     PlayerState,
     PlotPoint,
-    Sanctuary,
     StoryConfig,
     Tactic,
-    Vital,
     Zone,
     ZoneDate,
-    applySanctuaryResourceDeltas,
-    buildCurrentLocation,
-    clamp,
-    clampDynamicVitals,
-    getEntranceNodeId,
-    getNodeByKey,
-    getNodeSpecificEnemies,
-    getNodeThreatLevel,
-    isItemTemplate,
-    isSanctuary,
-    markNodeVisited,
-    safeAudioOperation,
-    safeDeepClone,
-    safeNumber,
 } from '../meta';
 import {
     HORROR_AESTHETICS,
     HORROR_ATOMS,
     HORROR_DOMAINS,
-    findAestheticReferences,
-    mergeNarrativeLibrary,
-    pickRandomTactics,
     PUBLIC_TACTIC_POOL,
-    validateAesthetic,
-    validateAtom,
-    validateDomain,
+    pickRandomTactics,
 } from '../constants';
-import type { NarrativeDraftContext, NarrativeDraftIssue } from '../constants';
-import { NECESSARY_RESOURCE_CONSUMPTION_PER_DAY } from './useSanctuary';
 import {
     AudioService,
     ChainNarrativeService,
     PersistenceService,
 } from '../services';
-import type { NarrativeLibrary } from '../services';
-
-const HALLUCINATION_TEXTS = [
-    '墙壁里传来了呼吸声',
-    '监控屏幕似乎眨了一下眼',
-    '别回头',
-    '文字在流血',
-    '它在看着你',
-    '脑海里的尖叫',
-] as const;
 
 type NarrativeFlowStep =
     | 'mode'
@@ -125,17 +119,6 @@ const EMPTY_ARCHIVE_INDEX: NarrativeArchiveIndex = {
     isLoading: false,
 };
 
-/** 空的自建叙事库。 */
-const EMPTY_NARRATIVE_LIBRARY: NarrativeLibrary = {
-    domains: [],
-    atoms: [],
-    aesthetics: [],
-};
-
-const DEFAULT_NODE_COUNT = 15;
-const DEFAULT_TENSION = 500;
-const DEFAULT_EPISODIC_TENSION_INPUT = 50;
-
 /**
  * 一次自建叙事库写入 / 删除操作的结果。
  *
@@ -159,158 +142,6 @@ export interface NarrativeMutationResult {
 const PRESET_READONLY_ISSUE: NarrativeDraftIssue = {
     field: 'id',
     message: '预设条目不可直接修改，请改用新的 id 另存为自建条目。',
-};
-
-/**
- * 运行时读入的自建库可能被外部手工篡改或来自旧版本，
- * 此处做一次形状收敛，避免非法条目污染 UI 渲染。
- */
-const sanitizeNarrativeLibrary = (raw: NarrativeLibrary | null): NarrativeLibrary => {
-    if (!raw || typeof raw !== 'object') return EMPTY_NARRATIVE_LIBRARY;
-
-    const pickArray = <T extends { id?: unknown }>(value: unknown): T[] =>
-        Array.isArray(value)
-            ? value.filter(
-                (item): item is T =>
-                    Boolean(item) && typeof item === 'object' && typeof (item as T).id === 'string',
-            )
-            : [];
-
-    return {
-        domains: pickArray<HorrorDomain>(raw.domains),
-        atoms: pickArray<HorrorAtom>(raw.atoms),
-        aesthetics: pickArray<HorrorAesthetic>(raw.aesthetics),
-    };
-};
-
-/** ZoneDate 刻度：tick 取值 0-29（30 进制），cycle 取值 0-11（12 进制）。
- *  一天 = 30×12 = 360 tick。与 useSanctuary.TIME_CONFIG（TICKS_PER_HOUR=15）
- *  保持一致：24 小时休息 = 360 tick = 恰好 1 天，确保设施每日产出可跨天结算。 */
-const TICKS_PER_CYCLE = 30;
-const CYCLES_PER_DAY = 12;
-
-/** 一天对应的 tick 数：庇护所资源 consumptionRate 以「每人每天」为单位。 */
-const TICKS_PER_DAY = TICKS_PER_CYCLE * CYCLES_PER_DAY;
-
-/** 升级成长曲线：每次升级各体征上限增量。 */
-const LEVEL_UP_GROWTH = {
-    maxHp: 5,
-    maxSanity: 3,
-    maxStamina: 2,
-    maxVigor: 2,
-} as const;
-
-// =====================
-// 本地纯函数（utils.ts 未导出或不存在，按接口契约实现）
-// =====================
-
-/**
- * 推进区域主观时间。
- * dilationFactor = 0 时时间停止；> 1 时主观时间被放大。
- */
-const advanceZoneTime = (
-    time: ZoneDate,
-    delta: number,
-    dilationFactor: number
-): ZoneDate => {
-    const subjective = Math.max(
-        0,
-        Math.floor(safeNumber(delta) * safeNumber(dilationFactor, 1))
-    );
-    const rawTick = safeNumber(time.tick) + subjective;
-    const tick = rawTick % TICKS_PER_CYCLE;
-    const rawCycle = safeNumber(time.cycle) + Math.floor(rawTick / TICKS_PER_CYCLE);
-    const cycle = rawCycle % CYCLES_PER_DAY;
-    const day = safeNumber(time.day) + Math.floor(rawCycle / CYCLES_PER_DAY);
-    return { day, cycle, tick };
-};
-
-const snapshotVital = (dynamic: BaseDynamicState): Vital => ({
-    maxHp: safeNumber(dynamic.maxHp),
-    maxSanity: safeNumber(dynamic.maxSanity),
-    maxStamina: safeNumber(dynamic.maxStamina),
-    maxVigor: safeNumber(dynamic.maxVigor),
-});
-
-const mutateSanctuaryResource = (
-    sanctuary: Sanctuary,
-    resourceId: string,
-    amount: number
-): void => {
-    applySanctuaryResourceDeltas(sanctuary, { [resourceId]: amount });
-};
-
-/**
- * 通用升级结算：属性 +1、体征上限成长并回满。
- * 同时适用于玩家与同伴的动态状态。
- */
-const applyLevelUp = <D extends PlayerDynamicState>(
-    dynamic: D,
-    attr: AttributeType
-): D => {
-    const maxHp = safeNumber(dynamic.maxHp, 100) + LEVEL_UP_GROWTH.maxHp;
-    const maxSanity = safeNumber(dynamic.maxSanity, 100) + LEVEL_UP_GROWTH.maxSanity;
-    const maxStamina = safeNumber(dynamic.maxStamina, 100) + LEVEL_UP_GROWTH.maxStamina;
-    const maxVigor = safeNumber(dynamic.maxVigor, 100) + LEVEL_UP_GROWTH.maxVigor;
-    return {
-        ...dynamic,
-        level: safeNumber(dynamic.level, 1) + 1,
-        [attr]: safeNumber(dynamic[attr], 0) + 1,
-        maxHp,
-        maxSanity,
-        maxStamina,
-        maxVigor,
-        hp: maxHp,
-        sanity: maxSanity,
-        stamina: maxStamina,
-        vigor: maxVigor,
-    } as D;
-};
-
-// =====================
-// 叙事流程配置工具
-// =====================
-
-const threatToRatio = (threat?: number): number =>
-    clamp(safeNumber(threat, 0) / 20, 0, 1);
-
-const normalizeTension = (value: number): number => {
-    // 输入语义统一为 0-1000 张力值（DetailsPanel 滑块 min=0 max=1000）。
-    // 历史实现把 ≤100 的值 ×10，导致 100→1000、150→150 的非单调跳变，已移除。
-    const base = Number.isFinite(value) ? value : DEFAULT_TENSION;
-    return Math.max(0, Math.min(1000, Math.round(base)));
-};
-
-const buildStoryConfigFromPending = (
-    pending: Partial<StoryConfig>,
-    episodicNodeCount: number,
-    episodicTension: number
-): StoryConfig | undefined => {
-    const mode = pending.mode;
-    const aesthetic = pending.aesthetic;
-    if (!mode?.id || !aesthetic?.id) return undefined;
-
-    const isEpisodic = mode.id === 'episodic';
-    const rawNodeCount = isEpisodic
-        ? episodicNodeCount
-        : (pending.nodesCount ?? DEFAULT_NODE_COUNT);
-    const nodeCount = Math.max(
-        1,
-        Math.round(Number.isFinite(rawNodeCount) ? rawNodeCount : DEFAULT_NODE_COUNT)
-    );
-
-    const config: StoryConfig = {
-        mode,
-        pacing: pending.pacing ?? { id: 'balanced', prompt: 'balanced' },
-        aesthetic,
-        nodesCount: nodeCount,
-        tension: isEpisodic
-            ? normalizeTension(episodicTension)
-            : normalizeTension(pending.tension ?? DEFAULT_TENSION),
-    };
-    if (pending.motif?.id) config.motif = pending.motif;
-    if (pending.mainAxis?.id) config.mainAxis = pending.mainAxis;
-    return config;
 };
 
 // =====================
@@ -412,183 +243,6 @@ interface UseGameStateReturn {
 }
 
 // =====================
-// 导出纯工具
-// =====================
-
-export const hasSolvePlotPointMarker = (
-    entity: unknown
-): entity is { toSolvePP: string } => {
-    if (entity === null || typeof entity !== 'object') return false;
-    return (
-        'toSolvePP' in entity &&
-        typeof (entity as { toSolvePP?: unknown }).toSolvePP === 'string'
-    );
-};
-
-export const extractPlotPointsFromZone = (
-    zone: Zone
-): {
-    resolvedIds: string[];
-    resolutionContexts: Record<string, string>;
-} => {
-    const resolvedIds: string[] = [];
-    const resolutionContexts: Record<string, string> = {};
-
-    const extract = (entity: unknown, contextText: string) => {
-        if (hasSolvePlotPointMarker(entity)) {
-            resolvedIds.push(entity.toSolvePP);
-            resolutionContexts[entity.toSolvePP] = contextText;
-        }
-    };
-
-    Object.values(zone.nodes).forEach((node) => {
-        extract(node, `在 [${node.name}] 中探索时揭示`);
-        node.items?.forEach((item) => extract(item, `发现线索 [${item.name}] 时解开`));
-        if (node.nodeNpc) {
-            extract(node.nodeNpc, `遭遇 [${node.nodeNpc.name}] 时获悉`);
-        }
-        // 固定遭遇（isDangerous 数组形态）中的 EnemyTemplate 同样承载 toSolvePP。
-        getNodeSpecificEnemies(node)?.forEach((enemy) => {
-            extract(enemy, `面对 [${enemy.name}] 时显现`);
-        });
-        node.interactions?.forEach((interaction) => {
-            extract(interaction, `在 [${node.name}] 执行交互时触发`);
-            if (interaction.requirements?.puzzleSolved) {
-                extract(
-                    interaction.requirements.puzzleSolved,
-                    `解开谜团 [${interaction.requirements.puzzleSolved.title}] 后揭晓`
-                );
-            }
-            interaction.results.stateChange?.gain?.forEach((reward) => {
-                if (isItemTemplate(reward)) {
-                    extract(reward, `获得物品 [${reward.name}] 时揭示`);
-                } else {
-                    extract(reward, `遭遇同伴 [${reward.name}] 时获悉`);
-                }
-            });
-            interaction.results.stateChange?.spawnEnemy?.forEach((enemy) => {
-                extract(enemy, `遭遇敌对实体 [${enemy.name}] 时显现`);
-            });
-        });
-    });
-
-    return { resolvedIds, resolutionContexts };
-};
-
-export const resolvePlotPointNet = (
-    plots: PlotPoint[],
-    resolvedIds: string[]
-): {
-    plots: PlotPoint[];
-    resolvedCount: number;
-} => {
-    const ids = new Set(resolvedIds);
-    let resolvedCount = 0;
-
-    const resolved = plots.map((point) => {
-        if (ids.has(point.id) && !point.isSolved) {
-            resolvedCount += 1;
-            return { ...point, isSolved: true };
-        }
-        return point;
-    });
-
-    return {
-        plots: resolved,
-        resolvedCount,
-    };
-};
-
-/**
- * 单 tick 结算核心（纯函数）：
- * 回合推进、区域主观时间、理智/电量消耗、庇护所资源结算、体征快照。
- */
-export const calculateNextTickState = (
-    prevPlayer: PlayerState,
-    timePassed: number,
-    gameState: GameState,
-    currentZone?: Zone | Sanctuary,
-    cameraModeOverride?: boolean
-): {
-    nextPlayer: PlayerState;
-    isBatteryDepleted: boolean;
-} => {
-    const nextPlayer = safeDeepClone(prevPlayer);
-    const timeDelta = Math.max(0, Math.floor(safeNumber(timePassed)));
-    const activeZone = currentZone ?? nextPlayer.sanctuary;
-    const dilationFactor = Math.max(0, safeNumber(activeZone.dilationFactor, 1));
-    const isSanctuaryMode = gameState === GameState.SANCTUARY || isSanctuary(activeZone);
-    const isCameraMode = cameraModeOverride ?? prevPlayer.visualMode === 'camera';
-    let isBatteryDepleted = false;
-
-    nextPlayer.currentGameRound.absoluteTick += timeDelta;
-    nextPlayer.currentGameRound.combatTurn =
-        gameState === GameState.COMBAT ? nextPlayer.currentGameRound.combatTurn + timeDelta : 0;
-    nextPlayer.currentZoneTime = advanceZoneTime(
-        nextPlayer.currentZoneTime,
-        timeDelta,
-        dilationFactor
-    );
-
-    // 探索压力：庇护所外按主观时间持续流失理智；神经链接仪离线时惩罚 ×11。
-    if (!isSanctuaryMode) {
-        const subjectiveDelta = Math.max(0, Math.floor(timeDelta * dilationFactor));
-        const neuralOffline =
-            nextPlayer.neuralLink.battery <= 0 || nextPlayer.neuralLink.integrity <= 0;
-        const sanityDrain = (0.1 + (neuralOffline ? 1.0 : 0)) * subjectiveDelta;
-        nextPlayer.dynamic.sanity = clamp(
-            nextPlayer.dynamic.sanity - sanityDrain,
-            0,
-            nextPlayer.dynamic.maxSanity
-        );
-    }
-
-    // 摄像模式耗电；完整度 < 50 时耗电翻倍。
-    if (isCameraMode && !isSanctuaryMode && nextPlayer.neuralLink.integrity > 0) {
-        const totalDrain = 0.05 * (nextPlayer.neuralLink.integrity < 50 ? 2 : 1) * timeDelta;
-        const previousBattery = nextPlayer.neuralLink.battery;
-        nextPlayer.neuralLink.battery = Math.max(0, previousBattery - totalDrain);
-        isBatteryDepleted = previousBattery > 0 && nextPlayer.neuralLink.battery <= 0;
-    }
-
-    // 庇护所资源结算：按「每人每天」消耗。
-    // 必要资源（食物 / 饮水）用引擎配平速率；独特资源用各自声明的 consumptionRate，
-    // 未声明速率的资源不随日常驻留消耗（如药品、废料）。
-    const sanctuary = nextPlayer.sanctuary;
-    const population = Math.max(0, safeNumber(sanctuary.population));
-    const elapsedDays = Math.max(0, safeNumber(timeDelta)) / TICKS_PER_DAY;
-    if (population > 0 && elapsedDays > 0) {
-        for (const [key, ratePerDay] of Object.entries(
-            NECESSARY_RESOURCE_CONSUMPTION_PER_DAY
-        )) {
-            mutateSanctuaryResource(sanctuary, key, -ratePerDay * population * elapsedDays);
-        }
-
-        for (const entry of sanctuary.uniqueResource) {
-            const rate = safeNumber(entry.consumptionRate);
-            if (rate <= 0) continue;
-            mutateSanctuaryResource(sanctuary, entry.id, -rate * population * elapsedDays);
-        }
-    }
-
-    clampDynamicVitals(nextPlayer.dynamic);
-
-    const previousCurrent = nextPlayer.vitalRecord.currentVital;
-    nextPlayer.vitalRecord = {
-        prevVital: {
-            prevTick: previousCurrent.currentTick,
-            prevVital: previousCurrent.currentVital,
-        },
-        currentVital: {
-            currentTick: nextPlayer.currentGameRound.absoluteTick,
-            currentVital: snapshotVital(nextPlayer.dynamic),
-        },
-    };
-
-    return { nextPlayer, isBatteryDepleted };
-};
-
-// =====================
 // 主钩子
 // =====================
 
@@ -622,10 +276,10 @@ export const useGameState = ({
         Partial<StoryConfig>
     >({});
     const [narrativeFlowEpisodicTension, setNarrativeFlowEpisodicTension] = useState(
-        DEFAULT_EPISODIC_TENSION_INPUT
+        DEFAULT_EPISODIC_TENSION
     );
     const [narrativeFlowEpisodicNodeCount, setNarrativeFlowEpisodicNodeCount] =
-        useState(DEFAULT_NODE_COUNT);
+        useState(DEFAULT_STORY_NODE_COUNT);
     const [currentNarrative, setCurrentNarrative] = useState<NarrativeState | null>(null);
     const [narrativeLibrary, setNarrativeLibrary] = useState<NarrativeArchiveIndex>(EMPTY_ARCHIVE_INDEX);
     const [pendingTacticOptions, setPendingTacticOptions] = useState<Tactic[] | null>(null);
@@ -1337,11 +991,10 @@ export const useGameState = ({
         const sidePlots = activePlots.filter((p) => p.type === 'S');
 
         const gen = analysis?.output?.ppToGenerate;
-        const pendingConfig = buildStoryConfigFromPending(
-            narrativeFlowPendingConfig,
-            narrativeFlowEpisodicNodeCount,
-            narrativeFlowEpisodicTension
-        );
+        const pendingConfig = buildStoryConfigFromPending(narrativeFlowPendingConfig, {
+            nodeCount: narrativeFlowEpisodicNodeCount,
+            tension: narrativeFlowEpisodicTension,
+        });
         const params =
             narrativeFlowStep !== 'closed'
                 ? (pendingConfig ?? player.activeArc?.config)
@@ -1452,11 +1105,10 @@ export const useGameState = ({
 
     const handleNarrativeFlowPreviewConfirm = useCallback(
         async (autoGenOptions?: { images?: boolean; videos?: boolean; audios?: boolean }) => {
-            const payload = buildStoryConfigFromPending(
-                narrativeFlowPendingConfig,
-                narrativeFlowEpisodicNodeCount,
-                narrativeFlowEpisodicTension
-            );
+            const payload = buildStoryConfigFromPending(narrativeFlowPendingConfig, {
+                nodeCount: narrativeFlowEpisodicNodeCount,
+                tension: narrativeFlowEpisodicTension,
+            });
             const prev = playerRef.current;
             if (!payload) {
                 console.warn('[叙事总线] 叙事配置不完整，无法确认叙事流程。');
@@ -1474,7 +1126,10 @@ export const useGameState = ({
                     if (arc) {
                         const nodesCount = Math.max(
                             1,
-                            safeNumber(arc.config?.nodesCount, payload.nodesCount || DEFAULT_NODE_COUNT)
+                            safeNumber(
+                                arc.config?.nodesCount,
+                                payload.nodesCount || DEFAULT_STORY_NODE_COUNT
+                            )
                         );
                         confirmedConfig = { ...payload, nodesCount };
                         next = {
@@ -1535,8 +1190,8 @@ export const useGameState = ({
     const handleNarrativeFlowCancel = useCallback(() => {
         setNarrativeFlowStep('closed');
         setNarrativeFlowPendingConfig({});
-        setNarrativeFlowEpisodicTension(DEFAULT_EPISODIC_TENSION_INPUT);
-        setNarrativeFlowEpisodicNodeCount(DEFAULT_NODE_COUNT);
+        setNarrativeFlowEpisodicTension(DEFAULT_EPISODIC_TENSION);
+        setNarrativeFlowEpisodicNodeCount(DEFAULT_STORY_NODE_COUNT);
         narrativeCallbacksRef.current?.onCancel?.();
     }, []);
 

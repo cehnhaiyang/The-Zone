@@ -65,7 +65,6 @@ import {
     ChainNarrativeService,
     DynamicNarrativeService,
 } from '../services';
-import { useCombat } from './useCombat';
 import type {
     AnyTactic,
     AttackForecast,
@@ -75,8 +74,7 @@ import type {
     CounterDecisionResult,
     InsertActionWindow,
     MoveDirection,
-    WeaponTraitState,
-} from './useCombat';
+} from '../meta';
 import { useSocialization } from './useSocialization';
 import { useSanctuary } from './useSanctuary';
 import type { CustomRestConfig, FacilityUpgradePayment } from './useSanctuary';
@@ -88,10 +86,9 @@ import { useAiGeneration } from './useAiGeneration';
 import { useInteraction } from './useInteraction';
 import type { PuzzleInteractionController } from './useInteraction';
 import { useZoneTransition } from './useZoneTransition';
+import { useCombat } from './useCombat';
 
-// =====================
-// 对外出口（模块唯一出口：视图层禁止深度引用内部文件）
-// =====================
+// 战斗契约与战场空间工具的唯一真源在 meta；此处按「视图层只引用本模块」的约定转出。
 export type {
     AnyTactic,
     AttackForecast,
@@ -102,9 +99,8 @@ export type {
     CounterDecisionResult,
     InsertActionWindow,
     MoveDirection,
-    WeaponTraitState,
-} from './useCombat';
-export { getBattleDistance, getCoverAtCell, getSteppedCell, isCellWalkable } from './useCombat';
+} from '../meta';
+export { getBattleDistance, getCoverAtCell, getSteppedCell, isCellWalkable } from '../meta';
 export type { PuzzleInteractionController } from './useInteraction';
 export type { NarrativeMutationResult } from './useGameState';
 export type { CustomRestConfig, FacilityUpgradePayment } from './useSanctuary';
@@ -207,11 +203,7 @@ interface UseGameReturn {
     counterSkip: Record<string, Partial<Record<CounterAdvanceRequest['type'], boolean>>>;
     /** 设置 / 取消跳过开关。 */
     setCounterSkip: (unitId: string, type: CounterAdvanceRequest['type'], skip: boolean) => void;
-    /**
-     * 我方单位的武器特性回合状态（瞄准 / 待装填 / 本回合移动 / 免费攻击已用）。
-     * 供战斗界面展示「已瞄准」「待装填」等契约特性提示。
-     */
-    weaponStates: Record<string, WeaponTraitState>;
+
     /**
      * 「立即行动」窗口：预支结算后我方单位的立即行动行动点池。
      * 每次行动按其自身行动点成本消耗窗口行动点，不再限制攻击次数。
@@ -746,7 +738,6 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         moveAlly,
         counterSkip,
         setCounterSkip,
-        weaponStates,
         insertAction,
         endInsertAction,
     } = useCombat({
@@ -1662,7 +1653,6 @@ export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
         resolveCounterPrompt,
         counterSkip,
         setCounterSkip,
-        weaponStates,
         insertAction,
         endInsertAction,
 

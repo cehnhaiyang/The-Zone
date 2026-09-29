@@ -42,7 +42,6 @@ import type {
     CounterAdvanceRequest,
     InsertActionWindow,
     MoveDirection,
-    WeaponTraitState,
 } from '../hooks';
 import { getBattleDistance, getCoverAtCell, getSteppedCell, isCellWalkable } from '../hooks';
 import {
@@ -65,11 +64,14 @@ import {
     Target,
     VitalType,
     WeaponType,
+    getAllyTargetId,
     getPercent,
+    getTacticWeaponType,
     isAttributeType,
     isDynamicVitalType,
     isVitalType,
     safeNumber,
+    sequenceMinLength,
 } from './../meta';
 
 const combatPanelCss = `
@@ -534,7 +536,6 @@ interface CombatPanelProps {
      * 我方单位的武器特性回合状态（瞄准 / 待装填 / 本回合移动 / 免费攻击已用）。
      * 用于在单位卡片上提示「已瞄准」「待装填」等契约武器特性。
      */
-    weaponStates?: Record<string, WeaponTraitState>;
     /**
      * 「立即行动」窗口：非空时锁定该单位并允许立即操作（预支的后续行为）。
      * 每次行动按其自身行动点成本消耗窗口行动点；行动点耗尽即窗口结束，可随时手动结束。
@@ -696,37 +697,10 @@ const formatTacticEffect = (effect: TacticEffectTuple): string => {
     const durationText = duration > 0 ? `/${duration}T` : '';
     return `${TARGET_LABEL[target]} · ${effectTypeLabel(type)} ${sign}${formatNumber(value)}${durationText}`;
 };
-/** 战术声明的武器类型需求：武器专属战术取 weaponOwn，常规战术取 requireWeapon。 */
-const getTacticWeaponType = (tactic: AnyTactic): WeaponType | undefined =>
-    'weaponOwn' in tactic ? tactic.weaponOwn : tactic.requireWeapon;
-/**
- * 武器特性动作的战术 id（与引擎 WEAPON_TRAIT_ACTIONS 同源）。
- *
- * 「瞄准」与「装填」在契约里是武器类型特性，在 constants/tactic/weapon.ts 里
- * 以武器专属战术的形式提供给玩家操作；界面据此给出「已瞄准」「待装填」等针对性提示。
- */
-const WEAPON_TRAIT_ACTION_IDS = {
-    aim: 'weapon_sniper_rifle_steady_aim',
-    reload: 'weapon_crossbow_rearm',
-} as const;
 /** 指定武器类型是否已挂在主手或副手任一槽位上。 */
 const hasEquippedWeaponType = (equipment: EquipState, weaponType: WeaponType): boolean => {
     const weapons = equipment?.weapons;
     return weapons?.main?.weaponType === weaponType || weapons?.side?.weaponType === weaponType;
-};
-/**
- * 结果序列的最小槽位长度（与引擎同口径）：
- * 任一存在的攻击槽或防御槽为 0，即视为序列耗尽、实体无法行动。
- */
-const sequenceMinLength = (sequence?: CombatAlly['resultSequence']): number => {
-    if (!sequence) return 0;
-    const lengths = [sequence.defense.length];
-    ([sequence.main, sequence.side, sequence.attack] as Array<AttackResult[] | undefined>).forEach(
-        (list) => {
-            if (list) lengths.push(list.length);
-        }
-    );
-    return Math.min(...lengths);
 };
 const getManualTargetMode = (tactic: AnyTactic): ManualTargetMode => {
     if (tactic.type === 'A') return 'single_enemy';
@@ -738,7 +712,6 @@ const getManualTargetMode = (tactic: AnyTactic): ManualTargetMode => {
     }
     return null;
 };
-const getAllyTargetId = (ally: { id: string }, idx: number): string => (idx === 0 ? 'player' : ally.id);
 const getEnemyTargetId = (enemy: CombatEnemy): string => enemy.instanceId || enemy.id;
 const toneClass = (tone: 'buff' | 'debuff' | 'neutral'): string => {
     if (tone === 'buff') return 'border-[#4bd6a5]/65 text-[#b6f5dd] bg-[#04241b]/85';
@@ -1868,8 +1841,7 @@ const AllyCard: React.FC<{
     /** 蓄反槽（owner × trigger，槽与槽独立结算）。 */
     counterSlots: CounterSlot[];
     /** 武器特性回合状态：已瞄准 / 待装填。 */
-    weaponState?: WeaponTraitState;
-}> = ({ ally, targetId, isActive, isSelectable, isTargeted, counterSlots, onClick, position, nearestEnemyDistance, moveAvailability, onMove, skipAccumulateCounter = false, skipDifferentialCounter = false, onToggleCounterSkip, weaponState }) => {
+}> = ({ ally, targetId, isActive, isSelectable, isTargeted, counterSlots, onClick, position, nearestEnemyDistance, moveAvailability, onMove, skipAccumulateCounter = false, skipDifferentialCounter = false, onToggleCounterSkip }) => {
     const hp = safeNumber(ally.hp);
     const maxHp = Math.max(1, safeNumber(ally.maxHp));
     const shield = safeNumber(ally.shield);
@@ -1948,15 +1920,6 @@ const AllyCard: React.FC<{
                         <ApPips current={Math.max(0, safeNumber(ally.actionPoint.current))} base={Math.max(1, safeNumber(ally.actionPoint.base))} advanced={safeNumber(ally.actionPoint.advanced)} />
                         <div className="flex items-center gap-2">
                             {shield > 0 && <span className="flex items-center gap-0.5 text-[10px] font-mono font-bold text-[#cdeeff] tabular"><Icon name="shield" className="w-3 h-3" />{formatNumber(shield)}</span>}
-                            {/* 武器特性状态：弩待装填是硬约束（未装填无法攻击），必须显式提示 */}
-                            {weaponState?.needsReload && hasEquippedWeaponType(ally.equipment, 'crossbow') && (
-                                <span className="px-1 py-px border border-[#ff9b7d]/60 bg-[#2a0d06]/70 text-[#ff9b7d] font-mono text-[8.5px] font-bold tracking-wider animate-soft-blink"
-                                    title="弩每次攻击后必须消耗 1 AP 装填，否则无法再次攻击">待装填</span>
-                            )}
-                            {weaponState?.aimed && (
-                                <span className="px-1 py-px border border-[#4bd6a5]/60 bg-[#04241b]/70 text-[#b6f5dd] font-mono text-[8.5px] font-bold tracking-wider"
-                                    title="已瞄准：下一次攻击判定提升 1 档（原为暴击则伤害翻倍）">已瞄准</span>
-                            )}
                             <CounterGauge slots={counterSlots} />
                         </div>
                     </div>
@@ -2164,7 +2127,7 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
     getTacticsFor, canUseTactic, executeTactic, endPlayerPhase, getVisibleResultSequence, getPredictionDepthFor, getAttackForecast, pendingDefense,
     onGenerateEnemyVisual, onRandomSwitchEnemyVisual, isEnemyVisualGenerating,
     positions, battleMap, covers, getUnitRange, getMoveCost, onMoveAlly,
-    counterPrompt, onResolveCounterPrompt, counterSkip, onToggleCounterSkip, weaponStates,
+    counterPrompt, onResolveCounterPrompt, counterSkip, onToggleCounterSkip, 
     insertAction, onEndInsertAction,
 }) => {
     const [selectedTactic, setSelectedTactic] = useState<AnyTactic | null>(null);
@@ -2411,25 +2374,13 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
         if (requiredWeapon && !hasEquippedWeaponType(ally.equipment, requiredWeapon)) {
             return `需要武器：${WEAPON_LABEL[requiredWeapon]}`;
         }
-        // 弩未装填无法发射：这是契约硬约束，需给出明确原因而非灰按钮。
-        if (
-            tactic.type === 'A' &&
-            hasEquippedWeaponType(ally.equipment, 'crossbow') &&
-            weaponStates?.[effectiveActiveId]?.needsReload === true
-        ) {
-            return '弩未装填 · 需先执行装填';
-        }
-        // 已瞄准时无需重复瞄准。
-        if (WEAPON_TRAIT_ACTION_IDS.aim === tactic.id && weaponStates?.[effectiveActiveId]?.aimed) {
-            return '已处于瞄准状态';
-        }
         // 攻击战术：射程内没有可攻击目标。
         if (tactic.type === 'A' && typeof activeRange === 'number') {
             const hasTarget = aliveEnemies.some((enemy) => !isOutOfRange(enemy));
             if (!hasTarget) return `射程外 · 需接近至 ${formatNumber(activeRange)} 格`;
         }
         return undefined;
-    }, [isBusy, isPlayerPhase, isInsertingUnit, insertAction, activeAllyEntry, activeRange, aliveEnemies, isOutOfRange, effectiveActiveId, weaponStates]);
+    }, [isBusy, isPlayerPhase, isInsertingUnit, insertAction, activeAllyEntry, activeRange, aliveEnemies, isOutOfRange, effectiveActiveId ]);
 
     /** 蓄反 / 差反询问发起者名称（player / 同伴 id）。 */
     const counterActorName = useMemo(() => {
@@ -2563,7 +2514,6 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
                                     isSelectable={isAllySelectable(id, safeNumber(ally.hp) > 0)}
                                     isTargeted={focusedEnemyIntent?.targetId === id}
                                     counterSlots={counterSlotsOf(id, ally.accumulateCounter)}
-                                    weaponState={weaponStates?.[id]}
                                     position={posMap[id]}
                                     nearestEnemyDistance={nearestEnemyDistance(id)}
                                     moveAvailability={onMoveAlly ? {

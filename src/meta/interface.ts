@@ -36,6 +36,7 @@ import {
     DefenseResult,
     Target,
     CombatStyle,
+    CounterType,
     IntentType,
     TacticEffectType,
     NarrativePacing,
@@ -926,6 +927,12 @@ export interface WeaponTemplate extends BaseItemTemplate {
      */
     maxUses: number
     /**
+     * 命中修正
+     * 
+     * 负为减益、正为增益
+     */
+    hitRevise?: number
+    /**
      * 防御效率
      * 
      * 由对应的武器类型决定防御效率，不在武器模板里显式定义
@@ -1735,7 +1742,7 @@ export interface CombatDynamicState extends BaseDynamicState {
      * 即额外免伤
      * 
      * - 敌人方（克苏鲁类） = evasion
-     * - 敌人方（不可移动类） = null
+     * - 敌人方（不可移动类） = 0
      * - 玩家方由实体自身的敏捷值决定
      */
     evasion: number
@@ -1816,14 +1823,13 @@ export interface CombatAlly extends EntityTemplate, CombatDynamicState, Omit<Pla
     /**
      * 结果序列
      *
-     * 进入战斗时，根据玩家方所有实体的五维，预生成长度为 stamina <= 0 ? 0 : floor(stamina / 10) 的序列
+     * 进入战斗时，根据玩家方所有实体的六维，预生成长度为 stamina <= 0 ? 0 : floor(stamina / 10) 的序列
      *
      * 结果序列分为攻击结果序列、防御结果序列。
      *  - 使用攻击/防御战术将触发结果序列判定，随后同时推进攻击结果序列与防御结果序列。
      *
-     * 实体数值在战斗中因增益 / 减益发生**临时**变化时，不重新生成序列，而是叠加最终结算增益/减益。
-     *  - 玩家方实体各自维护独立的结果序列，除非自身必要数值发生变化，否则序列样貌永远不变
-     *  - 玩家方序列耗尽时，扣除一定量 stamina ，随后重新生成
+     * 实体序列的基础样貌由其六维决定，是一个基础层；在战斗中，各种增益、减益并非直接修改序列样貌，而是在得到的结果之上进行修正得到最终结果。
+     *  - 玩家方实体各自维护独立的结果序列，序列耗尽时，扣除一定量 stamina ，随后重新生成
      *  - 序列长度为 0 时，实体无法行动
      *
      * 玩家方实体可预测自身 n 次行动的结果，在ui上表现为自身序列结果可见
@@ -1834,7 +1840,7 @@ export interface CombatAlly extends EntityTemplate, CombatDynamicState, Omit<Pla
      * 
      * instant伤害不参与任何正常结算，直接对目标造成 floor(
      *    MagicWeapon.damage
-     *    × (1 + floor(spiritual / 10) × 0.5)
+     *    × (1 + floor(will / 10) × 0.5)
      *    × combatBonus
      *    × 0.75
      *  )
@@ -1866,6 +1872,149 @@ export interface CombatAlly extends EntityTemplate, CombatDynamicState, Omit<Pla
      * 战斗增益 = clamp(1.0 + (KNO - 3) × 0.05, 0.5, 2.0)
      */
     combatBonus: number
+}
+
+// ==========================
+// 战斗引擎契约
+// ==========================
+
+/** 我方可用战术：角色习得的常规战术 + 已装备武器持有的专属战术。 */
+export type AnyTactic = Tactic | WeaponOwnTactic
+
+/**
+ * 预支询问的决议。
+ * - false：拒绝（保留 / 放弃）；
+ * - true：接受，采用请求中的默认预支档位；
+ * - number：接受，并指定预支档位（仅差反：2n 档位，须落在该单位可选档位表内）。
+ */
+export type CounterDecisionResult = boolean | number
+
+/**
+ * 蓄反 / 差反预支请求。
+ *
+ * 引擎在蓄反槽积满或差反条件满足时发起询问，由持有方决定是否预支行动点。
+ */
+export interface CounterAdvanceRequest {
+    /**
+     * 蓄反：单槽每积满 5 点即可发起一次询问。
+     * 差反：受击且速度不小于 10 时可被询问。
+     */
+    type: CounterType
+    /**
+     * 申请预支的实体
+     *
+     * 玩家为 player；同伴为模板 id；敌人为 instanceId
+     */
+    entityId: string
+    /**
+     * 本次将要预支的行动点
+     *
+     * 蓄反 = n；差反 = 2n（由该单位选择，请求给出的是默认档位）
+     */
+    apToAdvance: number
+    /**
+     * 「立即行动」窗口可消耗的行动点总量
+     *
+     * 蓄反 = n；差反 = n（= 2n / 2）
+     */
+    windowAp: number
+    /**
+     * 本回合剩余预支配额 = actionPoint.base + actionPoint.current − 本回合已预支合计
+     * （蓄反 n 与差反 2n 共享）。
+     * 无论蓄反 / 差反各触发多少次，预支加值合计都不得超过 base + current；用尽即不再询问。
+     */
+    existQuota: number
+}
+
+/**
+ * 「立即行动」窗口（蓄反 / 差反预支的直接产物）。
+ *
+ * 窗口内可进行任意行动（攻击 / 防御 / 移动 / 其他战术均可），
+ * 每次行动按其自身行动点成本消耗窗口行动点，可执行「最多 apMax 次」1 点成本的行动；
+ * 行动点耗尽即窗口结束，也可随时主动结束。
+ */
+export interface InsertActionWindow {
+    /** 窗口归属单位（player / 同伴 id）。 */
+    unitId: string
+    /** 窗口内剩余行动点。 */
+    apLeft: number
+    /** 窗口行动点总量：蓄反 = n；差反 = n（= 2n / 2）。 */
+    apMax: number
+}
+
+/**
+ * 进入战斗时的战场上下文。
+ *
+ * 由调用方（节点遭遇 / 庇护所事件等）注入，引擎据此解析战场地图与部署形态。
+ */
+export interface BattleStartContext {
+    /** 当前节点键名，用于按约定匹配该节点的专属战场地图。 */
+    nodeId?: string
+    /** 节点显式配置的 map 字段；优先于按节点键名的约定匹配。 */
+    mapOverride?: string
+    /** 伏击不利系数（0~1）：越大，我方锚点越靠前、敌方部署带压得越近。 */
+    isAmbushed?: number
+    /**
+     * 显式指定敌人生成数量。
+     *
+     * 由调用方（如庇护所事件的 impact.spawnEnemy）决定时优先于威胁等级推导；
+     * 缺省或为 0 时按威胁等级推导。
+     */
+    enemyCount?: number
+}
+
+/**
+ * 战前预测中的单条命中 / 伤害修正来源。
+ *
+ * 来源必须可辨识：掩体拦截、全局环境修正、武器类型修正分别标注，便于玩家判断
+ * 「这个减益是掩体给的，还是全场都在吃的」。
+ */
+export interface AttackForecastSource {
+    /** 来源类型：掩体拦截 / 全局环境修正 / 武器类型修正。 */
+    kind: 'cover' | 'environment' | 'weapon'
+    /** 来源展示名（掩体名 / 「战场环境」/「武器类型修正」）。 */
+    label: string
+    /** 命中档位修正：负数降档、正数升档、0 只影响伤害。 */
+    steps: number
+    /** 该修正生效的概率（0 ~ 1）。 */
+    chance: number
+    /** 伤害乘区（1 = 不影响伤害；掩体为 1 - coverRate）。 */
+    damageMultiplier: number
+}
+
+/** 战前预测的单个命中档位：出现概率与该档位的代表伤害（已含全部乘区）。 */
+export interface AttackForecastOdds {
+    ladder: AttackResult[0]
+    /** 最终落入该档位的概率（0 ~ 1，已含三处修正的档位偏移）。 */
+    chance: number
+    /** 该档位的代表伤害：擦伤取命中值对半、命中取攻击基准、暴击取暴击上限。 */
+    damage: number
+}
+
+/**
+ * 战前预测（我方一次攻击的完整链路）。
+ *
+ * 给的是**概率**而非下一次掷骰结果：档位分布由感知 / 疲劳权重推导（与序列生成同源），
+ * 是玩家凭属性本就能估出的信息，不会泄漏引擎预生成的序列内容。
+ * 各来源对档位的偏移按概率卷积进最终分布；伤害乘区与掩体吸收是确定项。
+ */
+export interface AttackForecast {
+    /** 命中档位分布：落空 / 擦伤 / 命中 / 暴击（索引与命中阶梯一致）。 */
+    odds: AttackForecastOdds[]
+    /** 命中与伤害减益的来源明细（逐条列出，用于标注出处）。 */
+    sources: AttackForecastSource[]
+    /**
+     * 环境 + 武器合计的档位修正（一次判定）。
+     *
+     * 掩体拦截是另一次独立判定，其档位与概率由 `sources` 中的 cover 项给出，不重复携带。
+     */
+    modifierRoll: { steps: number; chance: number }
+    /** 当前距离与武器射程（0 = 无限）。 */
+    distance: number
+    range?: number
+    weaponType?: WeaponType
+    /** 瞬时真实伤害武器：跳过一切常规结算，预测只作说明。 */
+    instant: boolean
 }
 
 // ==========================
@@ -2512,6 +2661,21 @@ export interface HorrorAesthetic extends _Nar {
          * }>
          */
     }
+}
+
+/**
+ * 玩家自建叙事库
+ *
+ * 与游戏存档解耦：作为全局用户资产持久化，任何存档、任何叙事链都可选用。
+ * 只承载自建内容，预设库始终来自常量，不写入本地文件。
+ *
+ * 容器本身只由三项 meta 原生类型组成，故契约定义在此处；
+ * 服务层与视图层一律从 `meta` 取用，不再各写一份同构容器。
+ */
+export interface NarrativeLibrary {
+    domains: HorrorDomain[]
+    atoms: HorrorAtom[]
+    aesthetics: HorrorAesthetic[]
 }
 
 /**

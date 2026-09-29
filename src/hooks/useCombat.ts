@@ -1,203 +1,147 @@
 /**
- * 多敌人模型：
- * - 所有敌人同时在场。
- * - 敌人回合按敌人数组索引顺序逐一行动。
- * - 每个敌人拥有独立 instanceId、行动点、蓄反槽、效果存储与意图。
+ * 战斗钩子（React 绑定层）
  *
- * 已实现（与 interface.ts CombatDynamicState 注释逐条对齐）：
+ * 本文件是战斗引擎与 React 之间的唯一接线处，只做三件事：
+ * 1. 维护战斗状态容器（敌人 / 友方 / 战场 / 日志 / 立即行动窗口 / 蓄反询问）；
+ * 2. 编排阶段推进与演出节奏（异步回合、动画延时、音效）；
+ * 3. 对外暴露动作接口（executeTactic / moveAlly / endPlayerPhase / getAttackForecast 等）。
  *
- * 速度 / 行动点：
- * - speed = 敏捷值
- * - actionPoint.base = floor(speed / 5)
- * - actionPoint.current = 当前可用
- * - actionPoint.advanced = 下回合已被蓄反 / 差反预支
- *
- * 友方结果序列（算法唯一真源见 meta/tools.ts 的「战斗序列生成」区段）：
- * - 按武器槽位分槽预生成：主手 / 副手各一条攻击序列，主副手皆空时一条统一序列
- *   （玩家主手远程、副手近程时两者序列不同），另有常驻防御序列一条
- * - 预生成长度 = stamina <= 0 ? 0 : floor(stamina / 10)
- * - 攻击按本次实际使用的武器消费对应槽位，并同步推进全部序列槽
- * - 序列耗尽时扣除一定量 stamina（maxStamina × 10%），随后重新生成
- * - 若扣除后仍无法生成序列（长度 0），不扣除 stamina，实体无法行动
- * - 实体数值因增益 / 减益变化时不重新生成序列
- * - 预测深度 n：will 为 50 时 n 为 1，此后每 5 点 will 额外 +1；will 小于 50 时 n 为 0
- * - getVisibleResultSequence 仅裁剪 UI 可见长度，不改变实际结算
- *
- * 武器类型特性（唯一真源见 meta/tools.ts 的 getWeaponTrait，逐条对应 type.ts 的 WeaponType 注释）：
- * - 挥动类（wave / both_wave）：对目标所在格内的其他目标造成 判定值 ÷ 其他目标数（向上取整）的溅射；
- * - 刺击类（prick / both_prick）：暴击无视目标全部 defense；
- * - 双手刺击（both_prick）：任意敌人进入攻击范围时立刻借机攻击一次（不消耗 AP，每个进入事件至多一次）；
- * - 盾牌类：partial 免伤上限可达 1；双手盾的防御序列不再出现 dodge 与 fail；
- * - 狙击步枪：可消耗 1 AP 瞄准使下一击升 1 档（原为 crit 则伤害翻倍）；
- *   暴击无视 0.3 defense；距离小于最佳攻击距离 12 格时按亏损比例降级（贴身可 crit → miss）；
- * - 冲锋枪：判定后若仍有剩余 AP，可消耗 1 点追加判定，所有结果取最优者结算；
- * - 手枪：另一手为空获得命中加成；本回合未移动时首次攻击不消耗 AP；
- * - 霰弹枪：对射程内所有目标同时造成伤害，且距离越近伤害越高；
- * - 弩：另一手为空获得命中加成；每次攻击后必须消耗 1 AP 装填，否则无法再次攻击；
- * - 单手武器（wave / prick / pistol / crossbow）：另一手为空时攻击序列质量提升且命中基准 +1。
- *
- * 敌方：
- * - 不预生成结果序列
- * - 攻击 / 防御值在执行前一刻根据模板四维动态计算
- * - 意图由 intentDistribution 权重表驱动
- *
- * 攻击结果：
- * - miss = 0
- * - graze ∈ [0, hit)
- * - hit = 攻击基准
- * - crit ∈ [hit, hit + 暴击加成]；暴击加成取武器 crit.bonus，空手取实体力量
- *
- * 防御结果：
- * - fail = 0
- * - partial 的值即最终免伤比 ∈ [常驻免伤, 最大免伤]（盾牌类最大免伤可达 1）
- * - dodge = 1
- *
- * 伤害结算顺序：
- * - 防御结果 → 最终免伤比 → 护盾 → 生命值
- * - 护盾位于防御结果之后、生命值之前
- *
- * 攻击基准：
- * - 敌人 = damage（模板四维，cthulhu / immovable 通用）
- * - 我方 近程（melee） = combatBonus × (力量 + 武器伤害)
- * - 我方 远程（range） = combatBonus × 武器伤害
- * - 我方 空手 = combatBonus × 力量值
- * - 战斗增益 = clamp(1.0 + (wisdom - 3) × 0.05, 0.5, 2.0)
- *
- * 战场空间（二维多轨 + 掩体，契约见 interface.ts 的 BattleMap / Cover / EnvironmentModifier）：
- * - 坐标 = { x: 纵深, y: 轨道 }；x ∈ BattleMap.depthRange，y ∈ [0, laneCount - 1]。
- * - 距离 = 切比雪夫距离 max(|Δx|, |Δy|)。
- * - 位移四向：forward / backward 沿纵深轴，lane_left / lane_right 换轨；
- *   每步消耗 MOVE_AP_COST + EnvironmentModifier.moveCostDelta 行动点。
- * - 掩体：不可通行的掩体格阻断位移；攻击线路被掩体拦截时，
- *   按 coverRate 概率使命中降一档，并按 coverRate 吸收伤害转由掩体耐久承受；
- *   仅声明了 `canBeDestoryed` 的掩体可被摧毁（该字段即最大耐久），hp 归零即失效。
- *   紧贴攻击者的掩体不计入拦截——射击方可以从掩体后探身绕出身前那一格再瞄准。
- * - 环境修正：accuracyBonus 为全局命中修正（负值降档、正值升档），
- *   weaponTypeModifier 按攻击者武器类型提供伤害乘区与额外命中修正。
- * - 攻击战术仅在目标距离 ≤ 施法者主手武器 range 时可用：
- *   普通武器 range ∈ [1, 12]（精确档位），魔法类 range = 0 视为无视攻击距离。
- *   无武器视为距离 1。
- * - 敌人超出攻击距离时会主动逼近（CombatIntent.approach）：
- *   逼近按四向 BFS 绕开掩体寻路（findNextStepToward），不会卡死在掩体墙后。
- *
- * instant 真实伤害：
- * - 不参与任何正常结算，不消费结果序列
- * - 无视护盾、免伤、防御判定，不触发蓄反
- * - floor(weapon.damage × (1 + floor(will / 10) × 0.5) × combatBonus × 0.75)
- *
- * 蓄反 / 差反（敌我双方对称适用，攻击结算后即时询问）：
- * - 蓄反槽按「owner（可预支的一方）× trigger（发起攻击的一方）」成对维护，槽与槽互不合并；
- * - 积累：任意单位发起攻击时（无论是否命中 / 被闪避，instant 除外），
- *   它对面的所有速度大于它的角色，各自在「自己 × 攻击方」槽内按 |速度差| 累积蓄反值。
- *   与「谁被攻击」无关：一次攻击同时喂养对面所有更快角色的槽；
- * - 预支配额：蓄反与差反共享同一额度——单回合内两类的预支行动点加值合计（蓄反 n 与差反 2n 累加）
- *   不得超过该角色的 actionPoint.base + actionPoint.current；
- *   额度耗尽即不再发起询问；每次预支优先消耗 current，后记入下回合 advanced 债务（扣 base）；
- * - 蓄反：与任意角色之间的槽达 5n 时当场询问槽拥有者：
- *   消耗该槽 5n 点蓄反值、预支 n 点行动点，开启可用行动点为 n 的「立即行动」窗口；
- *   n 由槽值决定，受剩余预支配额截断；
- * - 差反：攻击方对面所有速度 ≥ 10 的角色都可被询问：
- *   由其自行选择预支 2n 点行动点（2n 受剩余预支配额与可承受额度限制，
- *   档位为不超过该上限的 2 的倍数），开启可用行动点为 n 的「立即行动」窗口（不消耗蓄反值）；
- * - 「立即行动」窗口内可进行任意行动，每次行动按其自身行动点成本消耗窗口行动点：
- *   窗口可用行动点 = n，故「最多执行 n 次」仅在每次行动消耗 1 点时成立，
- *   行动点消耗更多的行动会相应减少次数；攻击不再限制次数；
- *   行动点耗尽即窗口结束，也可随时主动结束窗口；
- * - 顺序：优先蓄反，后差反；玩家方始终询问（单位卡片可设置跳过），
- *   AI 方受 Settings.accumulateCounterEnabled / differentialCounterEnabled 控制（默认关闭）；
- * - 若本次预支将导致下回合行动为负，则引擎不发起询问；
- * - 阶段结束时清算全场蓄反槽：该实体名下的未消耗蓄反值 × 0.1 向上取整转化为额外行动点，
- *   在其下个回合开始时到账（蓄反值由攻击方在其阶段内积累，故清算挂在阶段结束，
- *   否则敌方阶段积累的我方槽会整轮残留且额外 AP 延后一轮）；
- *   单位阵亡时，以它为 owner / trigger 的槽立即清除；
- * - 任一方回合开始时，该方上回合未蓄反 / 差反的角色额外 +1 行动点。
- *
- * pendingDefense：
- * - 防御战术 / 防御意图主动布设，受击时 FIFO 消费
- * - 契约未声明层数上限：已布设的每一层都保留，不截断
- *
- * 可选 counterDecision 回调用于接入 UI / LLM 决策蓄反 / 差反预支。
+ * 引擎规则不在此实现，也不在此重复声明契约：
+ * - 多敌人模型、速度与行动点、友方结果序列、武器类型特性、蓄反 / 差反、pendingDefense、
+ *   战场空间与伤害结算顺序的完整说明，以及全部纯函数实现，
+ *   见 `meta/tools.ts` 第 18 节「战斗引擎运行时」；
+ * - 战场坐标、位移方向、蓄反请求、立即行动窗口、武器特性状态、开战上下文与战前预测的
+ *   类型契约，见 `meta/interface.ts`。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { GameState } from '../meta';
 import type {
+    AllyResultSequence,
+    AnyTactic,
     AttackDamageScale,
+    AttackForecast,
+    AttackForecastOdds,
+    AttackForecastSource,
     AttackResult,
-    AttributeType,
+    AttackSlot,
     BattleMap,
+    BattleStartContext,
     CombatAlly,
     CombatDynamicState,
     CombatEnemy,
     CombatIntent,
+    CombatPosition,
     CombatStatus,
     CompanionDynamicState,
     CompanionTemplate,
+    CounterAdvanceRequest,
+    CounterDecisionResult,
     CounterType,
     Cover,
     DefenseResult,
     DotSoundType,
-    DynamicVitalType,
     EnemyTemplate,
     Entity,
     EnvironmentModifier,
     EquipState,
+    InsertActionWindow,
     IntentType,
     ItemInstance,
     ItemTemplate,
     LogType,
-    PlayerDynamicState,
-    PlayerTemplate,
+    MoveDirection,
     PlayerState,
-    Tactic,
     TacticEffectType,
     Target,
-    VitalType,
     WeaponInstance,
-    WeaponOwnTactic,
     WeaponType,
 } from '../meta';
 import {
     ATTACK_RESULT_LADDER,
+    ATTACK_SLOTS,
+    COMBAT_CONFIG,
     MAX_PARTIAL_REDUCTION,
+    RESULT_MODIFIER_TYPES,
+    addAccumulateCounter,
     addItemToInventory,
-    applyAimBonus,
+    applyCombatToDynamic,
+    applyVitalEffect,
+    attackValueAt,
     calculateCombatBonus,
     calculateEnemyAttackValue,
     calculateInstantDamage,
     canRegenerateSequence,
     clamp,
+    consumeCounterPair,
+    consumeJudgementStatuses,
+    createCombatantEntity,
+    createEnemyEntity,
     createItemInstance,
     createRuntimeCover,
+    findNextStepToward,
+    fix1,
+    formatCombatNumber,
     generateAllyResultSequence,
-    generateInstanceId,
     getAgilityEvasion,
+    getAllyDamageScale,
+    getAllyTargetId,
     getAttackDamageScale,
-    getAttackWeights,
-    getCloseRangeDamageMultiplier,
+    getAttackOdds,
+    getBattleDistance,
+    getCombatResultModifiers,
+    getCounterPairValue,
     getCoverMaxDurability,
     getCritDefensePierce,
+    getCritRangeProfile,
     getDefenseMaxReduction,
+    getEnemyDamageScale,
+    getEnemyReductionRange,
     getEquipPartialReduction,
     getExhaustStaminaCost,
     getPredictionDepth,
     getPrimaryWeapon,
     getSequenceLength,
+    getSequenceShift,
+    getShieldWeapon,
     getSniperDowngradeChance,
     getSplashDamage,
+    getSteppedCell,
+    getTacticWeaponType,
     getVisibleResultSequenceLength,
     getWeaponTrait,
-    isAttributeType,
+    isCellWalkable,
     isCoverDestructible,
-    isCoverDestroyed,
+    isDashWeapon,
+    isDisplacementEffect,
+    isDynamicVitalType,
+    isSequenceEffect,
+    isVitalEffectType,
     isVitalType,
+    isWeaponUsable,
+    isWithinRange,
     mergeDeep,
     normalizeEquipState,
+    pickOne,
+    processDamageDeduction,
     randomInt,
+    rebuildSequence,
+    resolveAttackSlot,
+    resolveAttackWeapon,
+    resolveBattleModifiers,
     rollEnemyAttackResult,
     rollEntityDefenseResult,
-    safeDeepClone,
+    round1,
     safeNumber,
+    sequenceMinLength,
+    settleCounterSlots,
+    shiftAttackResult,
+    shiftDefenseResult,
+    spendActionPoint,
+    spendDefenseDurability,
+    spendWeaponUse,
+    storeStatusItem,
+    tickRoundStatuses,
 } from '../meta';
 import {
     DEFAULT_BATTLE_MAP,
@@ -207,203 +151,6 @@ import {
     getEquippedWeaponOwnTactics,
 } from '../constants';
 import { AudioService } from '../services';
-
-/** 我方可用战术：角色习得的常规战术 + 已装备武器持有的专属战术。 */
-export type AnyTactic = Tactic | WeaponOwnTactic;
-
-/** 我方结果序列（与元契约 `CombatAlly['resultSequence']` 同构）。 */
-type AllySequence = CombatAlly['resultSequence'];
-
-/** 攻击序列槽位：主手 / 副手 / 空手统一。 */
-const ATTACK_SLOTS = ['main', 'side', 'attack'] as const;
-type AttackSlot = (typeof ATTACK_SLOTS)[number];
-
-/** 命中阶梯顺序取自 meta 的唯一真源，冲锋枪「取最优者」与档位比较共用。 */
-const ATTACK_LADDER_ORDER = ATTACK_RESULT_LADDER;
-
-/**
- * 武器特性动作与武器专属战术的对应关系。
- *
- * 契约把「瞄准」与「装填」声明为武器**类型特性**（sniper_rifle 的 1 AP 瞄准、
- * crossbow 的 1 AP 装填），而 `constants/tactic/weapon.ts` 为它们各自提供了一条 'U' 战术
- * 作为玩家的操作入口。引擎需要把这两条战术识别为特性动作而非普通辅助战术，
- * 否则「瞄准」只会加两点感知、不会提升下一击档位，「装填」则永远解不开弩的锁。
- *
- * 键为战术 id（`weapon_${weaponOwn}_${id}`），值与武器特性字段同名，便于双向核对。
- */
-const WEAPON_TRAIT_ACTIONS: Record<string, 'aim' | 'reload'> = {
-    weapon_sniper_rifle_steady_aim: 'aim',
-    weapon_crossbow_rearm: 'reload',
-};
-
-/** 战斗日志中的数值格式化：整数不带小数点，小数保留一位。 */
-const formatCombatNumber = (value: number): string => {
-    const n = safeNumber(value);
-    return Number.isInteger(n) ? String(n) : n.toFixed(1);
-};
-
-const pickOne = <T>(list: T[]): T | undefined =>
-    list.length === 0 ? undefined : list[randomInt(0, list.length - 1)];
-
-//==============================================================================
-// 常量
-//==============================================================================
-const CC = {
-    ANIM_DELAY: 150,
-    DEFAULT_BUFF_DURATION: 2,
-    LOG_LIMIT: 200,
-    ENEMY_ACTION_GUARD: 10,
-    COUNTER_TO_AP_RATIO: 0.1,
-    /** 蓄反槽每积满 5 点（5n）即消耗 5n 并预支 n 点行动点 */
-    ACCUMULATE_COUNTER_THRESHOLD: 5,
-    /**
-     * 差反的预支倍率 / 档位步长：预支 2n 点行动点换取窗口 n 点行动点，
-     * 档位取 2 的倍数（2、4、…），且 2n <= actionPoint.base。
-     */
-    DIFFERENTIAL_COUNTER_COST: 2,
-    DIFFERENTIAL_COUNTER_SPEED: 10,
-    /** 单次位移（纵深推进 / 换轨）的基础行动点消耗 */
-    MOVE_AP_COST: 1,
-    /** 敌人模板缺失 range 时的兜底攻击距离 */
-    ENEMY_DEFAULT_RANGE: 3,
-    /**
-     * 冲锋枪「追加判定取最优」的单次攻击内最大追加次数。
-     * 契约允许追加至 AP 耗尽，此处仅作防御性上限，避免异常 AP 值导致死循环。
-     */
-    REPEAT_FIRE_GUARD: 12,
-    /** 狙击步枪距离降级时，单次降级事件最多跨越的档位数（crit → miss 恰为 3 档）。 */
-    SNIPER_MAX_DOWNGRADE_STEPS: 3,
-    /**
-     * 我方部署锚点在纵深轴上的比例位置（0.5 = 战线正中）。
-     * 敌人部署带在同一条轴 75% 之后，双方初始间隔由地图 depthRange 推导。
-     */
-    ALLY_DEPLOY_RATIO: 0.5,
-    /** 敌方部署带起点在纵深轴上的比例位置。 */
-    ENEMY_DEPLOY_RATIO: 0.75,
-    /**
-     * 伏击（isAmbushed = 1）时的部署压缩比例：
-     * 我方锚点向敌方推进、敌方部署带向我方推进各 span × 该值 × isAmbushed。
-     */
-    AMBUSH_SHIFT_RATIO: 0.25,
-} as const;
-
-const ATTR_KEYS: ReadonlyArray<AttributeType> = [
-    'strength',
-    'agility',
-    'wisdom',
-    'awareness',
-    'will',
-    'cthulhu',
-];
-
-const VITAL_TO_DYNAMIC: Record<VitalType, DynamicVitalType> = {
-    maxHp: 'hp',
-    maxSanity: 'sanity',
-    maxStamina: 'stamina',
-    maxVigor: 'vigor',
-};
-
-/**
- * 恢复类效果类型。
- *
- * 契约已把效果键与动态体征键统一为同一套字面量（hp / sanity / stamina / vigor），
- * 不再需要 heal_* 这类中间别名，也就不再做键名映射。
- */
-const HEAL_TYPES: ReadonlyArray<DynamicVitalType> = ['hp', 'sanity', 'stamina', 'vigor'];
-
-/**
- * 预支询问的决议。
- * - false：拒绝（保留 / 放弃）；
- * - true：接受，采用请求中的默认预支档位；
- * - number：接受，并指定预支档位（仅差反：2n 档位，须落在该单位可选档位表内）。
- */
-export type CounterDecisionResult = boolean | number;
-
-export interface CounterAdvanceRequest {
-    /**
-     * 蓄反：单槽每积满 5 点即可发起一次询问。
-     * 差反：受击且速度不小于 10 时可被询问。
-     */
-    type: CounterType;
-    /**
-     * 申请预支的实体
-     *
-     * 玩家为 player；同伴为模板 id；敌人为 instanceId
-     */
-    entityId: string;
-    /**
-     * 本次将要预支的行动点
-     *
-     * 蓄反 = n；差反 = 2n（由该单位选择，请求给出的是默认档位）
-     */
-    apToAdvance: number;
-    /**
-     * 「立即行动」窗口可消耗的行动点总量
-     *
-     * 蓄反 = n；差反 = n（= 2n / 2）
-     */
-    windowAp: number;
-    /**
-     * 本回合剩余预支配额 = actionPoint.base + actionPoint.current − 本回合已预支合计
-     * （蓄反 n 与差反 2n 共享）。
-     * 无论蓄反 / 差反各触发多少次，预支加值合计都不得超过 base + current；用尽即不再询问。
-     */
-    existQuota: number;
-}
-
-/**
- * 武器特性回合状态（契约 `WeaponType` 各分支声明的攻击特性所需的运行时标记）。
- *
- * 语义约定：`needsReload` 为「待装填」而非「已装填」——初值 false 表示弩出厂即上弦，
- * 避免新单位因初值语义被自己的装填规则锁死第一次攻击。
- */
-export interface WeaponTraitState {
-    /** 狙击步枪已瞄准：下一次攻击判定提升 1 档（原为 crit 则伤害翻倍）。 */
-    aimed: boolean
-    /** 弩已击发，需消耗 1 AP 装填后才能再次攻击。 */
-    needsReload: boolean
-    /** 本回合是否移动过：手枪「未移动则首次攻击免 AP」的判定依据。 */
-    movedThisTurn: boolean
-    /** 手枪的免费首次攻击本回合是否已用掉。 */
-    freeAttackUsed: boolean
-}
-
-/**
- * 「立即行动」窗口（蓄反 / 差反预支的直接产物）。
- *
- * 窗口内可进行任意行动（攻击 / 防御 / 移动 / 其他战术均可），
- * 每次行动按其自身行动点成本消耗窗口行动点，可执行「最多 apMax 次」1 点成本的行动；
- * 行动点耗尽即窗口结束，也可随时主动结束。
- */
-export interface InsertActionWindow {
-    /** 窗口归属单位（player / 同伴 id）。 */
-    unitId: string;
-    /** 窗口内剩余行动点。 */
-    apLeft: number;
-    /** 窗口行动点总量：蓄反 = n；差反 = n（= 2n / 2）。 */
-    apMax: number;
-}
-
-/**
- * 进入战斗时的战场上下文。
- *
- * 由调用方（节点遭遇 / 庇护所事件等）注入，引擎据此解析战场地图与部署形态。
- */
-export interface BattleStartContext {
-    /** 当前节点键名，用于按约定匹配该节点的专属战场地图。 */
-    nodeId?: string;
-    /** 节点显式配置的 map 字段；优先于按节点键名的约定匹配。 */
-    mapOverride?: string;
-    /** 伏击不利系数（0~1）：越大，我方锚点越靠前、敌方部署带压得越近。 */
-    isAmbushed?: number;
-    /**
-     * 显式指定敌人生成数量。
-     *
-     * 由调用方（如庇护所事件的 impact.spawnEnemy）决定时优先于威胁等级推导；
-     * 缺省或为 0 时按威胁等级推导。
-     */
-    enemyCount?: number;
-}
 
 interface UseCombatParams {
     playerState: PlayerState;
@@ -446,7 +193,7 @@ interface UseCombatReturn {
      * 仅用于 UI 展示，不参与实际战斗结算。
      * 敌人目标始终返回空序列。
      */
-    getVisibleResultSequence: (targetId: string) => AllySequence;
+    getVisibleResultSequence: (targetId: string) => AllyResultSequence;
     /**
      * 该单位的序列预测深度 n（契约 `CombatAlly.resultSequence`）：
      * will 为 50 时 n 为 1，此后每 5 点 will 额外 +1；will 小于 50 时 n 为 0。
@@ -503,11 +250,7 @@ interface UseCombatReturn {
     counterSkip: Record<string, Partial<Record<CounterAdvanceRequest['type'], boolean>>>;
     /** 设置 / 取消跳过开关。 */
     setCounterSkip: (unitId: string, type: CounterAdvanceRequest['type'], skip: boolean) => void;
-    /**
-     * 我方单位的武器特性回合状态（瞄准 / 待装填 / 本回合移动 / 免费攻击已用）。
-     * 供 UI 展示「已瞄准」「待装填」等契约特性提示。
-     */
-    weaponStates: Record<string, WeaponTraitState>;
+
     /**
      * 「立即行动」窗口：预支结算后我方单位的立即行动窗口（敌方窗口由引擎自动执行，不在此列）。
      * 每次行动按其自身行动点成本消耗窗口行动点；行动点耗尽即窗口结束，可随时手动结束。
@@ -518,333 +261,16 @@ interface UseCombatReturn {
 }
 
 //==============================================================================
-// 工具函数
+// 表现层胶水（演出节奏与音效，不进入元工具）
 //==============================================================================
-/** 我方单位的目标键：0 号位恒为玩家，其余取同伴 id。 */
-export const getAllyTargetId = (ally: { id: string }, idx: number): string =>
-    idx === 0 ? 'player' : ally.id;
 
-const round1 = (value: number): number => parseFloat(safeNumber(value).toFixed(1));
-const fix1 = (value: number): number => Math.max(0, round1(value));
+/** 战斗演出单步延时（毫秒）。 */
+const ANIM_DELAY = 150;
 
-/**
- * 攻击距离判定。
- * range = 0 视为无视攻击距离（魔法 / 能量 / 无弹道衰减武器），恒可攻击。
- */
-const isWithinRange = (range: number, distance: number): boolean =>
-    range === 0 || distance <= range;
+/** 战斗日志保留条数上限。 */
+const COMBAT_LOG_LIMIT = 200;
 
-//------------------------------------------------------------------------------
-// 战场空间（二维多轨 + 掩体）
-//------------------------------------------------------------------------------
-
-/**
- * 战场坐标：x = 纵深（战线前后轴），y = 轨道（左右轴，0 起）。
- *
- * 直接取自契约 `CombatDynamicState.location`，不重复声明同构结构。
- */
-export type CombatPosition = CombatDynamicState['location'];
-
-/** 四向位移：forward = 纵深推进，backward = 纵深撤离，lane_left / lane_right = 换轨。 */
-export type MoveDirection = 'forward' | 'backward' | 'lane_left' | 'lane_right';
-
-
-/**
- * 战前预测中的单条命中 / 伤害修正来源。
- *
- * 来源必须可辨识：掩体拦截、全局环境修正、武器类型修正分别标注，便于玩家判断
- * 「这个减益是掩体给的，还是全场都在吃的」。
- */
-export interface AttackForecastSource {
-    /** 来源类型：掩体拦截 / 全局环境修正 / 武器类型修正。 */
-    kind: 'cover' | 'environment' | 'weapon';
-    /** 来源展示名（掩体名 / 「战场环境」/「武器类型修正」）。 */
-    label: string;
-    /** 命中档位修正：负数降档、正数升档、0 只影响伤害。 */
-    steps: number;
-    /** 该修正生效的概率（0 ~ 1）。 */
-    chance: number;
-    /** 伤害乘区（1 = 不影响伤害；掩体为 1 - coverRate）。 */
-    damageMultiplier: number;
-}
-
-/** 战前预测的单个命中档位：出现概率与该档位的代表伤害（已含全部乘区）。 */
-export interface AttackForecastOdds {
-    ladder: AttackResult[0];
-    /** 最终落入该档位的概率（0 ~ 1，已含三处修正的档位偏移）。 */
-    chance: number;
-    /** 该档位的代表伤害：擦伤取命中值对半、命中取攻击基准、暴击取暴击上限。 */
-    damage: number;
-}
-
-/**
- * 战前预测（我方一次攻击的完整链路）。
- *
- * 给的是**概率**而非下一次掷骰结果：档位分布由感知 / 疲劳权重推导（与序列生成同源），
- * 是玩家凭属性本就能估出的信息，不会泄漏引擎预生成的序列内容。
- * 各来源对档位的偏移按概率卷积进最终分布；伤害乘区与掩体吸收是确定项。
- */
-export interface AttackForecast {
-    /** 命中档位分布：落空 / 擦伤 / 命中 / 暴击（索引与命中阶梯一致）。 */
-    odds: AttackForecastOdds[];
-    /** 命中与伤害减益的来源明细（逐条列出，用于标注出处）。 */
-    sources: AttackForecastSource[];
-    /**
-     * 环境 + 武器合计的档位修正（一次判定）。
-     *
-     * 掩体拦截是另一次独立判定，其档位与概率由 `sources` 中的 cover 项给出，不重复携带。
-     */
-    modifierRoll: { steps: number; chance: number };
-    /** 当前距离与武器射程（0 = 无限）。 */
-    distance: number;
-    range?: number;
-    weaponType?: WeaponType;
-    /** 瞬时真实伤害武器：跳过一切常规结算，预测只作说明。 */
-    instant: boolean;
-}
-
-/** 战场距离 = 切比雪夫距离 max(|Δx|, |Δy|)。 */
-export const getBattleDistance = (a: CombatPosition, b: CombatPosition): number =>
-    Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
-
-/** 坐标是否落在地图范围内。 */
-const isInsideBattleMap = (map: BattleMap, cell: CombatPosition): boolean =>
-    cell.x >= map.depthRange[0] &&
-    cell.x <= map.depthRange[1] &&
-    cell.y >= 0 &&
-    cell.y < Math.max(1, map.laneCount);
-
-/** 按四向指令推导目标格（引擎与 UI 共用）。 */
-export const getSteppedCell = (from: CombatPosition, dir: MoveDirection): CombatPosition => {
-    switch (dir) {
-        case 'forward':
-            return { x: from.x + 1, y: from.y };
-        case 'backward':
-            return { x: from.x - 1, y: from.y };
-        case 'lane_left':
-            return { x: from.x, y: from.y - 1 };
-        default:
-            return { x: from.x, y: from.y + 1 };
-    }
-};
-
-/** 掩体是否仍在提供掩护：契约规定 `hp` 归零即被摧毁，未登记 `hp` 者不可摧毁。 */
-const isCoverAlive = (cover: Cover): boolean => !isCoverDestroyed(cover);
-
-/**
- * 取该格上的掩体。
- *
- * 落点单点维护在契约 `BattleMap.covers` 的 `[id, x, y]` 元组里，
- * 掩体实例只承载覆盖率、通行性与耐久。
- */
-export const getCoverAtCell = (
-    map: BattleMap,
-    covers: Cover[],
-    cell: CombatPosition
-): Cover | undefined => {
-    const id = map.covers?.find(([, x, y]) => x === cell.x && y === cell.y)?.[0];
-    return id === undefined ? undefined : covers.find((cover) => cover.id === id);
-};
-
-/** 该格是否可通行（地图内，且格上无存活的不通行掩体）。 */
-export const isCellWalkable = (
-    map: BattleMap,
-    covers: Cover[],
-    cell: CombatPosition
-): boolean => {
-    if (!isInsideBattleMap(map, cell)) return false;
-    const cover = getCoverAtCell(map, covers, cell);
-    return !(cover && isCoverAlive(cover) && cover.passable === undefined);
-};
-
-/**
- * 攻击者到目标直线上「严格位于两者之间」的格子。
- * 端点格（攻击者 / 目标自身所在格）不计入：站在掩体格上属于依托掩体，不算被掩体遮挡。
- */
-const cellsBetween = (from: CombatPosition, to: CombatPosition): CombatPosition[] => {
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
-    const steps = Math.max(Math.abs(dx), Math.abs(dy));
-    if (steps <= 1) return [];
-    const cells: CombatPosition[] = [];
-    for (let i = 1; i < steps; i += 1) {
-        const cell = {
-            x: Math.round(from.x + (dx * i) / steps),
-            y: Math.round(from.y + (dy * i) / steps),
-        };
-        if (!cells.some((entry) => entry.x === cell.x && entry.y === cell.y)) cells.push(cell);
-    }
-    return cells;
-};
-
-/**
- * 攻击线路上第一个提供掩护的掩体（未摧毁者）。
- *
- * 紧贴攻击者的掩体不计入拦截：射击方可以从掩体后探身、绕出身前那一格再瞄准，
- * 掩体只该保护躲在它后面的人，不该反过来惩罚贴着它开火的人。
- * 只跳过紧贴攻击者的那一个掩体，线路更远处的掩体照常拦截。
- */
-const findBlockingCover = (
-    map: BattleMap,
-    covers: Cover[],
-    from: CombatPosition,
-    to: CombatPosition
-): Cover | undefined =>
-    cellsBetween(from, to)
-        .filter((cell) => getBattleDistance(from, cell) > 1)
-        .map((cell) => getCoverAtCell(map, covers, cell))
-        .find((cover): cover is Cover => cover !== undefined && isCoverAlive(cover));
-
-/**
- * 敌方寻路的下一步：在可行格上做四向 BFS（绕开不可通行掩体与地图边界），
- * 取「距目标步数更少」的相邻格。
- *
- * 早期实现按坐标轴贪心推进：只要前方两轴都被掩体占住就永久卡死
- * （贴在掩体墙或凹角上时最明显）。改为真正的绕行寻路后，
- * 敌人会自己找缺口绕过去；目标不可达时返回 undefined。
- */
-const findNextStepToward = (
-    map: BattleMap,
-    covers: Cover[],
-    from: CombatPosition,
-    to: CombatPosition
-): CombatPosition | undefined => {
-    const key = (cell: CombatPosition) => `${cell.x},${cell.y}`;
-    const neighbors = (cell: CombatPosition): CombatPosition[] => [
-        { x: cell.x + 1, y: cell.y },
-        { x: cell.x - 1, y: cell.y },
-        { x: cell.x, y: cell.y + 1 },
-        { x: cell.x, y: cell.y - 1 },
-    ];
-
-    // 从目标反向洪水填充，得到每个可行格到目标的步数。
-    const steps = new Map<string, number>([[key(to), 0]]);
-    const queue: CombatPosition[] = [to];
-    while (queue.length > 0) {
-        const cell = queue.shift() as CombatPosition;
-        const distance = steps.get(key(cell)) ?? 0;
-        for (const neighbor of neighbors(cell)) {
-            if (!isInsideBattleMap(map, neighbor)) continue;
-            if (!isCellWalkable(map, covers, neighbor)) continue;
-            if (steps.has(key(neighbor))) continue;
-            steps.set(key(neighbor), distance + 1);
-            queue.push(neighbor);
-        }
-    }
-
-    const current = steps.get(key(from));
-    let next: CombatPosition | undefined;
-    let bestScore = Number.POSITIVE_INFINITY;
-    for (const candidate of neighbors(from)) {
-        const distance = steps.get(key(candidate));
-        if (distance === undefined) continue;
-        // 不原地踏步也不绕远：只有严格更近的格子才走。
-        if (current !== undefined && distance >= current) continue;
-        // 同一步数时优先走「离目标更近」的那一侧，让步态看起来自然。
-        const score =
-            distance * 100 + Math.abs(candidate.x - to.x) + Math.abs(candidate.y - to.y);
-        if (score < bestScore) {
-            bestScore = score;
-            next = candidate;
-        }
-    }
-    return next;
-};
-
-/**
- * 战场修正中与随机无关的部分：拦截掩体、命中档位修正、武器乘区。
- *
- * 实弹结算（applyAttackModifiers）与战前预测（getAttackForecast）共用本函数，
- * 保证「面板上看到的减益」与「真正打到身上的减益」来自同一套判定。
- */
-const resolveBattleModifiers = (
-    map: BattleMap,
-    covers: Cover[],
-    from: CombatPosition | undefined,
-    to: CombatPosition | undefined,
-    weaponType?: WeaponType
-): {
-    /** 线路上第一个拦截掩体（不含紧贴攻击者的掩体）。 */
-    blockingCover?: Cover;
-    /** 环境命中 + 武器命中的合计档位修正（含符号）。 */
-    accuracyDelta: number;
-    /** 武器类型修正（契约 `EnvironmentModifier.weaponTypeModifier` 的单类型切片）。 */
-    weaponModifier?: NonNullable<EnvironmentModifier['weaponTypeModifier']>[WeaponType];
-    /** 武器伤害乘区（无武器修正时为 1）。 */
-    damageMultiplier: number;
-} => {
-    const weaponModifier = weaponType
-        ? map.modifiers?.weaponTypeModifier?.[weaponType]
-        : undefined;
-    return {
-        blockingCover: from && to ? findBlockingCover(map, covers, from, to) : undefined,
-        accuracyDelta:
-            safeNumber(map.modifiers?.accuracyBonus, 0) +
-            safeNumber(weaponModifier?.accuracyDelta, 0),
-        weaponModifier,
-        damageMultiplier: Math.max(0, safeNumber(weaponModifier?.damageMultiplier, 1)),
-    };
-};
-
-/** 命中阶梯：miss < graze < hit < crit。 */
-const ATTACK_LADDER: ReadonlyArray<AttackResult[0]> = ['miss', 'graze', 'hit', 'crit'];
-
-/**
- * 命中阶梯各档位的伤害基准值。
- *
- * 与序列生成读同一份攻击伤害尺度：擦伤取命中值的对半，暴击直接取暴击上限
- * （而非固定 1.5 倍），保证「换档后的伤害」与「序列里抽到的伤害」同口径。
- */
-const attackValueAt = (kind: AttackResult[0], scale: AttackDamageScale): number => {
-    const hit = Math.max(0, safeNumber(scale.hit));
-    switch (kind) {
-        case 'miss':
-            return 0;
-        case 'graze':
-            return Math.max(0, Math.floor(hit * 0.5));
-        case 'crit':
-            return Math.max(0, Math.floor(Math.max(0, safeNumber(scale.critMax))));
-        default:
-            return Math.max(0, Math.floor(hit));
-    }
-};
-
-/**
- * 命中修正：按阶梯整档移动。
- * steps < 0 降档（掩体拦截 / 环境命中惩罚），steps > 0 升档（环境命中增益）。
- * 伤害值按新档位基准重算，避免出现「命中却 0 伤害」这类不自洽结果。
- */
-const shiftAttackResult = (
-    result: AttackResult,
-    scale: AttackDamageScale,
-    steps: number
-): AttackResult => {
-    if (steps === 0) return result;
-    const idx = ATTACK_LADDER.indexOf(result[0]);
-    if (idx < 0) return result;
-    const nextIdx = clamp(idx + steps, 0, ATTACK_LADDER.length - 1);
-    if (nextIdx === idx) return result;
-    const kind = ATTACK_LADDER[nextIdx];
-    return [kind, attackValueAt(kind, scale)];
-};
-
-/** 敌人攻击尺度：无武器，暴击倍率取下限 1.5（与 rollEnemyAttackResult 同源）。 */
-const getEnemyDamageScale = (attackValue: number): AttackDamageScale => {
-    const hit = Math.max(0, safeNumber(attackValue));
-    return { hit, grazeMax: hit, critMax: Math.max(hit, Math.floor(hit * 1.5)) };
-};
-
-/** 我方攻击尺度：与序列生成完全同源（含主手武器与副手空置加成）。 */
-const getAllyDamageScale = (ally: CombatAlly, weapon: WeaponInstance | null): AttackDamageScale =>
-    getAttackDamageScale({
-        contextual: true,
-        strength: ally.strength,
-        wisdom: ally.wisdom,
-        weapon,
-        offhandEmpty: !normalizeEquipState(ally.equipment).weapons.side,
-    });
-
-const delay = (ms: number = CC.ANIM_DELAY) =>
+const delay = (ms: number = ANIM_DELAY) =>
     new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const playSfx = (sfx: DotSoundType) => {
@@ -854,497 +280,6 @@ const playSfx = (sfx: DotSoundType) => {
         // noop
     }
 };
-
-const isHealType = (type: string): type is DynamicVitalType =>
-    (HEAL_TYPES as readonly string[]).includes(type);
-
-const isShieldEffect = (type: TacticEffectType): boolean => type === 'shield';
-
-const isOverTimeEffect = (type: TacticEffectType): boolean =>
-    isHealType(type) || isShieldEffect(type);
-
-const applyImmediateEffect = (
-    dyn: CombatDynamicState,
-    type: TacticEffectType,
-    rawValue: number
-): CombatDynamicState => {
-    const value = round1(rawValue);
-    if (value === 0) return dyn;
-
-    let next: CombatDynamicState = { ...dyn };
-
-    if (isShieldEffect(type)) {
-        next.shield = Math.max(0, fix1(next.shield + value));
-        return next;
-    }
-    if (type === 'hp') {
-        next.hp = clamp(next.hp + value, 0, next.maxHp);
-        return next;
-    }
-    if (type === 'sanity') {
-        next.sanity = clamp(next.sanity + value, 0, next.maxSanity);
-        return next;
-    }
-    if (type === 'stamina') {
-        next.stamina = clamp(next.stamina + value, 0, next.maxStamina);
-        return next;
-    }
-    if (type === 'vigor') {
-        next.vigor = clamp(next.vigor + value, 0, next.maxVigor);
-        return next;
-    }
-    if (type === 'ap') {
-        // 'ap' 为带符号增量：正数补给行动点，负数削减行动点。
-        return {
-            ...next,
-            actionPoint: {
-                ...next.actionPoint,
-                current: Math.max(0, next.actionPoint.current + value),
-            },
-        };
-    }
-    if (isAttributeType(type)) {
-        const record = next as unknown as Record<string, unknown>;
-        if (typeof record[type] === 'number') {
-            // 玩家方 / 人形敌人：拥有完整六维，直接增减。
-            record[type] = Math.max(0, safeNumber(record[type]) + value);
-            return next;
-        }
-        // 新模型敌人（cthulhu / immovable）没有六维：
-        // 力量 → damage、敏捷 → speed 按语义映射；其余维度无对应项，效果不生效。
-        const mapped = type === 'strength' ? 'damage' : type === 'agility' ? 'speed' : undefined;
-        if (mapped) {
-            record[mapped] = Math.max(0, safeNumber(record[mapped]) + value);
-        }
-        return next;
-    }
-    if (isVitalType(type)) {
-        const currentKey = VITAL_TO_DYNAMIC[type];
-        const nextMax = Math.max(0, safeNumber(next[type]) + value);
-        next[type] = nextMax;
-        next[currentKey] = clamp(next[currentKey], 0, nextMax);
-        return next;
-    }
-    return next;
-};
-
-/**
- * 读取「owner × trigger」单槽的蓄反值。
- * 蓄反值按对维护：某单位与其他单位之间的槽独立累积，判定与消耗都不跨槽合并。
- */
-const getCounterPairValue = (
-    dyn: CombatDynamicState,
-    ownerId: string,
-    triggerId: string
-): number =>
-    dyn.accumulateCounter.reduce(
-        (sum, entry) =>
-            entry.ownerId === ownerId && entry.triggerId === triggerId
-                ? sum + safeNumber(entry.value)
-                : sum,
-        0
-    );
-
-/** 仅从「owner × trigger」单槽扣除蓄反值，其余槽保持原样。 */
-const consumeCounterPair = (
-    dyn: CombatDynamicState,
-    ownerId: string,
-    triggerId: string,
-    amount: number
-): CombatDynamicState => {
-    let remaining = Math.max(0, Math.floor(safeNumber(amount)));
-    if (remaining <= 0) return dyn;
-    const nextCounter: CombatDynamicState['accumulateCounter'] = [];
-    for (const entry of dyn.accumulateCounter) {
-        if (entry.ownerId !== ownerId || entry.triggerId !== triggerId || remaining <= 0) {
-            nextCounter.push(entry);
-            continue;
-        }
-        const take = Math.min(safeNumber(entry.value), remaining);
-        remaining -= take;
-        const value = safeNumber(entry.value) - take;
-        if (value > 0) nextCounter.push({ ...entry, value });
-    }
-    return { ...dyn, accumulateCounter: nextCounter };
-};
-
-/** 某单位名下全部蓄反槽的剩余总值（owner 视角，不跨槽合并判定）。 */
-const sumOwnedCounterSlots = (dyn: CombatDynamicState, ownerId: string): number =>
-    (dyn.accumulateCounter ?? []).reduce(
-        (sum, entry) => (entry.ownerId === ownerId ? sum + safeNumber(entry.value) : sum),
-        0
-    );
-
-/**
- * 回合结束结算：未消耗蓄反值 × 0.1 向上取整转为额外行动点，随后清空该单位全部蓄反槽。
- * 返回额外行动点与结算后的动态状态（纯函数，副作用由调用方处理）。
- */
-const settleCounterSlots = (
-    dyn: CombatDynamicState,
-    ownerId: string
-): { dyn: CombatDynamicState; extraAp: number } => {
-    const slots = dyn.accumulateCounter ?? [];
-    if (!slots.length) return { dyn, extraAp: 0 };
-    const owned = sumOwnedCounterSlots(dyn, ownerId);
-    return {
-        dyn: { ...dyn, accumulateCounter: slots.filter((entry) => entry.ownerId !== ownerId) },
-        extraAp: owned > 0 ? Math.ceil(owned * CC.COUNTER_TO_AP_RATIO) : 0,
-    };
-};
-
-const storeStatusItem = (list: CombatStatus[], item: CombatStatus): CombatStatus[] => {
-    const idx = list.findIndex((entry) => entry.type === item.type);
-    if (idx === -1) return [...list, item];
-    const mergedValue = round1(list[idx].value + item.value);
-    if (mergedValue === 0) return list.filter((_, i) => i !== idx);
-    return list.map((entry, i) =>
-        i === idx
-            ? { ...entry, value: mergedValue, duration: Math.max(entry.duration, item.duration) }
-            : entry
-    );
-};
-
-/**
- * 行动点。
- * base = floor(speed / 5)。
- * 序列长度为 0 时实体无法行动，base 可为 0。
- */
-const createActionPoint = (speed: number) => {
-    const base = Math.floor(safeNumber(speed) / 5);
-    return { base, current: base, advanced: 0 };
-};
-
-/**
- * 攻击档位概率分布（按命中阶梯顺序：miss / graze / hit / crit）。
- *
- * 权重口径与序列生成完全同源（见 meta/tools.ts 的 getAttackWeights），
- * 此处只做「权重 → 归一化概率」的读取，供战前预测使用。
- */
-const getAttackOdds = (awareness: number, fatigueCount: number = 0): number[] => {
-    const weights = getAttackWeights({ awareness, fatigueCount });
-    const total = ATTACK_LADDER.reduce((sum, key) => sum + Math.max(0, weights[key]), 0);
-    if (total <= 0) return ATTACK_LADDER.map((key) => (key === 'crit' ? 1 : 0));
-    return ATTACK_LADDER.map((key) => Math.max(0, weights[key]) / total);
-};
-
-/**
- * 敌人模板的免伤 / 闪避点数 → 免伤比（引擎自动百分化，1 点 = 1%）。
- *
- * 契约在敌我两侧量纲不同：
- * - 敌人：`CombatDynamicState.defense / evasion` 直接承载模板原始点数；
- * - 我方：`defense` 为护甲常驻免伤加总、`evasion` 为敏捷推导的额外免伤，二者已是比值。
- */
-const toReductionRatio = (value: number): number => safeNumber(value) / 100;
-
-/**
- * 敌人模板点数 → 防御判定的取值区间 [floor, ceiling]（对点数做百分化）。
- *
- * 契约中 `evasion` 是叠加在 `defense` 之上的「额外免伤」而非最大免伤本身，
- * 故最大免伤 = defense + evasion（求和后再百分化）；
- * 不可移动类省略了 evasion（补 0），区间归零 → 只吃常驻免伤。
- */
-const getEnemyReductionRange = (
-    enemy: CombatEnemy
-): { floor: number; ceiling: number } => {
-    const defensePts = safeNumber(enemy.defense);
-    return {
-        floor: clamp(toReductionRatio(defensePts), -1, MAX_PARTIAL_REDUCTION),
-        ceiling: clamp(
-            toReductionRatio(defensePts + safeNumber(enemy.evasion)),
-            -1,
-            MAX_PARTIAL_REDUCTION
-        ),
-    };
-};
-
-/** 伤害扣除：护盾位于防御结果之后、生命值之前。 */
-const processDamageDeduction = (
-    currentShield: number,
-    rawDamage: number
-): { newShield: number; actualDmg: number } => {
-    const shield = Math.max(0, safeNumber(currentShield));
-    const damage = Math.max(0, safeNumber(rawDamage));
-    const damageToShield = Math.min(shield, damage);
-    return {
-        newShield: shield - damageToShield,
-        actualDmg: damage - damageToShield,
-    };
-};
-
-const spendActionPoint = (
-    combat: CombatDynamicState,
-    cost: number
-): CombatDynamicState => {
-    const safeCost = Math.max(0, safeNumber(cost));
-    if (safeCost <= 0) return combat;
-    if (combat.actionPoint.current < safeCost) return combat;
-    return {
-        ...combat,
-        actionPoint: {
-            ...combat.actionPoint,
-            current: Math.max(0, combat.actionPoint.current - safeCost),
-        },
-    };
-};
-
-/**
- * 向「owner × trigger」单槽累积蓄反值。
- * 不可原地改写条目对象：旧状态与新状态共享同一批 entry 引用，
- * 原地改写真会污染上一帧快照（React 严格模式下还会被重复结算）。
- */
-const addAccumulateCounter = (
-    combat: CombatDynamicState,
-    ownerId: string,
-    triggerId: string,
-    value: number
-): CombatDynamicState => {
-    const safeValue = Math.max(0, safeNumber(value));
-    if (safeValue <= 0) return combat;
-    const slots = combat.accumulateCounter ?? [];
-    const hit = slots.some((entry) => entry.ownerId === ownerId && entry.triggerId === triggerId);
-    const accumulateCounter = hit
-        ? slots.map((entry) =>
-            entry.ownerId === ownerId && entry.triggerId === triggerId
-                ? { ...entry, value: Math.max(0, safeNumber(entry.value) + safeValue) }
-                : entry
-        )
-        : [...slots, { ownerId, triggerId, value: safeValue }];
-    return { ...combat, accumulateCounter };
-};
-
-/**
- * 将战斗态同步回动态状态（仅我方战斗态持有六维与装备）。
- *
- * 泛型保留传入动态的子类型：玩家写回后仍是 `PlayerDynamicState`，
- * 同伴写回后仍是 `CompanionDynamicState`，不会丢掉 `affinity` / `needs` 这些非战斗字段。
- */
-const applyCombatToDynamic = <T extends PlayerDynamicState>(
-    base: T,
-    combat: CombatAlly
-): T => ({
-    ...base,
-    imageUrl: combat.imageUrl ?? base.imageUrl,
-    videoUrl: combat.videoUrl ?? base.videoUrl,
-    audioUrl: combat.audioUrl ?? base.audioUrl,
-    strength: combat.strength,
-    agility: combat.agility,
-    wisdom: combat.wisdom,
-    awareness: combat.awareness,
-    will: combat.will,
-    cthulhu: combat.cthulhu,
-    maxHp: combat.maxHp,
-    maxSanity: combat.maxSanity,
-    maxStamina: combat.maxStamina,
-    maxVigor: combat.maxVigor,
-    hp: combat.hp,
-    sanity: combat.sanity,
-    stamina: combat.stamina,
-    vigor: combat.vigor,
-    equipment: normalizeEquipState(combat.equipment),
-    isDead: combat.isDead || combat.hp <= 0,
-});
-
-//==============================================================================
-// 实体工厂
-//==============================================================================
-/**
- * 敌人实例工厂。
- *
- * 模板为判别联合（cthulhu / immovable）：
- * - cthulhu：speed / damage / defense / evasion 四维直取；
- * - immovable：同 cthulhu 结构但无 evasion（无额外免伤，免伤恒为常驻免伤）；
- *
- * 契约在敌人侧把 `defense` / `evasion` 定义为模板原始点数（结算时由引擎统一百分化），
- * 故此处不覆写这两个字段，只为省略了 evasion 的不可移动类补 0。
- * 敌人不再持有六维与装备；体征（maxHp 等）暂由四维推导，
- * TODO(数值迁移)：待数据迁移时替换为模板显式数值。
- */
-const createEnemyEntity = (
-    template: EnemyTemplate,
-    threatLevel: number = 0
-): CombatEnemy => {
-    const cloned = safeDeepClone(template);
-    const threat = clamp(threatLevel, 0, 50);
-    const vitalityScale = 1 + threat / 50;
-
-    const fourDim = cloned as Partial<{
-        speed: number;
-        damage: number;
-        defense: number;
-        evasion: number;
-    }>;
-    const speed = Math.max(0, safeNumber(fourDim.speed));
-    const damage = Math.max(0, safeNumber(fourDim.damage));
-    const defensePts = Math.max(0, safeNumber(fourDim.defense));
-    const evasionPts = Math.max(0, safeNumber(fourDim.evasion));
-
-    // 体征推导：四维点数和 × 2 × 威胁缩放（量级对齐旧版五维和）。
-    const attributeSum = speed + damage + defensePts + evasionPts;
-    const maxHp = Math.max(1, Math.floor(attributeSum * 2 * vitalityScale));
-    const maxSanity = Math.max(0, maxHp * 2);
-    const maxStamina = Math.max(0, maxHp * 2);
-    const maxVigor = Math.max(0, maxHp * 2);
-
-    const attack = calculateEnemyAttackValue(damage);
-
-    return {
-        ...cloned,
-        instanceId: generateInstanceId('enemy'),
-        // 不可移动类省略了 evasion：补 0，语义即「无额外免伤」。
-        evasion: evasionPts,
-        range: Math.max(0, safeNumber(cloned.range, CC.ENEMY_DEFAULT_RANGE)),
-        maxHp,
-        maxSanity,
-        maxStamina,
-        maxVigor,
-        hp: maxHp,
-        sanity: maxSanity,
-        stamina: maxStamina,
-        vigor: maxVigor,
-        isDead: false,
-        speed,
-        attack,
-        actionPoint: createActionPoint(speed),
-        accumulateCounter: [],
-        shield: 0,
-        status: [],
-        pendingDefense: [],
-        location: { x: 0, y: 0 },
-    } as CombatEnemy;
-};
-
-/**
- * 友方战斗实体工厂。
- *
- * 结果序列按武器槽位分别预生成：主手 / 副手各一条、主副手皆空时一条统一序列，
- * 另有一条常驻防御序列；长度 = stamina <= 0 ? 0 : floor(stamina / 10)。
- */
-const createCombatantEntity = (
-    template: PlayerTemplate,
-    prevDynamic: PlayerDynamicState
-): CombatAlly => {
-    // 战斗态只带模板的身份字段，初始属性已在动态状态里展开，不再重复携带 initialState。
-    const staticPart: Omit<PlayerTemplate, 'initialState'> & { initialState?: unknown } = {
-        ...template,
-    };
-    delete staticPart.initialState;
-
-    const equipment = normalizeEquipState(prevDynamic.equipment);
-    const combatBonus = calculateCombatBonus(prevDynamic.wisdom);
-    const speed = Math.max(0, safeNumber(prevDynamic.agility));
-    const weapon = getPrimaryWeapon(equipment);
-    const attack = getAttackDamageScale({
-        contextual: true,
-        strength: prevDynamic.strength,
-        wisdom: prevDynamic.wisdom,
-        weapon,
-        offhandEmpty: !equipment.weapons.side,
-    }).hit;
-
-    return {
-        ...staticPart,
-        strength: safeNumber(prevDynamic.strength),
-        agility: safeNumber(prevDynamic.agility),
-        wisdom: safeNumber(prevDynamic.wisdom),
-        awareness: safeNumber(prevDynamic.awareness),
-        will: safeNumber(prevDynamic.will),
-        cthulhu: safeNumber(prevDynamic.cthulhu),
-        maxHp: safeNumber(prevDynamic.maxHp),
-        maxSanity: safeNumber(prevDynamic.maxSanity),
-        maxStamina: safeNumber(prevDynamic.maxStamina),
-        maxVigor: safeNumber(prevDynamic.maxVigor),
-        hp: safeNumber(prevDynamic.hp),
-        sanity: safeNumber(prevDynamic.sanity),
-        stamina: safeNumber(prevDynamic.stamina),
-        vigor: safeNumber(prevDynamic.vigor),
-        imageUrl: prevDynamic.imageUrl,
-        videoUrl: prevDynamic.videoUrl,
-        audioUrl: prevDynamic.audioUrl,
-        equipment: safeDeepClone(equipment),
-        isDead: prevDynamic.isDead ?? safeNumber(prevDynamic.hp) <= 0,
-        tactics: safeDeepClone(prevDynamic.tactics ?? []),
-        inventory: safeDeepClone(prevDynamic.inventory ?? []),
-        speed,
-        attack,
-        defense: getEquipPartialReduction(equipment),
-        evasion: getAgilityEvasion(prevDynamic.agility),
-        range: weapon ? Math.max(0, safeNumber(weapon.range, 1)) : 1,
-        actionPoint: createActionPoint(speed),
-        accumulateCounter: [],
-        shield: 0,
-        combatBonus,
-        resultSequence: generateAllyResultSequence({
-            strength: safeNumber(prevDynamic.strength),
-            agility: safeNumber(prevDynamic.agility),
-            wisdom: safeNumber(prevDynamic.wisdom),
-            awareness: safeNumber(prevDynamic.awareness),
-            stamina: safeNumber(prevDynamic.stamina),
-            evasion: getAgilityEvasion(prevDynamic.agility),
-            equipment,
-        }),
-        status: [],
-        pendingDefense: [],
-        location: { x: 0, y: 0 },
-    } as CombatAlly;
-};
-
-//==============================================================================
-// 结果序列工具
-//==============================================================================
-
-/** 按同一变换规则重建序列的各个槽位（裁剪 / 推进共用）。 */
-const rebuildSequence = (
-    source: AllySequence,
-    transform: (list: AttackResult[]) => AttackResult[],
-    defenseTransform: (list: DefenseResult[]) => DefenseResult[]
-): AllySequence => ({
-    ...(source.main ? { main: transform(source.main) } : {}),
-    ...(source.side ? { side: transform(source.side) } : {}),
-    ...(source.attack ? { attack: transform(source.attack) } : {}),
-    defense: defenseTransform(source.defense),
-});
-
-/** 序列各槽位的最小长度：任一处为 0 即视为序列耗尽。 */
-const sequenceMinLength = (sequence: AllySequence): number => {
-    const lengths = [sequence.defense.length];
-    ATTACK_SLOTS.forEach((slot) => {
-        const list = sequence[slot];
-        if (list) lengths.push(list.length);
-    });
-    return Math.min(...lengths);
-};
-
-/** 本次攻击实际使用的武器：战术声明的武器类型优先，未声明时主手优先、退副手。 */
-const resolveAttackWeapon = (
-    equipment: EquipState,
-    required?: WeaponType
-): WeaponInstance | null => {
-    const weapons = normalizeEquipState(equipment).weapons;
-    if (required) {
-        if (weapons.main?.weaponType === required) return weapons.main;
-        if (weapons.side?.weaponType === required) return weapons.side;
-        return null;
-    }
-    return weapons.main ?? weapons.side ?? null;
-};
-
-/** 武器 → 对应的攻击序列槽位；无武器时取统一序列。 */
-const resolveAttackSlot = (
-    equipment: EquipState,
-    weapon: WeaponInstance | null
-): AttackSlot => {
-    const weapons = normalizeEquipState(equipment).weapons;
-    if (weapon && weapons.main?.instanceId === weapon.instanceId) return 'main';
-    if (weapon && weapons.side?.instanceId === weapon.instanceId) return 'side';
-    return 'attack';
-};
-
-/**
- * 战术声明的武器类型需求。
- * 武器专属战术取 `weaponOwn`，常规战术取 `requireWeapon`；皆无则为「无限制」。
- */
-const getTacticWeaponType = (tactic: AnyTactic): WeaponType | undefined =>
-    'weaponOwn' in tactic ? tactic.weaponOwn : tactic.requireWeapon;
 
 //==============================================================================
 // Hook
@@ -1383,13 +318,7 @@ export const useCombat = ({
     >({});
     /** 「立即行动」窗口：预支结算后，我方单位立即行动的行动点池（敌方窗口不在此展示）。 */
     const [insertAction, setInsertAction] = useState<InsertActionWindow | null>(null);
-    /**
-     * 武器特性回合状态的**响应式镜像**（真实来源仍是 `weaponStateRef`）。
-     *
-     * 引擎在异步结算链路中高频读写 ref，若直接以 state 为准会引入额外的重渲染与竞态；
-     * 这里只在每次写入后同步一份快照给 UI，保证「已瞄准 / 待装填」等提示能即时刷新。
-     */
-    const [weaponStates, setWeaponStates] = useState<Record<string, WeaponTraitState>>({});
+
 
     //--------------------------------------------------------------------------
     // Refs
@@ -1432,32 +361,17 @@ export const useCombat = ({
     const counterAskRef = useRef<((attackerId: string, targetId: string) => Promise<void>) | null>(
         null
     );
-    /**
-     * 借机攻击（both_prick）的前向引用。
-     *
-     * 契约：任意敌方单位进入双手刺击武器的攻击范围时，立刻进行 1 次不消耗 AP 的攻击序列判定。
-     * 敌人位移发生在 `stepEnemyToward`（定义在前），而攻击链路 `resolveAllyAttack` 定义在后，
-     * 故以 ref 打断声明顺序依赖。
-     */
-    const opportunityAttackRef = useRef<((movedEnemyId: string) => void) | null>(null);
+
     const pendingDefenseRef = useRef<Record<string, DefenseResult[]>>({});
     const positionsRef = useRef<Record<string, CombatPosition>>({});
     const battleMapRef = useRef<BattleMap>(DEFAULT_BATTLE_MAP);
     const coversRef = useRef<Cover[]>([]);
     /**
-     * 武器特性的回合内状态（key = 我方 targetId）。
-     *
-     * 这些是契约声明、但无法从实体静态数据推导的运行时标记，故收敛于单一容器：
-     * - `aimed`：狙击步枪已消耗 1 AP 瞄准，下一次攻击判定提升 1 档（触发后即消费）；
-     * - `needsReload`：弩已击发，必须消耗 1 AP 装填后才能再次攻击。
-     *   采用「待装填」而非「已装填」语义：新单位 / 新回合的初值是 false，
-     *   即弩出厂即上弦，不会出现「第一次攻击永远被自己的装填规则锁死」；
-     * - `movedThisTurn`：本回合是否移动过，手枪「未移动则首次攻击免 AP」的判定依据；
-     * - `freeAttackUsed`：手枪的免费首次攻击本回合是否已用掉。
-     *
-     * 每回合开始（restoreAP）时统一重置。
+     * 手枪「未移动则首次攻击免 AP」的回合内标记（key = 我方 targetId）。
+     * 每回合开始（restoreAP）与开战时重置。
      */
-    const weaponStateRef = useRef<Record<string, WeaponTraitState>>({});
+    const movedThisTurnRef = useRef<Record<string, boolean>>({});
+    const freePistolShotUsedRef = useRef<Record<string, boolean>>({});
     const actionLockRef = useRef(false);
     const combatActiveRef = useRef(false);
     /** 进入战斗前的全局状态快照，用于战斗结束后恢复（庇护所战斗不应回到 PLAYING）。 */
@@ -1545,35 +459,8 @@ export const useCombat = ({
     /** 单次位移的行动点消耗 = 基础值 + 环境移动修正（至少 1 点）。 */
     const getMoveCost = useCallback((): number => {
         const delta = safeNumber(battleMapRef.current.modifiers?.moveCostDelta, 0);
-        return Math.max(1, CC.MOVE_AP_COST + Math.floor(delta));
+        return Math.max(1, COMBAT_CONFIG.MOVE_AP_COST + Math.floor(delta));
     }, []);
-
-    /**
-     * 读取（并按需初始化）某单位的武器特性回合状态。
-     *
-     * 状态本身存放于 `weaponStateRef`，此处只做惰性初始化，
-     * 保证任何单位在首次被访问时都拿到一份完整的零值状态。
-     */
-    const getWeaponState = useCallback((unitId: string) => {
-        const current = weaponStateRef.current[unitId];
-        if (current) return current;
-        const fresh = { aimed: false, needsReload: false, movedThisTurn: false, freeAttackUsed: false };
-        weaponStateRef.current[unitId] = fresh;
-        return fresh;
-    }, []);
-
-    /**
-     * 写入武器特性状态，并同步一份快照给 UI。
-     * 所有对 `weaponStateRef` 的写操作都必须经过此处，否则界面提示会与实际状态脱节。
-     */
-    const setWeaponState = useCallback(
-        (unitId: string, patch: Partial<WeaponTraitState>) => {
-            const next = { ...getWeaponState(unitId), ...patch };
-            weaponStateRef.current[unitId] = next;
-            setWeaponStates({ ...weaponStateRef.current });
-        },
-        [getWeaponState]
-    );
 
     /**
      * 单位的攻击距离：
@@ -1587,8 +474,8 @@ export const useCombat = ({
             return weapon ? Math.max(0, safeNumber(weapon.range, 1)) : 1;
         }
         const enemy = enemiesRef.current.find((e) => e.instanceId === unitId);
-        if (enemy) return Math.max(0, safeNumber(enemy.range, CC.ENEMY_DEFAULT_RANGE));
-        return CC.ENEMY_DEFAULT_RANGE;
+        if (enemy) return Math.max(0, safeNumber(enemy.range, COMBAT_CONFIG.ENEMY_DEFAULT_RANGE));
+        return COMBAT_CONFIG.ENEMY_DEFAULT_RANGE;
     }, []);
 
     const setEnemiesSafe = useCallback((value: SetStateAction<CombatEnemy[]>) => {
@@ -1646,7 +533,7 @@ export const useCombat = ({
 
     const addCombatLog = useCallback(
         (text: string) => {
-            setCombatLog((prev) => [...prev.slice(-(CC.LOG_LIMIT - 1)), text]);
+            setCombatLog((prev) => [...prev.slice(-(COMBAT_LOG_LIMIT - 1)), text]);
             addLog(text, 'combat');
         },
         [addLog]
@@ -2030,10 +917,12 @@ export const useCombat = ({
                 const list = dyn.status ?? [];
                 if (!list.length) return dyn;
                 let next = dyn;
+                // 结果修正 / 序列修正类效果只存在于状态下，随战斗结束一并失效；
+                // 需要回收的只有写进了动态态的体征上限。
                 list
-                    .filter((fx) => isAttributeType(fx.type) || isVitalType(fx.type))
+                    .filter((fx) => isVitalType(fx.type))
                     .forEach((fx) => {
-                        next = applyImmediateEffect(next, fx.type, -fx.value);
+                        next = applyVitalEffect(next, fx.type, -fx.value);
                     });
                 return { ...next, status: [] };
             };
@@ -2417,21 +1306,9 @@ export const useCombat = ({
             }
 
             let result = shiftAttackResult(rawResult, scale, steps);
-            let critDoubled = false;
-
-            // 瞄准：消耗掉的瞄准标记把本次判定整体提升 1 档（crit 则改为伤害翻倍）。
-            const weaponState = weaponStateRef.current[attackerId];
-            if (trait.canAim && weaponState?.aimed) {
-                const aimed = applyAimBonus(result);
-                if (aimed.critDoubled) {
-                    critDoubled = true;
-                } else {
-                    // 升档后的伤害必须按新档位基准重算，避免沿用旧档数值。
-                    const kind = aimed.result[0];
-                    result = [kind, attackValueAt(kind, scale)];
-                }
-                setWeaponState(attackerId, { aimed: false });
-            }
+            // 瞄准（aim）不再是武器类型特性：改由战术效果的 a_sequence / aim 键在攻击链路中统一升档，
+            // 原结果为 crit 时的「伤害翻倍」也在该处判定（见 resolveAllyAttack）。
+            const critDoubled = false;
 
             // 距离降级：狙击步枪在最佳攻击距离内会随距离缩短而失准。
             if (trait.optimalRange > 0) {
@@ -2443,9 +1320,9 @@ export const useCombat = ({
                     if (chance > 0 && Math.random() < chance) {
                         // 距离越近降级越狠：亏损比例越高，一次跨越的档位越多。
                         const stepCount = clamp(
-                            Math.ceil(chance * CC.SNIPER_MAX_DOWNGRADE_STEPS),
+                            Math.ceil(chance * COMBAT_CONFIG.SNIPER_MAX_DOWNGRADE_STEPS),
                             1,
-                            CC.SNIPER_MAX_DOWNGRADE_STEPS
+                            COMBAT_CONFIG.SNIPER_MAX_DOWNGRADE_STEPS
                         );
                         result = shiftAttackResult(result, scale, -stepCount);
                     }
@@ -2459,7 +1336,7 @@ export const useCombat = ({
                 critDoubled,
             };
         },
-        [setWeaponState]
+        []
     );
 
     /**
@@ -2506,8 +1383,10 @@ export const useCombat = ({
             const enemy = getEnemy(targetId);
             if (!enemy || enemy.isDead || enemy.hp <= 0) return 0;
 
+            const mods = getCombatResultModifiers(enemy.status);
             const defense = takePendingDefense(targetId);
-            let finalReduction = getEnemyReductionRange(enemy).floor;
+            let finalReduction =
+                getEnemyReductionRange(enemy).floor + safeNumber(mods.defense) / 100;
             if (defense) {
                 if (defense[0] === 'dodge') {
                     playSfx('combat_miss');
@@ -2557,8 +1436,21 @@ export const useCombat = ({
             if (idx < 0) return 0;
             const ally = alliesRef.current[idx];
 
-            const defense = takePendingDefense(targetId);
-            let finalReduction = safeNumber(ally.defense);
+            const mods = getCombatResultModifiers(ally.status);
+            const dSteps = getSequenceShift(ally.status, 'd');
+
+            let defense = takePendingDefense(targetId);
+            // 防御序列修正（d_sequence）：按防御阶梯整档移动；该判定同时消耗按判定计数的防御效果。
+            if (defense) {
+                defense = shiftDefenseResult(defense, dSteps);
+                mutateAlly(targetId, (dyn) => ({
+                    ...dyn,
+                    status: consumeJudgementStatuses(dyn.status, 'd'),
+                }));
+            }
+
+            // 结果修正：defense / evasion 以百分点给出（与敌人模板点数同口径）。
+            let finalReduction = safeNumber(ally.defense) + safeNumber(mods.defense) / 100;
             if (defense) {
                 if (defense[0] === 'dodge') {
                     playSfx('combat_miss');
@@ -2568,8 +1460,11 @@ export const useCombat = ({
                 if (defense[0] === 'partial') finalReduction = defense[1];
             }
             // 上限按武器口径收敛：盾牌类叠加到 1 时部分闪避也可为 1（满额抵挡），其余不超过 0.999。
-            const reductionCap = getDefenseMaxReduction(
-                getPrimaryWeapon(normalizeEquipState(ally.equipment))?.weaponType
+            const weaponType = getPrimaryWeapon(normalizeEquipState(ally.equipment))?.weaponType;
+            const reductionCap = clamp(
+                getDefenseMaxReduction(weaponType) + safeNumber(mods.evasion) / 100,
+                -1,
+                1
             );
             finalReduction = clamp(finalReduction, -1, reductionCap);
 
@@ -2577,11 +1472,20 @@ export const useCombat = ({
             const { newShield, actualDmg } = processDamageDeduction(ally.shield, mitigated);
             const actual = fix1(actualDmg);
 
-            const dyn: CombatDynamicState = {
+            // 契约：partial 裁定值为 1 时只消耗盾牌耐久，其余情况每件在役护甲消耗 1 点耐久。
+            const shieldOnly = defense?.[0] === 'partial' && safeNumber(defense[1]) >= 1;
+            const wornEquipment = spendDefenseDurability(
+                normalizeEquipState(ally.equipment) as EquipState,
+                shieldOnly
+            );
+
+            // 装备（耐久损耗）与护盾、生命一并写回；CombatAlly 在动态态之上另持 equipment。
+            const dyn = {
                 ...ally,
+                equipment: wornEquipment,
                 shield: newShield,
                 hp: fix1(ally.hp - actual),
-            };
+            } as CombatDynamicState;
 
             commitAlly(targetId, dyn);
             playSfx(actual > 0 ? 'combat_hit' : 'combat_block');
@@ -2634,13 +1538,42 @@ export const useCombat = ({
             const value = round1(rawValue);
             if (value === 0) return;
 
-            const isAttrOrVital = isAttributeType(type) || isVitalType(type);
-            const isOverTime = isOverTimeEffect(type);
-            const shouldStore = duration > 0 && (isAttrOrVital || isOverTime);
+            // 位移效果（left / right / up / down）：按战场坐标即时执行一步，不存状态。
+            if (isDisplacementEffect(type)) {
+                const from = positionsRef.current[targetId];
+                if (!from) return;
+                const dir: MoveDirection =
+                    type === 'left'
+                        ? 'lane_left'
+                        : type === 'right'
+                            ? 'lane_right'
+                            : type === 'up'
+                                ? 'forward'
+                                : 'backward';
+                const to = getSteppedCell(from, dir);
+                if (!isWalkableCell(to)) return;
+                syncLocations({ ...positionsRef.current, [targetId]: to });
+                const name = isEnemyTarget(targetId)
+                    ? getEnemy(targetId)?.name
+                    : getAlly(targetId)?.name;
+                addCombatLog(`[位移] ${name ?? targetId} 被强制位移一格。`);
+                return;
+            }
+
+            /**
+             * 效果分三类（契约 TacticEffectType）：
+             * - 即时写入（体征 / 体征上限 / 行动点 / 护盾）：直接改写动态态；
+             * - 结果修正（speed / damage / aim / crit_chance / crit_bonus / defense / evasion）
+             *   与序列修正（a_sequence / d_sequence）：只存状态，判定时由
+             *   getCombatResultModifiers / getSequenceShift 读取，不写动态态；
+             * - duration = 0 表示下一次结果判定后即消耗（见 consumeJudgementStatuses）。
+             */
+            const instantWrite = isVitalEffectType(type) || type === 'ap' || type === 'shield';
+            const shouldStore = !instantWrite || duration !== 0;
             const statusItem: CombatStatus = { sourceId, sourceName, type, value, duration };
 
             const apply = (dyn: CombatDynamicState): CombatDynamicState => {
-                const applied = applyImmediateEffect(dyn, type, value);
+                const applied = instantWrite ? applyVitalEffect(dyn, type, value) : dyn;
                 if (!shouldStore) return applied;
                 return { ...applied, status: storeStatusItem(applied.status ?? [], statusItem) };
             };
@@ -2668,39 +1601,33 @@ export const useCombat = ({
             getAlly,
             checkEnemyDeaths,
             checkAllyDeath,
+            isWalkableCell,
+            syncLocations,
+            addCombatLog,
         ]
     );
 
+    /**
+     * 回合结束的状态 tick。
+     *
+     * 判定计数的效果（a_sequence / d_sequence 与 aim）不按回合递减，只按判定次数消耗
+     * （见 consumeJudgementStatuses）；其余效果按回合递减，归零时回收体征上限的写入。
+     */
     const tickEffects = useCallback(
-        (targetId: string, phase: 'start' | 'end') => {
+        (targetId: string) => {
             const target = isEnemyTarget(targetId) ? getEnemy(targetId) : getAlly(targetId);
             if (!target || !target.status || !target.status.length) return;
 
-            if (phase === 'start') {
-                const startEffects = target.status.filter((fx) => isOverTimeEffect(fx.type));
-                if (!startEffects.length) return;
-                const apply = (dyn: CombatDynamicState) =>
-                    startEffects.reduce((acc, fx) => applyImmediateEffect(acc, fx.type, fx.value), dyn);
-                if (isEnemyTarget(targetId)) mutateEnemyById(targetId, apply);
-                else mutateAlly(targetId, apply);
-                if (isEnemyTarget(targetId)) checkEnemyDeaths();
-                else checkAllyDeath();
-                return;
-            }
-
             const applyEndTick = (dyn: CombatDynamicState): CombatDynamicState => {
-                const remaining: CombatStatus[] = [];
-                const expired: CombatStatus[] = [];
-                (dyn.status ?? []).forEach((fx) => {
-                    const nextDuration = fx.duration - 1;
-                    if (nextDuration <= 0) expired.push(fx);
-                    else remaining.push({ ...fx, duration: nextDuration });
-                });
+                const { remaining, expired } = tickRoundStatuses(
+                    dyn.status,
+                    (fx) => !(fx.duration > 0 && (isSequenceEffect(fx.type) || fx.type === 'aim'))
+                );
                 let next = dyn;
                 expired
-                    .filter((fx) => isAttributeType(fx.type) || isVitalType(fx.type))
+                    .filter((fx) => isVitalType(fx.type))
                     .forEach((fx) => {
-                        next = applyImmediateEffect(next, fx.type, -fx.value);
+                        next = applyVitalEffect(next, fx.type, -fx.value);
                     });
                 return { ...next, status: remaining };
             };
@@ -2986,14 +1913,9 @@ export const useCombat = ({
                 carryApRef.current[unitId] = 0;
                 // 新回合：重置本回合蓄反 / 差反预支配额（上限 = actionPoint.base）。
                 delete counterPrepayUsedRef.current[unitId];
-                // 新回合：重置武器特性状态（瞄准 / 装填 / 移动与免费攻击标记）。
-                weaponStateRef.current[unitId] = {
-                    aimed: false,
-                    needsReload: false,
-                    movedThisTurn: false,
-                    freeAttackUsed: false,
-                };
-                setWeaponStates({ ...weaponStateRef.current });
+                // 新回合：重置手枪的移动 / 免费射击标记。
+                movedThisTurnRef.current[unitId] = false;
+                freePistolShotUsedRef.current[unitId] = false;
                 return {
                     ...derived,
                     actionPoint: { ...derived.actionPoint, current, advanced: 0 },
@@ -3020,7 +1942,7 @@ export const useCombat = ({
         (enemy: CombatEnemy, allyList: CombatAlly[], onlyInRange: boolean): string | undefined => {
             const enemyPos = positionsRef.current[enemy.instanceId];
             if (!enemyPos) return undefined;
-            const range = safeNumber(enemy.range, CC.ENEMY_DEFAULT_RANGE);
+            const range = safeNumber(enemy.range, COMBAT_CONFIG.ENEMY_DEFAULT_RANGE);
 
             const candidates = allyList
                 .map((ally, idx) => ({ ally, id: getAllyTargetId(ally, idx) }))
@@ -3175,8 +2097,6 @@ export const useCombat = ({
             );
             if (!next) return false;
             syncLocations({ ...positionsRef.current, [enemyId]: next });
-            // 敌人移动后可能踏入我方双手刺击武器的攻击范围，触发借机攻击。
-            opportunityAttackRef.current?.(enemyId);
             return true;
         },
         [syncLocations]
@@ -3364,7 +2284,7 @@ export const useCombat = ({
                 if (safeNumber(unit.speed) <= attackerSpeed) continue;
 
                 const slotValue = getCounterPairValue(unit, unitId, attackerId);
-                const stacks = Math.floor(slotValue / CC.ACCUMULATE_COUNTER_THRESHOLD);
+                const stacks = Math.floor(slotValue / COMBAT_CONFIG.ACCUMULATE_COUNTER_THRESHOLD);
                 // 蓄反：预支 n 点、窗口可用 n 点；n 由槽值（5n）决定，
                 // 但受本回合剩余预支配额（base + current − 已预支合计）截断。
                 const n = Math.min(stacks, prepayQuotaLeftOf(unitId, unit));
@@ -3380,7 +2300,7 @@ export const useCombat = ({
                 if (!mountedRef.current || !combatActiveRef.current) return;
                 if (decision === false) continue;
                 // 蓄反代价：从「owner × trigger」单槽消耗 5n 点蓄反值。
-                const counterCost = n * CC.ACCUMULATE_COUNTER_THRESHOLD;
+                const counterCost = n * COMBAT_CONFIG.ACCUMULATE_COUNTER_THRESHOLD;
                 grantCounterAdvance(unitId, 'accumulate', n, counterCost, attackerId, n);
                 await runInsertAction(unitId, n);
                 if (!combatActiveRef.current) return;
@@ -3394,11 +2314,11 @@ export const useCombat = ({
                 const unitIsAlly = !isEnemyTarget(unitId);
                 if (!unitIsAlly && !differentialCounterEnabled) continue;
                 if (isCounterSkipped(unitId, 'differential')) continue;
-                if (safeNumber(unit.speed) < CC.DIFFERENTIAL_COUNTER_SPEED) continue;
+                if (safeNumber(unit.speed) < COMBAT_CONFIG.DIFFERENTIAL_COUNTER_SPEED) continue;
 
                 // 档位约束：2n <= 本回合剩余预支配额（base + current − 已预支合计）
                 // 且 2n <= 可承受额度；档位为 2 的倍数（2、4、…）。
-                const step = CC.DIFFERENTIAL_COUNTER_COST;
+                const step = COMBAT_CONFIG.DIFFERENTIAL_COUNTER_COST;
                 const evenFloor = (value: number) => value - (value % step);
                 const maxDebt = Math.min(
                     evenFloor(prepayQuotaLeftOf(unitId, unit)),
@@ -3471,7 +2391,6 @@ export const useCombat = ({
             clearPendingDefense(tid);
             if (ally.hp <= 0) return;
             mutateAlly(tid, (dyn) => ({ ...dyn, shield: 0 }));
-            tickEffects(tid, 'start');
             restoreAP(tid, false);
         });
 
@@ -3501,7 +2420,6 @@ export const useCombat = ({
 
             clearPendingDefense(enemyId);
             mutateEnemyById(enemyId, (dyn) => ({ ...dyn, shield: 0 }));
-            tickEffects(enemyId, 'start');
             if (checkEnemyDeaths()) {
                 if (!combatActiveRef.current) return;
                 continue;
@@ -3514,7 +2432,7 @@ export const useCombat = ({
             }
 
             let guard = 0;
-            while (combatActiveRef.current && guard < CC.ENEMY_ACTION_GUARD) {
+            while (combatActiveRef.current && guard < COMBAT_CONFIG.ENEMY_ACTION_GUARD) {
                 const activeEnemy = getEnemy(enemyId);
                 if (
                     !activeEnemy ||
@@ -3622,32 +2540,33 @@ export const useCombat = ({
                     addCombatLog(`[偏转矩阵] ${actor.name} 布设防御判定。`);
                     playSfx('combat_block');
                 } else if (intent.type === 'buff') {
-                    const attr = pickOne([...ATTR_KEYS]);
-                    if (attr) {
+                    // 契约：战术效果不再修改六维，增益/减益只作用于战斗动态结果修正键。
+                    const key = pickOne([...RESULT_MODIFIER_TYPES]);
+                    if (key) {
                         addEffect(
                             enemyId,
-                            attr,
+                            key,
                             3,
-                            CC.DEFAULT_BUFF_DURATION,
+                            COMBAT_CONFIG.DEFAULT_BUFF_DURATION,
                             enemyId,
                             actor.name
                         );
-                        addCombatLog(`[异常增殖] ${actor.name} 强化了 ${attr}。`);
+                        addCombatLog(`[异常增殖] ${actor.name} 的 ${key} 被强化。`);
                     }
                 } else if (intent.type === 'debuff') {
                     const targetId = chooseAliveTarget(intent.targetId);
-                    const attr = pickOne([...ATTR_KEYS]);
-                    if (attr) {
+                    const key = pickOne([...RESULT_MODIFIER_TYPES]);
+                    if (key) {
                         addEffect(
                             targetId,
-                            attr,
+                            key,
                             -2,
-                            CC.DEFAULT_BUFF_DURATION,
+                            COMBAT_CONFIG.DEFAULT_BUFF_DURATION,
                             enemyId,
                             actor.name
                         );
                         addCombatLog(
-                            `[污染注入] ${getAlly(targetId)?.name ?? targetId} 的 ${attr} 被削弱。`
+                            `[污染注入] ${getAlly(targetId)?.name ?? targetId} 的 ${key} 被削弱。`
                         );
                     }
                 } else {
@@ -3666,7 +2585,7 @@ export const useCombat = ({
             // 该敌人回合结束：仅做效果 tick，蓄反槽留待「敌方阶段结束」统一清算。
             const after = getEnemy(enemyId);
             if (after && !after.isDead && after.hp > 0) {
-                tickEffects(enemyId, 'end');
+                tickEffects(enemyId);
                 if (checkEnemyDeaths()) {
                     if (!combatActiveRef.current) return;
                     continue;
@@ -3746,7 +2665,7 @@ export const useCombat = ({
         alliesRef.current.forEach((ally, idx) => {
             const tid = getAllyTargetId(ally, idx);
             if (ally.hp <= 0) return;
-            tickEffects(tid, 'end');
+            tickEffects(tid);
         });
 
         if (checkAllyDeath()) {
@@ -3828,7 +2747,7 @@ export const useCombat = ({
                 mutateAlly(allyId, (dyn) => spendActionPoint(dyn, moveCost));
             }
             // 记录本回合已移动：手枪「未移动则首次攻击免 AP」依据此标记失效。
-            setWeaponState(allyId, { movedThisTurn: true });
+            movedThisTurnRef.current[allyId] = true;
             syncLocations({ ...positionsRef.current, [allyId]: next });
             const actionLabel: Record<MoveDirection, string> = {
                 forward: '向前推进',
@@ -3853,7 +2772,6 @@ export const useCombat = ({
             spendInsertActionAp,
             getMoveCost,
             isWalkableCell,
-            getWeaponState,
         ]
     );
 
@@ -3885,15 +2803,8 @@ export const useCombat = ({
             const weapon = resolveAttackWeapon(caster.equipment, requiredWeapon);
             if (requiredWeapon && !weapon) return false;
 
-            // 弩未装填时不能发射：契约要求每次攻击后必须装填才能再次攻击。
-            const casterTrait = getWeaponTrait(weapon?.weaponType);
-            if (tactic.type === 'A' && casterTrait.requiresReload && getWeaponState(casterId).needsReload) {
-                return false;
-            }
-            // 已瞄准时无需重复瞄准，避免白耗行动点。
-            if (WEAPON_TRAIT_ACTIONS[tactic.id] === 'aim' && getWeaponState(casterId).aimed) {
-                return false;
-            }
+            // 契约：武器每次攻击消耗 1 点耐久，耐久耗尽后无法再用该武器攻击。
+            if (tactic.type === 'A' && weapon && !isWeaponUsable(weapon)) return false;
 
             // 序列耗尽校验：仅当无法通过扣除 stamina 重生成时阻止行动。
             // instant 武器不消费结果序列，豁免此门槛（否则序列耗尽的 instant 玩家被软锁）。
@@ -3914,6 +2825,13 @@ export const useCombat = ({
             // 攻击战术必须在射程内存有可攻击目标：够不着的距离用不了（range 0 = 无限距离）。
             if (tactic.type === 'A') {
                 const range = weapon ? Math.max(0, safeNumber(weapon.range, 1)) : 1;
+                // 近程冲刺：实际攻击距离 = 当前 AP + 武器自身 range（AP 池为常规行动点或立即行动窗口）。
+                const apPool = isInsertCaster
+                    ? safeNumber(insertWindow?.apLeft)
+                    : safeNumber(caster.actionPoint.current);
+                const reach = isDashWeapon(weapon?.weaponType)
+                    ? range + Math.floor(apPool)
+                    : range;
                 const pos = positionsRef.current[casterId];
                 const hasTarget =
                     Boolean(pos) &&
@@ -3922,14 +2840,14 @@ export const useCombat = ({
                         const enemyPos = positionsRef.current[enemy.instanceId];
                         return (
                             Boolean(enemyPos) &&
-                            isWithinRange(range, getBattleDistance(pos, enemyPos))
+                            isWithinRange(reach, getBattleDistance(pos, enemyPos))
                         );
                     });
                 if (!hasTarget) return false;
             }
             return true;
         },
-        [isPlayerPhase, getAlly, getAliveEnemyIds, getWeaponState]
+        [isPlayerPhase, getAlly, getAliveEnemyIds]
     );
 
     const resolveTargetIds = useCallback(
@@ -3994,19 +2912,70 @@ export const useCombat = ({
         ): boolean => {
             const caster = getAlly(casterId);
             if (!caster || caster.hp <= 0) return false;
+            // 契约：武器每次攻击消耗 1 点耐久，耐久耗尽无法再用该武器攻击。
+            if (weapon && !isWeaponUsable(weapon)) {
+                addCombatLog('[损坏] 武器耐久已耗尽，无法攻击。');
+                playSfx('error');
+                return false;
+            }
 
             const trait = getWeaponTrait(weapon?.weaponType);
             const scale = getAllyDamageScale(caster, weapon);
             const slot = resolveAttackSlot(caster.equipment, weapon);
+            /** 结果修正（speed / damage / aim / crit_* / defense / evasion）与攻击序列修正。 */
+            const mods = getCombatResultModifiers(caster.status);
+            const aSteps = getSequenceShift(caster.status, 'a') + mods.aim;
 
-            /** 距离与射程（霰弹枪近距加成 / 溅射判定共用）。 */
-            const distance = getDistance(casterId, targetId);
+            /** 距离与射程（冲刺 / 锥形扩散 / 距离暴击共用）。 */
+            let distance = getDistance(casterId, targetId);
             const range = weapon ? Math.max(0, safeNumber(weapon.range, 1)) : 1;
+
+            /**
+             * 近程冲刺（契约各近程分支）：
+             * 攻击时直接向目标冲刺，最多消耗当前 AP 格，每格追加特性伤害；
+             * 实际攻击距离 = 当前 AP + 武器自身 range。
+             */
+            let dashCells = 0;
+            if (trait.dashDamagePerCell > 0 && distance > range) {
+                const apLeftOf = () =>
+                    isInsertCaster
+                        ? Math.max(0, safeNumber(insertActionRef.current?.apLeft))
+                        : Math.max(0, safeNumber(getAlly(casterId)?.actionPoint.current));
+                let remaining = Math.min(
+                    Math.floor(apLeftOf()),
+                    Math.max(0, distance - range)
+                );
+                while (remaining > 0 && combatActiveRef.current && apLeftOf() >= 1) {
+                    const from = positionsRef.current[casterId];
+                    const to = positionsRef.current[targetId];
+                    if (!from || !to) break;
+                    const next = findNextStepToward(
+                        battleMapRef.current,
+                        coversRef.current,
+                        from,
+                        to
+                    );
+                    if (!next) break;
+                    if (isInsertCaster) spendInsertActionAp(1);
+                    else mutateAlly(casterId, (dyn) => spendActionPoint(dyn, 1));
+                    syncLocations({ ...positionsRef.current, [casterId]: next });
+                    dashCells += 1;
+                    remaining -= 1;
+                    distance = getDistance(casterId, targetId);
+                    if (distance <= range) break;
+                }
+                if (dashCells > 0) {
+                    addCombatLog(
+                        `[冲刺] ${caster.name} 突进 ${dashCells} 格接敌（伤害 +${dashCells * trait.dashDamagePerCell}）。`
+                    );
+                }
+            }
+            const dashBonus = dashCells * trait.dashDamagePerCell;
 
             // —— 冲锋枪：追加判定取最优 ——
             // 契约：判定后若仍有剩余 AP，可消耗 1 点再判一次，可重复至 AP 耗尽。
             // REPEAT_FIRE_GUARD 只是防御性上限，真实终止条件由循环内的 AP 校验决定。
-            const maxExtra = trait.repeatForBest ? CC.REPEAT_FIRE_GUARD : 0;
+            const maxExtra = trait.repeatForBest ? COMBAT_CONFIG.REPEAT_FIRE_GUARD : 0;
             const judgementCount = 1 + maxExtra;
 
             /**
@@ -4030,7 +2999,7 @@ export const useCombat = ({
                 const drawn = drawAttackResult(current, casterId, slot);
                 commitAlly(casterId, drawn.updatedEntity as CombatAlly);
 
-                const applied = applyAttackModifiers(
+                let applied = applyAttackModifiers(
                     casterId,
                     targetId,
                     scale,
@@ -4038,10 +3007,55 @@ export const useCombat = ({
                     weapon?.weaponType
                 );
 
+                // 序列修正（a_sequence）与瞄准（aim）：整体升降档；原结果已是 crit 时改为伤害翻倍。
+                if (aSteps !== 0 && applied.attackResult[0] !== 'miss') {
+                    if (applied.attackResult[0] === 'crit' && aSteps > 0) {
+                        applied = { ...applied, critDoubled: true };
+                    } else {
+                        applied = {
+                            ...applied,
+                            attackResult: shiftAttackResult(applied.attackResult, scale, aSteps),
+                        };
+                    }
+                }
+
+                // 暴击率修正（crit_chance，按百分点）：非暴击判定按概率整体升 1 档。
+                if (applied.attackResult[0] !== 'crit' && mods.crit_chance > 0) {
+                    if (Math.random() < clamp(mods.crit_chance / 100, 0, 1)) {
+                        const idx = ATTACK_RESULT_LADDER.indexOf(applied.attackResult[0]);
+                        const kind =
+                            ATTACK_RESULT_LADDER[
+                                Math.min(idx + 1, ATTACK_RESULT_LADDER.length - 1)
+                            ];
+                        applied = { ...applied, attackResult: [kind, attackValueAt(kind, scale)] };
+                    }
+                }
+
+                // 距离暴击（霰弹枪 / 短管霰弹枪）：超过上限距离不可暴击，距离越远保留暴击的概率越低。
+                const critRange = getCritRangeProfile(weapon?.weaponType);
+                if (applied.attackResult[0] === 'crit' && critRange.cutoff > 0) {
+                    const keepChance =
+                        distance > critRange.cutoff
+                            ? 0
+                            : clamp(
+                                1 -
+                                (distance - critRange.optimal) /
+                                (critRange.cutoff - critRange.optimal + 1),
+                                0,
+                                1
+                            );
+                    if (Math.random() > keepChance) {
+                        applied = {
+                            ...applied,
+                            attackResult: ['hit', attackValueAt('hit', scale)],
+                        };
+                    }
+                }
+
                 if (
                     !best ||
-                    ATTACK_LADDER_ORDER.indexOf(applied.attackResult[0]) >
-                    ATTACK_LADDER_ORDER.indexOf(best.attackResult[0])
+                    ATTACK_RESULT_LADDER.indexOf(applied.attackResult[0]) >
+                    ATTACK_RESULT_LADDER.indexOf(best.attackResult[0])
                 ) {
                     best = {
                         attackResult: applied.attackResult,
@@ -4063,21 +3077,25 @@ export const useCombat = ({
 
             if (!best) return false;
             const { attackResult, blockingCover, critDoubled, damageMultiplier } = best;
+            // 本次攻击判定已结束：消耗按判定计数的效果（a_sequence / aim）。
+            mutateAlly(casterId, (dyn) => ({
+                ...dyn,
+                status: consumeJudgementStatuses(dyn.status, 'a'),
+            }));
             if (attackResult[0] === 'miss') {
                 addCombatLog('[未命中] 战术计算落空。');
                 playSfx('combat_miss');
                 return false;
             }
 
-            /** 伤害乘区：武器类型 × 霰弹枪近距加成。 */
-            const closeRangeMultiplier =
-                trait.closeRangeDamageBonus && weapon
-                    ? getCloseRangeDamageMultiplier(distance, range)
-                    : 1;
+            /** 伤害定项：判定值 + 冲刺追加 + 攻击力修正；暴击时另加暴击伤害修正。 */
             const critMultiplier = critDoubled ? 2 : 1;
+            const bonusCrit = attackResult[0] === 'crit' ? mods.crit_bonus : 0;
             const raw = absorbDamageByCover(
                 blockingCover,
-                Math.max(0, attackResult[1]) * damageMultiplier * closeRangeMultiplier * critMultiplier
+                (Math.max(0, attackResult[1]) + dashBonus + mods.damage + bonusCrit) *
+                    damageMultiplier *
+                    critMultiplier
             );
 
             const label =
@@ -4092,57 +3110,46 @@ export const useCombat = ({
                 addCombatLog('[偏转] 攻击未能穿透目标防护。');
             }
 
-            // —— 挥动类溅射：对目标所在格内的其他目标造成 判定值 ÷ 其他目标数（向上取整）——
-            if (trait.splash && combatActiveRef.current) {
-                const cell = positionsRef.current[targetId];
-                if (cell) {
-                    const bystanders = getAliveEnemies().filter((enemy) => {
-                        if (enemy.instanceId === targetId) return false;
-                        const pos = positionsRef.current[enemy.instanceId];
-                        return Boolean(pos) && pos.x === cell.x && pos.y === cell.y;
+            // —— 锥形范围伤害（霰弹枪 / 短管霰弹枪）：判定值 ÷ 其他目标数，向上取整 ——
+            if (trait.coneSplash && combatActiveRef.current) {
+                const from = positionsRef.current[casterId];
+                const to = positionsRef.current[targetId];
+                const others = getAliveEnemies().filter((enemy) => {
+                    if (enemy.instanceId === targetId) return false;
+                    const pos = positionsRef.current[enemy.instanceId];
+                    if (!pos || !from || !to) return false;
+                    if (getBattleDistance(from, pos) > range) return false;
+                    // 锥形：以「施法者 → 主目标」为轴，横向偏移不超过纵深推进量，且不落在轴后方。
+                    const dx = pos.x - from.x;
+                    const dy = Math.abs(pos.y - from.y);
+                    const dirX = to.x - from.x;
+                    if (dx * dirX < 0) return false;
+                    return dy <= Math.max(1, Math.abs(dx));
+                });
+                const splash = getSplashDamage(attackResult[1] + mods.damage, others.length);
+                if (splash > 0) {
+                    others.forEach((enemy) => {
+                        if (!combatActiveRef.current) return;
+                        const hit = dealDamageToEnemy(enemy.instanceId, splash * damageMultiplier);
+                        addCombatLog(
+                            `[锥形扩散] ${enemy.name} 承受 ${hit} 点扩散伤害（判定值 ${formatCombatNumber(attackResult[1])} ÷ ${others.length}）。`
+                        );
                     });
-                    const splash = getSplashDamage(attackResult[1], bystanders.length);
-                    if (splash > 0) {
-                        bystanders.forEach((enemy) => {
-                            if (!combatActiveRef.current) return;
-                            const hit = dealDamageToEnemy(enemy.instanceId, splash * damageMultiplier);
-                            addCombatLog(
-                                `[溅射] ${enemy.name} 承受 ${hit} 点扩散伤害（判定值 ${formatCombatNumber(attackResult[1])} ÷ ${bystanders.length}）。`
-                            );
-                        });
-                    }
                 }
             }
 
-            // —— 霰弹枪：对攻击范围内的所有目标同时造成伤害 ——
-            if (trait.hitsAllInRange && combatActiveRef.current) {
-                const others = getAliveEnemies().filter(
-                    (enemy) =>
-                        enemy.instanceId !== targetId &&
-                        isWithinRange(range, getDistance(casterId, enemy.instanceId))
-                );
-                others.forEach((enemy) => {
-                    if (!combatActiveRef.current) return;
-                    const spread = Math.max(
-                        1,
-                        Math.floor(
-                            Math.max(0, attackResult[1]) *
-                            damageMultiplier *
-                            getCloseRangeDamageMultiplier(
-                                getDistance(casterId, enemy.instanceId),
-                                range
-                            )
-                        )
-                    );
-                    const hit = dealDamageToEnemy(enemy.instanceId, spread);
-                    addCombatLog(`[弹幕扩散] ${enemy.name} 承受 ${hit} 点散射伤害。`);
+            // —— 武器耐久：契约规定每次攻击消耗 1 点 ——
+            if (weapon && (slot === 'main' || slot === 'side')) {
+                mutateAlly(casterId, (dyn) => {
+                    const equipment = normalizeEquipState((dyn as CombatAlly).equipment);
+                    return {
+                        ...dyn,
+                        equipment: {
+                            ...equipment,
+                            weapons: { ...equipment.weapons, [slot]: spendWeaponUse(weapon) },
+                        },
+                    } as CombatDynamicState;
                 });
-            }
-
-            // —— 弩：每次攻击后必须消耗 1 AP 装填 ——
-            if (trait.requiresReload) {
-                setWeaponState(casterId, { needsReload: true });
-                addCombatLog('[装填] 弩具张力已释放，需消耗 1 AP 重新装填。');
             }
 
             return true;
@@ -4159,66 +3166,8 @@ export const useCombat = ({
             absorbDamageByCover,
             dealDamageToEnemy,
             addCombatLog,
-            setWeaponState,
         ]
     );
-
-    /**
-     * 借机攻击（双手刺击 both_prick）。
-     *
-     * 契约：任意敌方单位进入攻击范围时，立刻进行 1 次**不消耗 AP** 的攻击序列判定，并执行其结果。
-     *
-     * 只在「该敌人此前不在范围内、本次移动后进入」时触发，避免敌人在范围内反复微调走位
-     * 被同一把武器无限次借机攻击。每个敌人对同一名持械者的进入事件至多结算一次，
-     * 直到它离开范围后再次进入。
-     */
-    const opportunityAttackedRef = useRef<Set<string>>(new Set());
-    const resolveOpportunityAttack = useCallback(
-        (movedEnemyId: string) => {
-            if (!combatActiveRef.current) return;
-            const enemy = getEnemy(movedEnemyId);
-            if (!enemy || enemy.isDead || enemy.hp <= 0) return;
-            const enemyPos = positionsRef.current[movedEnemyId];
-            if (!enemyPos) return;
-
-            alliesRef.current.forEach((ally, idx) => {
-                if (ally.hp <= 0) return;
-                const allyId = getAllyTargetId(ally, idx);
-                const weapon = getPrimaryWeapon(ally.equipment);
-                const trait = getWeaponTrait(weapon?.weaponType);
-                if (!trait.opportunityAttack || !weapon) return;
-
-                const range = Math.max(0, safeNumber(weapon.range, 1));
-                const allyPos = positionsRef.current[allyId];
-                if (!allyPos) return;
-                const inRange = isWithinRange(range, getBattleDistance(allyPos, enemyPos));
-
-                const key = `${movedEnemyId}::${allyId}`;
-                if (!inRange) {
-                    // 离开范围：清除标记，允许其再次进入时重新触发。
-                    opportunityAttackedRef.current.delete(key);
-                    return;
-                }
-                if (opportunityAttackedRef.current.has(key)) return;
-                opportunityAttackedRef.current.add(key);
-
-                // 不消耗 AP、不消费序列之外的资源：直接走完整攻击链路。
-                const caster = getAlly(allyId);
-                if (!caster) return;
-                addCombatLog(`[借机攻击] ${caster.name} 拦截踏入攻击范围的 ${enemy.name}。`);
-                resolveAllyAttack(allyId, movedEnemyId, weapon, false);
-            });
-        },
-        [getEnemy, getAlly, resolveAllyAttack, addCombatLog]
-    );
-
-    /** 注册借机攻击回调，供定义在前的 stepEnemyToward 调用。 */
-    useEffect(() => {
-        opportunityAttackRef.current = resolveOpportunityAttack;
-        return () => {
-            opportunityAttackRef.current = null;
-        };
-    }, [resolveOpportunityAttack]);
 
     const executeTactic = useCallback(
         async (tacticId: string, casterId = 'player', manualTargetId?: string) => {
@@ -4256,14 +3205,11 @@ export const useCombat = ({
                 return;
             }
 
-            // 弩未装填时不能发射（与 canUseTactic 同口径，防止绕过 UI 直接调用）。
-            if (
-                tactic.type === 'A' &&
-                getWeaponTrait(weapon?.weaponType).requiresReload &&
-                getWeaponState(casterId).needsReload
-            ) {
+            // 契约：武器每次攻击消耗 1 点耐久，耐久耗尽后无法再用该武器攻击
+            //（与 canUseTactic 同口径，防止绕过 UI 直接调用）。
+            if (tactic.type === 'A' && weapon && !isWeaponUsable(weapon)) {
                 playSfx('error');
-                addCombatLog('[未装填] 弩具尚未完成装填，无法攻击。');
+                addCombatLog('[损坏] 武器耐久已耗尽，无法攻击。');
                 return;
             }
 
@@ -4293,15 +3239,22 @@ export const useCombat = ({
             let attackTargetId: string | undefined;
             if (tactic.type === 'A') {
                 const range = weapon ? Math.max(0, safeNumber(weapon.range, 1)) : 1;
+                // 近程冲刺：射程按当前 AP 扩展（冲刺本身在攻击结算内逐格消耗 AP）。
+                const apPool = isInsertCaster
+                    ? safeNumber(insertWindow?.apLeft)
+                    : safeNumber(caster.actionPoint.current);
+                const reach = isDashWeapon(weapon?.weaponType)
+                    ? range + Math.floor(apPool)
+                    : range;
                 const enemyIds = getAliveEnemyIds();
                 const requested =
                     manualTargetId && enemyIds.includes(manualTargetId) ? manualTargetId : undefined;
                 attackTargetId =
                     requested ??
-                    enemyIds.find((id) => isWithinRange(range, getDistance(casterId, id)));
+                    enemyIds.find((id) => isWithinRange(reach, getDistance(casterId, id)));
                 if (
                     !attackTargetId ||
-                    !isWithinRange(range, getDistance(casterId, attackTargetId))
+                    !isWithinRange(reach, getDistance(casterId, attackTargetId))
                 ) {
                     playSfx('error');
                     addCombatLog('[超距] 目标不在射程内，无法攻击。');
@@ -4322,14 +3275,14 @@ export const useCombat = ({
                 const isFreePistolShot =
                     tactic.type === 'A' &&
                     casterTrait.freeFirstAttackIfStationary &&
-                    !getWeaponState(casterId).movedThisTurn &&
-                    !getWeaponState(casterId).freeAttackUsed;
+                    !movedThisTurnRef.current[casterId] &&
+                    !freePistolShotUsedRef.current[casterId];
 
                 if (!isInsertCaster && !isFreePistolShot) {
                     mutateAlly(casterId, (dyn) => spendActionPoint(dyn, tactic.apCost));
                 }
                 if (isFreePistolShot) {
-                    setWeaponState(casterId, { freeAttackUsed: true });
+                    freePistolShotUsedRef.current[casterId] = true;
                     addCombatLog('[未移动] 手枪首次射击不消耗行动点。');
                 }
                 addCombatLog(`>> [${caster.name}] 执行战术：${tactic.name}`);
@@ -4412,16 +3365,8 @@ export const useCombat = ({
                     }
                     applyTacticEffects(tactic);
                 } else {
-                    // 辅助战术（'U'）：不触发攻击 / 防御序列判定，只结算附带效果。
-                    // 其中「瞄准」「装填」是武器特性的操作入口，需同时写入特性状态。
-                    const traitAction = WEAPON_TRAIT_ACTIONS[tactic.id];
-                    if (traitAction === 'aim') {
-                        setWeaponState(casterId, { aimed: true });
-                        addCombatLog('[瞄准] 弹道已校准，下一次攻击判定提升 1 档。');
-                    } else if (traitAction === 'reload') {
-                        setWeaponState(casterId, { needsReload: false });
-                        addCombatLog('[装填] 弩具重新上弦，可以再次发射。');
-                    }
+                    // 辅助战术（'U'）：不触发攻击 / 防御序列判定，只结算附带效果
+                    //（「瞄准」等武器玩法开放为 U 类战术，档位提升由 effect 的 aim 键承担）。
                     applyTacticEffects(tactic);
                 }
 
@@ -4463,7 +3408,6 @@ export const useCombat = ({
             applyAttackModifiers,
             absorbDamageByCover,
             resolveAllyAttack,
-            getWeaponState,
         ]
     );
 
@@ -4485,8 +3429,8 @@ export const useCombat = ({
     );
 
     const getVisibleResultSequence = useCallback(
-        (targetId: string): AllySequence => {
-            const empty: AllySequence = { defense: [] };
+        (targetId: string): AllyResultSequence => {
+            const empty: AllyResultSequence = { defense: [] };
             if (isEnemyTarget(targetId)) return empty;
             const ally = getAlly(targetId);
             if (!ally) return empty;
@@ -4588,16 +3532,16 @@ export const useCombat = ({
             );
             for (const roll of [modifierRoll, coverRoll]) {
                 if (!roll || roll.chance <= 0 || roll.steps === 0) continue;
-                const next = ATTACK_LADDER.map(() => 0);
+                const next = ATTACK_RESULT_LADDER.map(() => 0);
                 distribution.forEach((chance, index) => {
                     if (chance <= 0) return;
-                    next[clamp(index + roll.steps, 0, ATTACK_LADDER.length - 1)] +=
+                    next[clamp(index + roll.steps, 0, ATTACK_RESULT_LADDER.length - 1)] +=
                         chance * roll.chance;
                     next[index] += chance * (1 - roll.chance);
                 });
                 distribution = next;
             }
-            const odds: AttackForecastOdds[] = ATTACK_LADDER.map((ladder, index) => ({
+            const odds: AttackForecastOdds[] = ATTACK_RESULT_LADDER.map((ladder, index) => ({
                 ladder,
                 chance: distribution[index],
                 damage: tierDamage(ladder),
@@ -4723,9 +3667,9 @@ export const useCombat = ({
             carryApRef.current = {};
             counterPrepayUsedRef.current = {};
             enemyAttackedThisTurnRef.current = {};
-            // 新战斗：清空武器特性状态与借机攻击记录，避免上一场的标记残留。
-            weaponStateRef.current = {};
-            opportunityAttackedRef.current = new Set();
+            // 新战斗：清空手枪的移动 / 免费射击标记，避免上一场的残留。
+            movedThisTurnRef.current = {};
+            freePistolShotUsedRef.current = {};
             endInsertAction();
 
             alliesRef.current = allAllies;
@@ -4750,15 +3694,15 @@ export const useCombat = ({
             const laneCount = Math.max(1, map.laneCount);
             const span = Math.max(0, maxX - minX);
             const ambush = clamp(safeNumber(context?.isAmbushed, 0), 0, 1);
-            const deployShift = Math.round(span * CC.AMBUSH_SHIFT_RATIO * ambush);
+            const deployShift = Math.round(span * COMBAT_CONFIG.AMBUSH_SHIFT_RATIO * ambush);
             const enemyBandStart = clamp(
-                minX + Math.round(span * CC.ENEMY_DEPLOY_RATIO) - deployShift,
+                minX + Math.round(span * COMBAT_CONFIG.ENEMY_DEPLOY_RATIO) - deployShift,
                 minX,
                 maxX
             );
             // 我方锚点最多推进到敌方部署带的起点：伏击时开局即贴身，但仍不越过敌阵。
             const allyAnchorX = Math.min(
-                clamp(minX + Math.round(span * CC.ALLY_DEPLOY_RATIO) + deployShift, minX, maxX),
+                clamp(minX + Math.round(span * COMBAT_CONFIG.ALLY_DEPLOY_RATIO) + deployShift, minX, maxX),
                 enemyBandStart
             );
 
@@ -4913,7 +3857,6 @@ export const useCombat = ({
         moveAlly,
         counterSkip,
         setCounterSkip: setCounterSkipFor,
-        weaponStates,
         insertAction,
         endInsertAction,
     };

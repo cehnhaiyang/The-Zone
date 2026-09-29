@@ -2,7 +2,10 @@ import { useCallback, useMemo } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import {
     GameState,
+    NECESSARY_RESOURCE_CONSUMPTION_PER_DAY,
+    ZONE_TICKS_PER_HOUR,
     addItemToInventory,
+    advanceZoneTime,
     applySanctuaryResourceDeltas,
     clamp,
     clampDynamicVitals,
@@ -13,6 +16,7 @@ import {
     removeItemFromInventory,
     safeDeepClone,
     safeNumber,
+    snapshotVital,
 } from '../meta';
 import type {
     BaseDynamicState,
@@ -26,25 +30,13 @@ import type {
     PlayerState,
     Resident,
     Sanctuary,
-    Vital,
     VitalRecord,
-    ZoneDate,
 } from '../meta';
 import { generateResidentName } from '../constants';
 import { AudioService } from '../services';
 
 /** 侵蚀度上限：契约中它是庇护所的顶层比例读数。 */
 const SANCTUARY_EROSION_MAX = 100;
-
-/**
- * 必要资源（food / water）每人每天的消耗量。
- *
- * 契约中必要资源只声明数量、不携带 consumptionRate，故日常消耗速率由引擎配平。
- */
-export const NECESSARY_RESOURCE_CONSUMPTION_PER_DAY: NecessaryResource = {
-    food: 0.2,
-    water: 0.3,
-};
 
 /** 必要资源的显示名：契约未给必要资源名称字段，由引擎固定。 */
 const NECESSARY_RESOURCE_LABELS: Record<keyof NecessaryResource, string> = {
@@ -331,12 +323,6 @@ export const applySanctuaryEventChoice = (
 };
 
 
-const TIME_CONFIG = {
-    TICKS_PER_CYCLE: 30,
-    CYCLES_PER_DAY: 12,
-    TICKS_PER_HOUR: 15,
-} as const;
-
 const SANCTUARY_CONFIG = {
     COMPANION_RECOVERY_RATE: 0.8,
 } as const;
@@ -418,35 +404,6 @@ type RestPlan =
         config: CustomRestConfig;
         daysPassed: number;
     };
-
-export const advanceZoneTime = (
-    current: ZoneDate,
-    timePassed: number,
-    dilationFactor: number = 1
-): ZoneDate => {
-    const baseDay = Math.max(0, Math.floor(safeNumber(current.day)));
-    const baseCycle = Math.max(0, Math.floor(safeNumber(current.cycle)));
-    const baseTick = Math.max(0, Math.floor(safeNumber(current.tick)));
-
-    const effectiveDelta = Math.max(
-        0,
-        Math.floor(safeNumber(timePassed) * Math.max(0, safeNumber(dilationFactor, 1)))
-    );
-
-    const totalTicks = baseTick + effectiveDelta;
-    const tick = totalTicks % TIME_CONFIG.TICKS_PER_CYCLE;
-    const extraCycles = Math.floor(totalTicks / TIME_CONFIG.TICKS_PER_CYCLE);
-
-    const totalCycles = baseCycle + extraCycles;
-    const cycle = totalCycles % TIME_CONFIG.CYCLES_PER_DAY;
-    const day = baseDay + Math.floor(totalCycles / TIME_CONFIG.CYCLES_PER_DAY);
-
-    return {
-        day,
-        cycle,
-        tick,
-    };
-};
 
 const parsePositiveInt = (value: unknown): number | null => {
     const parsed = safeNumber(value, Number.NaN);
@@ -549,13 +506,6 @@ const validateRestResources = (
         missingResources,
     };
 };
-
-const snapshotVital = (dynamic: BaseDynamicState): Vital => ({
-    maxHp: safeNumber(dynamic.maxHp),
-    maxSanity: safeNumber(dynamic.maxSanity),
-    maxStamina: safeNumber(dynamic.maxStamina),
-    maxVigor: safeNumber(dynamic.maxVigor),
-});
 
 const createNextVitalRecord = (
     state: PlayerState,
@@ -759,7 +709,7 @@ const createRestPlan = (state: PlayerState, hours: number): RestPlan => {
         };
     }
 
-    const timePassed = safeHours * TIME_CONFIG.TICKS_PER_HOUR;
+    const timePassed = safeHours * ZONE_TICKS_PER_HOUR;
     const dilationFactor = Math.max(0, safeNumber(state.sanctuary.dilationFactor, 1));
 
     const nextZoneTime = advanceZoneTime(state.currentZoneTime, timePassed, dilationFactor);

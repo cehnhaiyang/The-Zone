@@ -1,270 +1,185 @@
-import type { SanctuaryTemplate } from '../../meta';
+import type { SanctuaryTemplate } from '../../meta'
+import {
+    I,
+    P,
+    E,
+    act,
+    node,
+    danger,
+    uRes,
+    enemy,
+    loot,
+    quest,
+    npc,
+    createReplacement,
+    roam,
+    sanctuary,
+    svg
+} from './sanctuaryFactory'
 
 /**
- * 铁锈前哨
+ * 铁锈前哨 (Rust Outpost)
  *
- * 设计原则：
- * 安保检查站、野战医务室、军用礼拜室构成相对安全的外层庇护核心。
- * 指挥区、生活区、工程舱承担资源、线索与设施修复。
- * 深层掩体为高危锁定区域，承载「铁壁」真相、高价值物资与 Boss 级威胁。
- * 威胁曲线：地表 1~6 → 工程舱 5~7 → 深层 7~11 + 脚本 Boss。
+ * 核心拓扑与规约：
+ * 1. 结构拓扑：安保检查站中枢(1)、指挥区(9)、生活区(10)、工程舱(8)、深层掩体(10，高危物理锁定)、野战医务室(1)、主防爆门(1)，共计整 40 个节点。
+ * 2. 威胁曲线：地表边缘 1~6 级 → 重工程走廊 5~7 级 → 深层辐射掩体 7~11 级 + 关底高维实体。
+ * 3. 物质与异态：八阶工造层级与深渊正交异态（血肉融合、认知侵蚀、因果倒错）全面落地。
+ * 4. 实体规约：克苏鲁系敌人意图分布精准归一化至 100；不可动安保炮塔严格遵循 ImmovableEnemyTemplate。
  */
-export const ZONE_BUNKER: SanctuaryTemplate = {
-    id: 'bunker',
-    name: '铁锈前哨',
-    background: '一座废弃的地下军事防空洞，曾经是人类抵抗未知威胁的坚固阵地。如今，只剩下残骸、血迹和生锈的机器，以及昔日绝望防守的残酷烙印。军方曾在基金会技术顾问的协助下，于深层掩体进行代号「铁壁」的生化实验，试图利用异变组织样本、清理人回收的神经链接仪原型与深渊信号残片开发武器。实验失败后，深层掩体被紧急封锁，所有参与人员被命令就地处决。但某些东西活了下来。它不再只是实验体，而像是被前哨站的恐惧、纪律与死亡共同喂养出的回声。工程舱那台由聚变核心稳压的柴油-生物混合发电机仍在吞食废料、油脂与不可名状的残骸，为表层庇护所提供最后的电力。',
-    topology: '安保检查站中枢（1）；指挥区（9）：指挥中枢走廊 + 中央指挥室、安保监控室、机密通讯室、作战室、情报拦截室、审讯室、档案室、后勤办公室；生活区（10）：生活区干道 + 士兵营房、战术食堂、重症隔离区、军用礼拜室、军官寝室、公共净水室、洗消淋浴间、洗衣房、冷藏储藏室；工程舱（8）：重装备走廊 + 聚变动力源、核心军械库、通风管控枢纽、废料处理池、维修湾、冷却剂控制室、辅助泵房；深层掩体（10，锁定）：深层走廊 + 生化实验室、低温冻存室、中央数据中心、紧急逃生通道、训练场、高炉焚化室、零号收容单元、观测回廊、处置滑道；野战医务室（1）；主防爆门出口（1）',
-    nodesCount: 40,
-    visualStyle: 'Military Bunker, Industrial Rust, Cold War Aesthetics, Dim Emergency Lighting, UV Deep Labs, Volumetric Fog, Cinematic Horror',
-    dilationFactor: 1.0,
-    entrance: 'security_checkpoint',
-    initialState: {
-        necessaryResource: {
-            food: 24,
-            water: 48,
-        },
-        uniqueResource: [
-            {
-                id: 'medicine',
-                name: '药品',
-                desc: '药剂调配站回收再加工的过期药剂与残余药材。',
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="9" width="18" height="7" rx="3.5"></rect><path d="M12 9v7"></path></svg>',
-                value: 14,
-            },
-            {
-                id: 'electricity',
-                name: '电力',
-                desc: '聚变核心稳压的柴油-生物混合发电机输出的电力。',
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2L4 14h7l-1 8 9-12h-7z"></path></svg>',
-                value: 72,
-                consumptionRate: 0.1,
-            },
-            {
-                id: 'scraps',
-                name: '废料',
-                desc: '报废军械、装甲残片与不明金属压成的可用坯料，可充作升级设施的代价。',
-                icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h16v10H4z"></path><path d="M8 7v10M16 7v10"></path></svg>',
-                value: 80,
-            },
-        ],
-        population: 6,
+export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
+    'bunker',
+    '铁锈前哨',
+    '一座冷战时期开凿的地下加固防空洞，曾是大灾变前夕军方驻扎的钢铁壁垒。在深渊基金会技术顾问的深度介入下，这里秘密启动了代号「铁壁」的生化武装工程——试图利用深渊星神质提取液、清理人遗留的试作型神经链接仪核心与高维信号残片锻造不朽单兵。降临波峰到来时，收容单元发生维度坍塌，军方高层紧急下达全封锁与就地处决令。如今地表部分沦为拾荒者与生还者的避风港，而深层走廊深处，某些未曾死透的造物仍在紫外灯管下缓慢增殖。',
+    '以安保检查站为地面防线中枢，向内辐射指挥中枢走廊（8个情报作战分区）、生活区干道（9个生存维稳分区）、重装备工程走廊（7个动力维护分区）；工程走廊末端由重型气动锁闭隔绝深层掩体走廊（9个绝密生物与零号收容分区）；中枢外侧另设野战医务室与通往外界荒原的主防爆门。',
+    'Military Bunker, Industrial Rust, Cold War Aesthetics, Dim Emergency Lighting, UV Deep Labs, Volumetric Fog, Cinematic Horror',
+    {
+        entrance: 'security_checkpoint',
+        nodesCount: 40,
+        factor: 1.0,
+        res: [24, 48],
+        pop: 6,
         erosion: 20,
-        facility: [
-            {
-                id: 'facility_bunker_purifier',
-                name: '公共净水循环塔',
-                desc: '工程舱的净水装置残骸被重新接通，勉强维持着前哨的饮用水循环。水质混浊但能入口，每一滴都带着铁锈与消毒液的味道。',
-                nodeMounted: 'water_purification',
-                function: {
-                    water: 8,
-                    electricity: -2,
-                },
-            },
-            {
-                id: 'facility_bunker_bio_generator',
-                name: '柴油-生物混合发电机',
-                desc: '以微型聚变核心作为稳压中枢，外接巨型船用柴油燃烧室的改装动力枢纽。它可以吞下柴油、变异生物脂肪、废弃有机物乃至难以辨认的尸骸，为前哨提供磅礴电力。',
-                nodeMounted: 'power_station',
-                function: {
-                    electricity: 12,
-                    erosion: 2,
-                },
-            },
-            {
-                id: 'facility_bunker_mess',
-                name: '战术食堂配给口',
-                desc: '战术食堂的军用配给口，靠库存罐头与压缩口粮维持。热气腾腾的烂炖菜是前哨为数不少的人间烟火。',
-                nodeMounted: 'mess_hall',
-                function: {
-                    food: 5,
-                    water: -2,
-                },
-            },
-            {
-                id: 'facility_bunker_pharmacy',
-                name: '药剂调配站',
-                desc: '在野战医务室搭建的调配台，把过期药剂与残余药材重新加工成可用的医疗物资。效率不高，但聊胜于无。',
-                nodeMounted: 'field_medical',
-                function: {
-                    medicine: 2,
-                    electricity: -1,
-                },
-            },
-            {
-                id: 'facility_bunker_reclaimer',
-                name: '重型废料回收棚',
-                desc: '搭建在工程走廊与废料池之间的切割棚，把报废军械、装甲残片和不明金属压成可用坯料。噪声极大，火花刺眼，但铁锈前哨的物资链离不开它。',
-                nodeMounted: 'waste_disposal',
-                function: {
-                    scraps: 6,
-                    electricity: -2,
-                    erosion: 1,
-                },
-            },
-        ],
+        uniqueResources: [
+            uRes(
+                'medicine',
+                '药品',
+                '药剂调配站回收再加工的过期药剂与残余药材，可用于抑制感染并缓解神经刺痛。',
+                svg('<rect x="3" y="9" width="18" height="7" rx="3.5"/><path d="M12 9v7"/>'),
+                14
+            ),
+            uRes(
+                'electricity',
+                '电力',
+                '以微型聚变核心作为稳压中枢的混合发电机输出的高压电流，维系防爆门与通风系统运转。',
+                svg('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'),
+                72,
+                0.1
+            ),
+            uRes(
+                'scraps',
+                '废料',
+                '报废军械、装甲残片与不明金属压成的可用坯料，是前哨加固工事与升级设施的核心货币。',
+                svg('<path d="M4 7h16v10H4z"/><path d="M8 7v10M16 7v10"/>'),
+                80
+            )
+        ]
     },
-    nodes: {
-        security_checkpoint: {
-            name: '安保检查站',
-            desc: '坚固的混凝土掩体入口，厚重的防弹玻璃已经布满龟裂，甚至沾染着干涸的黑色痕迹。这里连接着前哨站的各个重要区块。生锈的安检机仍然亮着微弱的黄灯，警报器早已哑火。远处的黑暗中偶尔传来沉重的回声，像是有什么重物在地板上拖行。安检机有时会毫无预兆地亮起绿灯并发出一声短哔，仿佛批准了某个不可见的通行者。作为庇护所中枢，这里勉强保留了最低限度的照明与空气循环。',
-            visualPrompt: 'Concrete checkpoint, bulletproof glass with spider-web cracks and dark stains, dull yellow lights, rusted turnstiles, faded color-coded floor lines, makeshift sanctuary hub, dim but stable lighting',
-            childrenIds: ['command_sector', 'living_quarters', 'engineering_bay'],
+
+    // =========================================================================
+    // 1. 核心中枢区 (1 节点)
+    // =========================================================================
+    node(
+        'security_checkpoint',
+        '安保检查站',
+        '坚固的混凝土掩体入口，厚重的防弹玻璃布满蛛网状裂纹，沾染着干涸发黑的血印。生锈的旋转闸机闪着微弱的黄光。作为庇护所中枢，这里勉强保留了最低限度的照明与通风循环，两侧的机枪射击孔正无声地监视着空荡荡的走廊。',
+        'Concrete checkpoint, bulletproof glass with spider-web cracks and dark stains, dull yellow lights, rusted turnstiles, faded color-coded floor lines, makeshift sanctuary hub, dim but stable lighting',
+        {
+            children: ['command_sector', 'living_quarters', 'engineering_bay'],
             items: [
-                {
-                    id: 'checkpoint_log',
-                    name: '检查站值班日志',
-                    desc: '一本被咖啡渍和黑色指纹覆盖的值班记录。',
-                    type: 'data',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 5,
-                    documentContent: '第 1 天：防爆门关闭。外部通讯断续。第 3 天：清理人频道消失。第 5 天：有人声称看见门外站着自己的家人。第 7 天：不再记录门外声音。补充：如果安检机自行亮绿灯，不要看摄像头。',
-                },
+                I.data(
+                    'checkpoint_log',
+                    '检查站值班日志',
+                    '一本被咖啡渍和黑色指纹覆盖的值班记录，纸质发脆。',
+                    '第 1 天：防爆门关闭。外部电磁通讯断续。第 3 天：清理人频道彻底消失。第 5 天：有人声称在监视器里看见门外站着自己的家人。第 7 天：严禁记录门外传来的任何呼唤。补充：如果安检机自行亮起绿灯，闭上眼，不要看摄像头。',
+                    { threshold: 5 }
+                )
             ],
-            interactions: [
-                {
-                    desc: '整理临时营地',
-                    results: {
-                        timeCost: 20,
-                        soundEffect: 'success',
-                        narrative: '你把散落的物资归拢到防爆墙后，确认通风与照明仍在最低限度运转。短暂的秩序感让你紧绷的神经稍微松弛。',
-                        stateChange: { sanity: 5 },
-                    },
-                },
-                {
-                    desc: '核对物资封条',
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'search',
-                        narrative: '你逐一检查封条。大多数仍然完好，只有一箱医疗物资的封条被重新粘过。胶水下面压着一小撮黑色菌丝，像是从箱体内部长出来的。',
-                        stateChange: { sanity: 2 },
-                    },
-                },
+            interacts: [
+                act(
+                    '整理临时营地',
+                    '你把散落的物资归拢到防爆墙后，检查通风阀读数。短暂的秩序感让你紧绷的神经稍微松弛，手心的冷汗慢慢风干。',
+                    { cost: 20, san: 5 }
+                ),
+                act(
+                    '核对物资封条',
+                    '你逐一检查箱体封条。多数仍然完好，只有一箱医疗物资的封签被揭开过。胶水下压着一小撮细密的黑色菌丝，正随着气流微微起伏。',
+                    { cost: 10, sound: 'search', san: 2 }
+                )
             ],
-            nodeNpc: {
-                id: 'npc_quartermaster_harper',
-                name: '军需官哈珀',
-                gender: 'male',
-                desc: '前哨站的军需官，负责物资登记与分配。他的左臂从肘部以下被替换成粗糙的机械义肢，关节处渗出黑色油渍。他坚持按条令办事，但在条令无法覆盖的灰色地带，他会用沉默代替拒绝。',
-                visualPrompt:
-                    'Middle-aged military quartermaster with a crude mechanical forearm, oil-stained uniform, tired but disciplined eyes, checkpoint dim lighting',
-                style: 'balance',
-                initialState: {
+            npc: npc(
+                'npc_quartermaster_harper',
+                '军需官哈珀',
+                '前哨站的军需官，负责物资登记与配给分配。他的左臂从肘部以下被替换成粗糙的军工机械义肢，活动时伴随着沉闷的齿轮咬合声。他固执地坚持按战时条令办事，但在条令无法覆盖的灰色地带，他会用沉默代替拒绝。',
+                'Middle-aged military quartermaster with a crude mechanical forearm, oil-stained uniform, tired but disciplined eyes, checkpoint dim lighting',
+                {
+                    gender: 'male',
                     trust: 35,
-                    attribute: {
-                        strength: 12,
-                        agility: 14,
-                        wisdom: 16,
-                        awareness: 18,
-                        will: 10,
-                        cthulhu: 3,
-                    },
-                    vital: {
-                        maxHp: 110,
-                        maxSanity: 120,
-                        maxStamina: 105,
-                        maxVigor: 105,
-                    },
+                    attrs: { strength: 14, agility: 12, wisdom: 18, awareness: 22, will: 16, cthulhu: 4 },
+                    vitals: { maxHp: 120, maxSanity: 110, maxStamina: 105, maxVigor: 110 },
                     quests: [
-                        {
-                            id: 'supply_manifest',
-                            desc: '哈珀需要恢复前哨的物资链。他要求你从中央指挥室回收剩余弹药箱，并从后勤办公室取回最后的配给凭证，以便核对存量、重新建立可审计的补给台账。',
-                            goals: [
-                                {
-                                    id: 'ammo_box',
-                                    name: '军用弹药箱',
-                                    desc: '里面还有一些通用补给。',
-                                    type: 'material',
-                                    grade: 'standard',
-                                    size: [2, 1],
-                                },
-                                {
-                                    id: 'supply_requisition',
-                                    name: '最后配给凭证',
-                                    desc: '一张盖着红色印章的配给单，末尾写着「仅用于活人」。',
-                                    type: 'data',
-                                    grade: 'standard',
-                                    size: [1, 1],
-                                },
-                            ],
-                            rewards: [
-                                {
-                                    id: 'military_medkit',
-                                    name: '军用急救包',
-                                    desc: '完整的野战急救套件。',
-                                    type: 'consumable',
+                        quest(
+                            'supply_manifest',
+                            '哈珀需要重建前哨的物资台账。他要求你从中央指挥室回收封存的军用弹药箱，并从后勤办公室取回最后的配给凭证，以便审计现存物资并加固检查站外围。',
+                            4,
+                            [
+                                I.material('ammo_box', '军用弹药箱', '完好的制式弹药封箱，内含未拆封的标准步枪弹药。', {
                                     grade: 'military',
-                                    size: [2, 1],
-                                    effects: [['hp', 40]],
-                                },
-                                {
-                                    id: 'power_cell',
-                                    name: '军用电池',
-                                    desc: '高容量电池组，可以为设备充电。',
-                                    type: 'consumable',
-                                    grade: 'military',
-                                    size: [1, 1],
-                                    effects: [['battery', 80]],
-                                },
+                                    size: [2, 1]
+                                }),
+                                I.data('supply_requisition', '最后配给凭证', '一张盖着深红印戳的物资调配单，末尾写着「仅用于活人」。')
                             ],
-                            difficulty: 4,
-                        },
-                        {
-                            id: 'black_inventory',
-                            desc: '哈珀想知道深层掩体里究竟发生了什么。他需要你带回一份异变组织样本，以便向仍在运转的上级频道证明铁壁计划的失败。他不保证这能换来救援，但至少能换来真相。',
-                            goals: [
-                                {
-                                    id: 'mutated_tissue',
-                                    name: '异变组织样本',
-                                    desc: '具有极高科研价值，但非常危险。',
-                                    type: 'material',
-                                    grade: 'prototype',
-                                    size: [1, 1],
-                                },
+                            [
+                                I.consumable(
+                                    'military_medkit',
+                                    '军用急救包',
+                                    '配备止血带、聚维酮碘与急救缝合针的野战医疗包。',
+                                    [['hp', 40]],
+                                    { grade: 'military', size: [2, 1] }
+                                ),
+                                I.consumable('power_cell', '军用电池', '高容量同位素电容电池，可为设备提供长效电力。', [['battery', 80]], {
+                                    grade: 'military'
+                                })
+                            ]
+                        ),
+                        quest(
+                            'black_inventory',
+                            '哈珀必须确认深层掩体内的「铁壁」实验究竟失控到了何种地步。他需要你深入隔离层带回一份完整的异变组织样本。他无法承诺这能换来方舟的救援，但至少能让死者不再背负叛逃的污名。',
+                            8,
+                            [
+                                I.material('mutated_tissue', '异变组织样本', '从铁壁实验体残骸上剥离的活性组织，封存在防爆管内。', {
+                                    grade: 'prototype'
+                                })
                             ],
-                            rewards: [
-                                {
-                                    id: 'neural_filter_mk2',
-                                    name: '改良神经过滤插件',
-                                    desc: '哈珀用深层样本与链接仪残件改装的过滤插件，能略微拓宽认知安全边界。',
-                                    type: 'accessory',
-                                    grade: 'corporate',
-                                    size: [1, 1],
-                                    effects: [
-                                        ['maxSanity', 35],
-                                        ['will', 5],
-                                    ],
-                                },
-                            ],
-                            difficulty: 8,
-                        },
+                            [
+                                I.accessory(
+                                    'neural_filter_mk2',
+                                    '改良神经过滤插件',
+                                    '哈珀用清理人遗留晶片改装的过滤模块，能更有效地阻断高维认知污染。',
+                                    [['maxSanity', 35], ['will', 5]],
+                                    { grade: 'corporate' }
+                                )
+                            ]
+                        )
                     ],
-                },
-                canBeInvited: {
-                    trust: 60,
-                    questsArchived: ['black_inventory'],
-                    replacement: [
-                        {
-                            duty: '军需官',
-                            desc: '负责前哨物资台账与配给的人员，需足够细心以维持可审计的补给链。',
-                            attributes: { wisdom: 12, awareness: 14 },
-                            vitals: { maxStamina: 80 },
-                        },
-                    ],
-                    isSanctuarySafe: { food: 30, water: 30 },
-                },
-            },
-            exits: [
-                { targetId: 'blast_door', label: '检查防爆门', type: 'local' },
-                { targetId: 'field_medical', label: '前往医务室', type: 'local' },
-            ],
-        },
-        command_sector: {
-            name: '指挥中枢走廊',
-            desc: '铺着防滑钢板的走廊，通往前哨站的大脑。两侧的墙上贴满褪色的战术海报，以及被红色记号笔划掉的名字列表。顶部有一排已经不亮了的状态指示灯——只有最后一盏还在闪烁暗红色的光，像是在执行某个永远不会结束的报警程序。走廊深处似乎偶尔会传来有节奏的皮靴声，但仔细聆听时又会消失。',
-            visualPrompt: 'Steel-plated floor corridor, faded tactical posters, lists of names crossed out in red marker, status lights mostly dead, one blinking red',
-            isDangerous: 2,
-            childrenIds: [
+                    canBeInvited: {
+                        trust: 60,
+                        questsArchived: ['black_inventory'],
+                        replacement: [
+                            createReplacement(
+                                '军需官',
+                                '负责前哨台账与配给统筹的人员，需拥有高度敏锐的审计与仓储管理能力。',
+                                { attributes: { wisdom: 14, awareness: 16 }, vitals: { maxStamina: 90 } }
+                            )
+                        ],
+                        isSanctuarySafe: { food: 30, water: 30 }
+                    }
+                }
+            ),
+            exits: [E.to('blast_door', '检查主防爆门'), E.to('field_medical', '前往野战医务室')]
+        }
+    ),
+
+    // =========================================================================
+    // 2. 指挥中枢区 (9 节点)
+    // =========================================================================
+    node(
+        'command_sector',
+        '指挥中枢走廊',
+        '铺着防滑钢板的加固走廊，两旁墙壁上贴满泛黄的战术避险挂图。上方一整排状态指示灯已近熄灭，只有尽头的一盏应急红灯在以规律的三短一长频率闪烁，像是一串永远无法完成的莫尔斯求救信号。',
+        'Steel-plated floor corridor, faded tactical posters, lists of names crossed out in red marker, status lights mostly dead, one blinking red',
+        {
+            danger: danger.level(2),
+            children: [
                 'command_center',
                 'surveillance_room',
                 'comms_room',
@@ -272,341 +187,290 @@ export const ZONE_BUNKER: SanctuaryTemplate = {
                 'intel_room',
                 'interrogation_room',
                 'records_archive',
-                'logistics_office',
+                'logistics_office'
             ],
-            interactions: [
-                {
-                    desc: '检查状态指示灯',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'error',
-                        narrative: '你靠近那盏唯一亮着的红灯。灯罩下积着黑色灰尘，闪烁频率并不随机，像是在重复某种三短一长的信号。你试图记录时，灯突然熄灭，走廊陷入短暂的绝对黑暗。',
-                        stateChange: { sanity: -2 },
-                    },
-                },
-            ],
-        },
-        command_center: {
-            name: '中央指挥室',
-            desc: '废弃的地下防空洞的核心。生锈的终端机发出幽幽绿光。满地的弹壳和闪烁的雷达屏幕暗示着曾经的惨烈保卫战。墙上的战术地图已经过时，但红色标记依然触目惊心——每一个红叉都代表一个失守的阵地。最后一个红叉标在了这座掩体本身的位置。',
-            visualPrompt: 'Underground bunker command center, rusty terminals glowing green, tactical maps with red markers, bullet casings on the floor, final red X on the bunker position',
-            isDangerous: 3,
+            interacts: [
+                act(
+                    '检查状态指示灯',
+                    '你靠近红灯观察，发现灯罩内部落满死去的飞蛾尸体。就在你试图抄录其闪烁规律时，电流突然爆鸣，灯光瞬间熄灭，走廊陷入数秒绝对死寂的黑暗。',
+                    { cost: 5, sound: 'error', san: -2 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'command_center',
+        '中央指挥室',
+        '前哨站的中枢神经脑区。几台重型终端的绿色荧光屏依然亮着，满地散落着军用步枪弹壳。墙上的巨幅电子态势图被定格在灾变爆发前夜，代表阵地沦陷的红色叉号密集覆盖了整个区域，而最后一个红叉精准烙印在掩体自身的坐标之上。',
+        'Underground bunker command center, rusty terminals glowing green, tactical maps with red markers, bullet casings on the floor, final red X on the bunker position',
+        {
+            danger: danger.level(3),
+            map: 'bunker_command',
             items: [
-                {
-                    id: 'officer_pistol',
-                    name: '军官配枪',
-                    desc: '一把保养良好的 M1911 手枪，枪托上刻着一段经文。',
-                    type: 'weapon',
+                I.weapon(
+                    'officer_pistol',
+                    '军官配枪',
+                    '一把保养完好、配重精确的 M1911 手枪，枪柄胡桃木贴片上刻着一行模糊的祷词。',
+                    'pistol',
+                    5,
+                    24,
+                    [0.2, 16],
+                    28,
+                    { damageType: 'range', grade: 'military', threshold: 20 }
+                ),
+                I.material('ammo_box', '军用弹药箱', '里面整齐装填着军用制式枪弹，铅封完好。', {
                     grade: 'military',
                     size: [2, 1],
-                    discoveryThreshold: 20,
-                    weaponType: 'pistol',
-                    weaponDamageType: 'range',
-                    range: 5,
-                    damage: 24,
-                    crit: { chance: 0.2, bonus: 16 },
-                    maxUses: 8,
-                },
-                {
-                    id: 'ammo_box',
-                    name: '军用弹药箱',
-                    desc: '里面还有一些通用补给。',
-                    type: 'material',
-                    grade: 'standard',
-                    size: [2, 1],
-                    discoveryThreshold: 5,
-                    quantity: 3,
-                },
-                {
-                    id: 'hidden_plan',
-                    name: '防御部署图',
-                    desc: '一张沾血的蓝图，标记着隐藏的武器库。',
-                    type: 'data',
-                    grade: 'military',
-                    size: [1, 1],
-                    discoveryThreshold: 15,
-                    documentContent: 'CLASSIFIED - EYES ONLY。Sector 7 is compromised. Fall back to the bunker. Seal the blast doors. Do not open for ANYONE. 警告：外部通讯已中断。最后收到的命令是「就地坚守」。那是 72 小时前的事了。补充：有人在敲门。但我们没有派人出去。',
-                },
+                    threshold: 5,
+                    qty: 3
+                }),
+                I.data(
+                    'hidden_plan',
+                    '防御部署图',
+                    '一张染有暗红血斑的蓝图，详细标注了掩体内部的暗格与安防盲区。',
+                    '机密·阅后即焚。7号防区失守，全员后撤至掩体深层并降下铅防爆门。严禁向任何未持认证卡者开门。补充：外部通讯已完全中断72小时。昨夜防爆门外传来整齐的踢正步声，但雷达上什么都没有。',
+                    { grade: 'military', threshold: 15 }
+                )
             ],
-            interactions: [
-                {
-                    desc: '启动主战术面板',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'error',
-                        narrative: '你尝试重启面板，屏幕闪烁了几下，显示出一片不可名状的混乱数据流和一张长满獠牙的脸。你赶紧关闭了电源。在屏幕关闭前的最后一帧，你看到了一行文字：深层掩体收容失败。铁壁协议已启动。',
-                        stateChange: { sanity: -5 },
-                    },
-                },
-            ],
-        },
-        surveillance_room: {
-            name: '安保监控室',
-            desc: '一面墙的监视器大多是雪花屏，但有几个还在运作。你可以看到防爆门外的荒原，以及掩体深处某些你不认识的走廊。控制台上有一杯还没喝完的咖啡，已经长满了黑色的霉菌。其中一台监视器显示的画面你无法理解——它似乎在播放这间监控室本身，但画面中多了一个站在你身后的黑影。',
-            visualPrompt: 'Wall of CRT security monitors, mostly static, control console with a moldy coffee cup, one monitor showing the room itself with an extra shadow figure, dim cold lighting',
-            isDangerous: 4,
+            interacts: [
+                act(
+                    '重启主战术面板',
+                    '你强行合上电闸。屏幕在一阵尖啸后跳出混乱的几何雪花，紧接着浮现出一张由神经节错乱拼接出的非人面孔。屏幕熄灭前的最后日志显示：铁壁协议已进入终末清除阶段。',
+                    { cost: 5, sound: 'error', san: -5 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'surveillance_room',
+        '安保监控室',
+        '成排的阴极射线管监视器大部分已烧蚀黑屏，剩下的屏幕在不断刷新着雪花条纹。控制台前倒着半杯干涸发霉的速溶咖啡。其中一块监视屏诡异地映射出监控室内部的俯视景象——画面里，在你身侧的阴影中，正伫立着一个轮廓扭曲的瘦长黑影。',
+        'Wall of CRT security monitors, mostly static, control console with a moldy coffee cup, one monitor showing the room itself with an extra shadow figure, dim cold lighting',
+        {
+            danger: danger.level(4),
             items: [
-                {
-                    id: 'security_log',
-                    name: '安保日志',
-                    desc: '记录了最后几天的监控摘要。',
-                    type: 'data',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 10,
-                    documentContent: '摄像头 4：目标消失。摄像头 5：墙壁在移动。摄像头 1：它们在里面。重复，它们已经在里面了。补充：摄像头 7（深层掩体）出现异常——画面中的收容单元门已经打开了，但安保系统显示门仍处于锁定状态。',
-                },
+                I.data(
+                    'security_log',
+                    '安保监控日志',
+                    '记录了撤离前夕几个关键摄像头的异常报告。',
+                    '03:14 监控04画面撕裂。03:22 监控05捕捉到走廊墙面像肺泡一样舒张。03:40 监控07（深层掩体隔离门）显示内侧铰链被融化，但门禁传感器依然锁死在闭合状态。',
+                    { threshold: 10 }
+                )
             ],
-            interactions: [
-                {
-                    desc: '切换到深层掩体的摄像头',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'terrifying',
-                        narrative: '画面切换到一条昏暗的走廊。起初什么都没有。然后你注意到天花板上有什么东西——一团肉色的、缓慢蠕动的物质，像是巨大的海星贴在混凝土上。它突然快速移动到摄像头正前方，你看到了数十只完全没有虹膜的眼球。然后画面中断了。',
-                        stateChange: { sanity: -8 },
-                    },
-                },
-            ],
-        },
-        comms_room: {
-            name: '机密通讯室',
-            desc: '各种无线电设备和监控屏幕排列在墙边。大多数屏幕只显示雪花，但耳机里传来断断续续的声音，像是求救信号，又像是警告。一台加密通讯终端还在运行，但需要安保权限才能解锁。',
-            visualPrompt: 'Communication room with radio equipment and screens showing static, one active encrypted terminal glowing, wall map with red X marks',
-            isDangerous: 3,
+            interacts: [
+                act(
+                    '切换深层监视信号',
+                    '屏幕强行切入底层冷藏区。红外夜视画面中，一团巨大的肉质聚合体吸附在天花板上，数十枚惨白的眼球无声地转向镜头。屏幕在下一秒被剧烈的电磁杂音撕得粉碎。',
+                    { cost: 5, sound: 'terrifying', san: -8 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'comms_room',
+        '机密通讯室',
+        '大功率军用短波电台整齐排列在防震架上，几副耳机垂挂在调谐旋钮旁。终端扬声器不时喷出一阵带有规律底噪的静电声，似乎在循环播报一条加密短波。',
+        'Communication room with radio equipment and screens showing static, one active encrypted terminal glowing, wall map with red X marks',
+        {
+            danger: danger.level(3),
             items: [
-                {
-                    id: 'last_transmission',
-                    name: '最后的广播',
-                    desc: '一段录制在防水磁带上的绝密通讯。',
-                    type: 'data',
+                I.data('last_transmission', '最后的绝密广播', '一段录制在防磁金属带上的通讯原盘。', {
                     grade: 'military',
-                    size: [1, 1],
-                    discoveryThreshold: 15,
-                    audioScript: '这里是铁锈前哨……我们已经守不住了。重复，防线已全面崩溃。如果有人听到这个录音，不要来找我们。炸毁入口。把我们和这里的东西一起埋葬。',
-                },
-                {
-                    id: 'signal_decoder',
-                    name: '信号解码器',
-                    desc: '便携式解码设备，可以破译加密通讯。',
-                    type: 'material',
+                    threshold: 15,
+                    audio: '这里是铁锈前哨……重复，防御协议已彻底失效。如果外界还有活人听到这条讯号，不要尝试搜救，立即引爆竖井炸药，将深层的东西和我们一起深埋。'
+                }),
+                I.material('signal_decoder', '便携信号解码器', '轻便的军用算法转译机，能够破解基础凯撒与置换密码。', {
                     grade: 'military',
                     size: [2, 1],
-                    discoveryThreshold: 20,
-                },
+                    threshold: 20
+                })
             ],
-            interactions: [
-                {
-                    desc: '尝试接收信号',
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'ui_notification',
-                        narrative: '你调整频率。静电声中，一个声音回应道：收到……不要……移动……他们在……听……声音突然变得清晰无比：你不应该在这里。你应该和其他人一起，在深层掩体里——等一下，你不是我们的人。你是谁？你是怎么——然后信号中断了。',
-                        stateChange: { sanity: -8 },
-                    },
-                },
-                {
-                    desc: '破解通讯加密',
-                    requirements: {
-                        puzzleSolved: {
-                            title: '军方密文拦截',
-                            lore: '拦截到一段经过凯撒密码加密的短波通讯：IDOOEDFN。这是一套典型的军用字符倒推加密系统。需要解密并输入最终原文。',
-                            body: {
-                                type: 'type',
-                                answer: 'FALLBACK',
-                            },
-                            hints: [
-                                '密文长度很短，这是一种简单的字符位移加密系统。',
-                                '军用密码表可能尝试了倒推 3 个字符来防破译。',
-                                '将密文中的每个字母向前推 3 位：I 变成 F，D 变成 A……',
-                            ],
-                            restrictions: {
-                                timeCostPerAttempt: 15,
+            interacts: [
+                act(
+                    '尝试接收全频段信号',
+                    '你在嘈杂的白噪音中捕捉到一段清晰的人声：「退后……不要直视它的轨迹……你不是哨所编制人员……你为什么能活着走到这里……」声音在剧烈的电流刺鸣中戛然而止。',
+                    { cost: 10, sound: 'ui_notification', san: -8 }
+                ),
+                act(
+                    '破解通讯加密',
+                    '密文成功解密为「FALLBACK」（全线撤退），终端随之吐出一张带有后勤高阶认证签名的通行凭证。理性与逻辑的胜利驱散了心中的一丝阴霾。',
+                    {
+                        cost: 15,
+                        san: 10,
+                        puzzle: P.type(
+                            '军方密文拦截',
+                            '拦截到一段由前线指挥部发出的紧急字符倒推加密电文：IDOOEDFN。需要解密还原原文指令。',
+                            'FALLBACK',
+                            {
+                                hints: [
+                                    '电文长度较短，采用典型的凯撒单表位移加密。',
+                                    '旧世军用简易加密常将字母统一向前倒推 3 位。',
+                                    '例如字母 I 还原为 F，D 还原为 A。'
+                                ],
+                                timeCost: 15,
                                 maxAttempts: 3,
-                            },
-                            penalties: { sanity: -10 },
-                        },
-                    },
-                    results: {
-                        timeCost: 15,
-                        soundEffect: 'success',
-                        narrative: '你解开了密文，内容只有一个单词：FALLBACK（撤退）。伴随密文的还有一份掩体后勤权限代码。由于成功破译，你感到一丝自信。',
-                        stateChange: { sanity: 10 },
-                    },
-                },
-            ],
-        },
-        war_room: {
-            name: '作战室',
-            desc: '巨大的沙盘地图占据了房间中央，上面用微缩模型标记着异变前的最后战线。小旗子代表着各个军事单位的位置——大部分被推倒了。沙盘的某个角落被人特意堆高，形成了一个微型的掩体模型，旁边用铅笔写着：我们在这里。没有援军。沙盘下方的抽屉微微突出。',
-            visualPrompt: 'Large sand table tactical map with miniature flags and unit markers, most toppled, detailed bunker model with pencil inscription, drawer slightly open beneath',
-            isDangerous: 2,
-            interactions: [
-                {
-                    desc: '搜索沙盘下方',
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'search',
-                        narrative: '你拉开抽屉，在一堆旧地图下面找到了一张红色边框的磁卡和一张字条：如果你读到这个，说明我已经回不来了。深层掩体的磁卡藏在这里。别去。但如果你必须去——不要相信任何看起来正常的东西。',
-                        stateChange: {
-                            gain: [
-                                {
-                                    id: 'deep_access_card',
-                                    name: '深层安保磁卡',
-                                    desc: '红色边框标识最高权限。背面刻着「铁壁协议」四个字。',
-                                    type: 'material',
-                                    grade: 'corporate',
-                                    size: [1, 1],
-                                },
-                            ],
-                        },
-                    },
-                },
-            ],
-        },
-        intel_room: {
-            name: '情报拦截室',
-            desc: '这间房间的墙壁上覆满了吸音材料，中央架设着一台庞大的信号拦截设备。它仍在自动运行，不断截取外部的无线电波并将其转化为一卷似乎永远用不完的热敏纸文本。大部分内容是乱码，但偶尔会出现几句令人不安的清晰语句。',
-            visualPrompt: 'Soundproofed room, massive signal interception apparatus, continuous thermal paper printout with mostly garbled text, some clear haunting phrases visible',
-            isDangerous: 5,
+                                penalties: { sanity: -10 }
+                            }
+                        )
+                    }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'war_room',
+        '作战室',
+        '厚重的沙盘台占据了房间正中，代表旧世守军部队的塑料微缩旗帜倒伏大半。沙盘一角的地形被刻意挖空，露出由铅块雕凿出的前哨立体截面，底座旁刻着一行铅笔字：孤立无援。',
+        'Large sand table tactical map with miniature flags and unit markers, most toppled, detailed bunker model with pencil inscription, drawer slightly open beneath',
+        {
+            danger: danger.level(2),
+            interacts: [
+                act(
+                    '搜查沙盘暗屉',
+                    '你拉出卡死的木质抽屉，在陈旧的作战地图下摸出一张红色边框的硬质磁卡，上面贴着发黄的绝密封条。',
+                    {
+                        cost: 10,
+                        sound: 'search',
+                        gain: [
+                            I.material('deep_access_card', '深层安保磁卡', '带有深红警告涂装的高权限磁卡，芯片背面刻着「铁壁协议」四个小字。', {
+                                grade: 'corporate'
+                            })
+                        ]
+                    }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'intel_room',
+        '情报拦截室',
+        '四壁贴满深灰色的多孔吸音泡棉。正中架设着一台仍在自行咬合的重型无线电侦听仪，不断吐出长长的热敏打印纸，纸上大半为杂乱的黑点，间歇夹杂着令人毛骨悚然的明文字句。',
+        'Soundproofed room, massive signal interception apparatus, continuous thermal paper printout with mostly garbled text, some clear haunting phrases visible',
+        {
+            danger: danger.level(5),
             items: [
-                {
-                    id: 'encrypted_disk',
-                    name: '加密数据盘',
-                    desc: '军方级加密存储设备。指示灯仍在微弱闪烁。',
-                    type: 'data',
-                    grade: 'military',
-                    size: [1, 1],
-                    discoveryThreshold: 20,
-                    documentContent: '[解密后] 最终报告：异变并非自然现象。我们截获的信号分析表明，这是一次有计划的「播种」。信号源坐标位于[数据损坏]。建议立即对所有已知的「种子」着陆点实施核打击。附注：建议已被上级否决。原因：「种子」已发芽。',
-                },
-                {
-                    id: 'interception_core',
-                    name: '拦截装置核心',
-                    desc: '信号拦截装置仍在运转的核心部件。拆下它，就能让这台机器永远闭嘴。',
-                    type: 'material',
+                I.data(
+                    'encrypted_disk',
+                    '加密情报光盘',
+                    '带有铅硼防辐射外壳的数据介质，指示灯仍在规律闪烁。',
+                    '最终分析备忘录：深渊侵蚀非自然灾害，而是一场有规划的星际播种。我们监听到的高维谐振即为唤醒信号。建议立即对所有降落点实施地毯式核清理。附注：提案已被防务巨头否决，理由是「种子已在第三收容区生根」。',
+                    { grade: 'military', threshold: 20 }
+                ),
+                I.material('interception_core', '拦截装置核心', '信号拦截仪的核心振荡组件，拆除后能让这台永不停歇的机器彻底闭嘴。', {
                     grade: 'military',
                     size: [2, 1],
-                    discoveryThreshold: 18,
-                },
+                    threshold: 18
+                })
             ],
-            interactions: [
-                {
-                    desc: '阅读最新的打印内容',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'typing_1',
-                        narrative: '热敏纸上的最新打印内容：...ALL SECTORS DARK... ...播种完成。收割期开始。... ...坐标已确认。下一个目标：[本掩体的 GPS 坐标]... 你的手指不由自主地颤抖了起来。日期标注的是今天。',
-                        stateChange: { sanity: -10 },
-                    },
-                },
-                {
-                    desc: '用解码器分析热敏纸',
-                    requirements: {
-                        items: ['signal_decoder'],
-                    },
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'typing_2',
-                        narrative: '解码器将乱码转译为坐标与时间表。多个着陆点被圈出，本掩体的坐标被标注为已收割。最后一行写着：清理人频道：无响应。方舟：已封闭。',
-                        stateChange: { sanity: -6 },
-                    },
-                },
-            ],
-        },
-        interrogation_room: {
-            name: '审讯室',
-            desc: '一间加装了隔音海绵的封闭房间，中央有一张固定在地板上的厚重铁椅，绑带已经硬化。单向玻璃被从内部暴力击碎。墙上与天花板上有呈喷射状的暗红色血迹。桌上散落着几支空的注射器和一个仍在空转的录音机。',
-            visualPrompt: 'Soundproofed interrogation room, metal chair bolted to the floor with hardened straps, shattered two-way mirror, arterial blood spatter on walls and ceiling, tape recorder slowly spinning',
-            isDangerous: 6,
+            interacts: [
+                act(
+                    '阅读最新打印内容',
+                    '热敏纸边缘依然带着滚烫的油墨温度：「……方舟已进入封闭航程……地表祭坛活性达到 98%……收割程序就绪……下一个清除坐标：[本前哨精确网格]」。你的冷汗瞬间浸透了衣背。',
+                    { cost: 5, sound: 'typing_1', san: -10 }
+                ),
+                act(
+                    '利用解码器精细破译',
+                    '解码器将乱码重构成作战时间轴。你确认了清理人先遣队的覆灭时间点与深层掩体的沦陷完全同步。底行赫然写着：清理人频道无应答，认知面甲全部烧蚀。',
+                    { cost: 10, sound: 'typing_2', reqItems: ['signal_decoder'], san: -6 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'interrogation_room',
+        '审讯室',
+        '加装隔音铅板的狭窄死室。正中固定着一张焊接在地面的沉重铁椅，皮质束缚带已经硬化干裂。单向透视玻璃被从审讯室内侧以难以置信的蛮力击得粉碎，天花板上残留着大片星芒状的喷射血痕。',
+        'Soundproofed interrogation room, metal chair bolted to the floor with hardened straps, shattered two-way mirror, arterial blood spatter on walls and ceiling, tape recorder slowly spinning',
+        {
+            danger: danger.level(6),
             items: [
-                {
-                    id: 'interrogation_transcript',
-                    name: '审讯笔录（残卷）',
-                    desc: '沾满血迹的军方记录，字迹潦草。',
-                    type: 'data',
-                    grade: 'military',
-                    size: [1, 1],
-                    discoveryThreshold: 10,
-                    documentContent: '对象编号：114（前哨站外勤兵）。症状：极度恐慌，坚称树林里的人不是平民。审讯官提问：你为什么向车队开火？对象回答：他们的骨头……他们的骨头是在皮肤外面生长的！他们是在笑，但声音是从肚子里发出来的！备注：建议对 114 号执行处决。精神污染有扩散迹象。',
-                },
+                I.data(
+                    'interrogation_transcript',
+                    '审讯笔录残卷',
+                    '沾染暗黑污血的审讯记录，字迹因剧烈手颤而扭曲。',
+                    '审讯对象：114号外勤哨兵。提问：为什么拒绝向撤离卡车放行？回答：那不是卡车……里面坐着的不是人！他们的下颌骨在胸口呼吸！他们说话的声音是从胃部翻滚出来的！记录：对象已丧失逻辑，出现严重深渊共鸣，批准就地处决。',
+                    { grade: 'military', threshold: 10 }
+                )
             ],
-            interactions: [
-                {
-                    desc: '倒放录音带',
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'terrifying',
-                        narrative: '你按下倒放键，刺耳的磁带摩擦声后，传出的不是预想中的审讯对话，而是一个低沉、多重重叠的嗓音在念诵某种无法理解的音节。每听一个音节，你的后脑勺都像被针扎一样刺痛。',
-                        stateChange: { sanity: -8 },
-                    },
-                },
-            ],
-        },
-        records_archive: {
-            name: '档案室',
-            desc: '成排的铁皮档案柜被潮气泡胀，标签上的字迹晕开成灰蓝色斑块。这里的每一份文件都曾经代表一个可以追查的名字、一段可以归档的人生。现在，许多档案夹里只剩下反复抄写的同一句话：此人不曾存在。',
-            visualPrompt: 'Military archive room, rusted filing cabinets, damp paper, faded labels, flickering bulb, scattered personnel files with redacted names',
-            isDangerous: 3,
+            interacts: [
+                act(
+                    '倒放桌面录音机',
+                    '磁带卷动发出生涩的摩擦声。耳机里传出的并非人类对话，而是一段层层叠叠、不断变调的多重嘶鸣，像是几十个人的声带在同时撕裂。你的前额叶剧烈刺痛，手忙脚乱地拔掉了插头。',
+                    { cost: 10, sound: 'terrifying', san: -8 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'records_archive',
+        '档案室',
+        '数排高大的铁皮档案柜因地下潮气而严重胀死，泛黄的分类标签大多已霉变为灰绿色的斑块。这里的每一个档案盒都曾记录着一名前哨驻军的生平与履历，如今大多数名字被粗暴地用红笔划死。',
+        'Military archive room, rusted filing cabinets, damp paper, faded labels, flickering bulb, scattered personnel files with redacted names',
+        {
+            danger: danger.level(3),
             items: [
-                {
-                    id: 'personnel_roster',
-                    name: '残存人员名册',
-                    desc: '一份被多次涂改的名单，某些名字被钉书针粗暴地封住。',
-                    type: 'data',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 10,
-                    documentContent: '在册人员：已缩减。备注：不要核对第 7 页之后的签名。如果某个名字开始回应你，立即焚毁本页。补充：后勤办公室仍保留最后批次配给凭证。',
-                },
+                I.data(
+                    'personnel_roster',
+                    '残存人员名册',
+                    '经过多次修正的人员编制单，许多行用钉书钉死死封牢。',
+                    '驻军编制核减记录：不要撕开第7页之后的订书针。如果档案里的某个名字开始在耳边呼应你，立刻焚烧当前页码。后勤主管最后配给单存放在后勤办公室铁柜。',
+                    { threshold: 10 }
+                )
             ],
-            interactions: [
-                {
-                    desc: '翻找被封存的档案',
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'search',
-                        narrative: '你拉开一个卡死的抽屉。里面没有纸，只有数十枚军牌被铁丝穿成一串。每枚军牌背面都刻着相同的日期——今天。',
-                        stateChange: { sanity: -4 },
-                    },
-                },
-            ],
-        },
-        logistics_office: {
-            name: '后勤办公室',
-            desc: '这里曾是维持整个前哨运转的账房。墙上贴着燃料、弹药、药品与口粮的曲线图，所有曲线都在某个时间点同时坠向零点。桌面中央放着一台老式计算器，按键缝隙里嵌着黑色粉末。',
-            visualPrompt: 'Military logistics office, supply charts on wall, old calculator, stacked requisition forms, dusty desk lamp, cold bunker lighting',
-            isDangerous: 2,
+            interacts: [
+                act(
+                    '翻找封存档案箱',
+                    '你撬开最底层卡住的铁抽屉，里面没有纸张，只是一长串用钢丝穿透的金属军牌。令人不寒而栗的是，每一枚军牌背部刻印的阵亡日期都赫然指向今天。',
+                    { cost: 10, sound: 'search', san: -4 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'logistics_office',
+        '后勤办公室',
+        '这里曾是维系整座前哨生存运转的物资调度中枢。墙上的库存折线图记录着粮食、弹药与纯水的断崖式枯竭过程。一张沉重的铁质办公桌上散落着账册与卡死的机械计算器。',
+        'Military logistics office, supply charts on wall, old calculator, stacked requisition forms, dusty desk lamp, cold bunker lighting',
+        {
+            danger: danger.level(2),
             items: [
-                {
-                    id: 'supply_requisition',
-                    name: '最后配给凭证',
-                    desc: '一张盖着红色印章的配给单，末尾写着「仅用于活人」。',
-                    type: 'data',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 8,
-                    documentContent: '配给项目：净水、压缩口粮、镇静剂、滤芯。备注：冷藏储藏室尚有部分冻结军粮。若发现标签变为手写，请勿食用。',
-                },
+                I.data(
+                    'supply_requisition',
+                    '最后配给凭证',
+                    '盖有军需官与医官双重印鉴的调拨单，纸角已被磨圆。',
+                    '项目明细：野战净水药片、加固滤芯、军用镇静针剂。最后批注：冷藏储藏室内尚有少量冻结军粮封存。若发现包装箱封条变为手写暗红字样，绝对禁止开箱食用。',
+                    { threshold: 8 }
+                )
             ],
-            interactions: [
-                {
-                    desc: '核对后勤台账',
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'search',
-                        narrative: '你逐页核对台账。数字一开始还算正常，后来所有栏目都被填成了同一个数：0。最后一页用红笔写着：别把账算平。',
-                        stateChange: { sanity: -3 },
-                    },
-                },
-            ],
-        },
-        living_quarters: {
-            name: '生活区干道',
-            desc: '灯光黯淡的通道，散发着沉闷的汗液、发霉的食物以及消毒水的混合气味。墙壁上有人用粉笔画了一条时间线——从 D-Day 开始，每一天都划上一道。最后几天的划痕越来越深，越来越乱，最后变成了一个巨大的问号。远处的灯管偶尔闪烁，你似乎总能隐约听到有人在哼着一首走调的摇篮曲。',
-            visualPrompt: 'Dimly lit passage, grimy floor tiles, flickering overhead neon bars, chalk timeline on wall ending in a giant question mark',
-            isDangerous: 1,
-            childrenIds: [
+            interacts: [
+                act(
+                    '核算最终库存表',
+                    '你逐页清点残存数字。在最后一页所有物资列归零的下方，有人用红色水笔狠狠划破纸页留下八个大字：「活着就是亏空，别算」。',
+                    { cost: 10, sound: 'search', san: -3 }
+                )
+            ]
+        }
+    ),
+
+    // =========================================================================
+    // 3. 生活区干道 (10 节点)
+    // =========================================================================
+    node(
+        'living_quarters',
+        '生活区干道',
+        '昏暗压抑的长廊，空气中混杂着汗渍、霉变食物与刺鼻的次氯酸钠消毒水味。斑驳的墙壁上有人用白色粉笔画着一道漫长的时间线，末尾几天的划痕深深刻入了水泥墙体，最终化为一个巨大的惊叹号。',
+        'Dimly lit passage, grimy floor tiles, flickering overhead neon bars, chalk timeline on wall ending in a giant exclamation mark',
+        {
+            danger: danger.level(1),
+            children: [
                 'barracks',
                 'mess_hall',
                 'quarantine_cell',
@@ -615,1008 +479,760 @@ export const ZONE_BUNKER: SanctuaryTemplate = {
                 'water_purification',
                 'decon_shower',
                 'laundry_room',
-                'cold_storage',
+                'cold_storage'
             ],
-            interactions: [
+            interacts: [
+                act(
+                    '辨认粉笔时间刻痕',
+                    '你顺着刻痕向前摸索，发现最后几天的计数是由重叠的人名笔划构成的。在最深处的一道划痕旁，刻着几个极小的字：「它们就在门后看着我们数」。',
+                    { cost: 5, sound: 'search', san: -2 }
+                )
+            ],
+            npc: npc(
+                'npc_survivor_sasha',
+                '通讯兵萨莎',
+                '前哨站的前沿通讯兵。灾变爆发当夜，她正蜷缩在通风管道中抢修断裂的同轴电缆，耳机里完整收录了所有战友在不同防区的最后尖叫。自那以后，她再也不肯佩戴开启状态的对讲机，但她的听觉已进化到能够捕捉数面墙之外的肌肉蠕动。',
+                'Young female survivor and former communications soldier, oversized military jacket, wary alert eyes, headphones resting around neck, dim living quarters lighting',
                 {
-                    desc: '辨认粉笔时间线',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'search',
-                        narrative: '你靠近那条粉笔时间线。最后几道划痕并不是数字，而是反复描画的正字。正字中央写着一个小小的词：还在。你不知道它指的是人，还是别的什么。',
-                        stateChange: { sanity: -2 },
-                    },
-                },
-            ],
-            nodeNpc: {
-                id: 'npc_survivor_sasha',
-                name: '通讯兵萨莎',
-                gender: 'female',
-                desc: '前哨站的通讯兵。灾变降临时她正躲在生活区的通风管道里检修线路，透过对讲系统亲耳听见战友们一个接一个的最后时刻。此后她不愿再碰任何会发声的设备，但她的耳朵依旧敏锐得可怕。她对陌生人抱有本能的警惕，可一旦确认你值得信任，她会成为战场上最好的眼睛和耳朵。',
-                visualPrompt:
-                    'Young female survivor and former communications soldier, oversized military jacket, wary alert eyes, headphones resting around neck, dim living quarters lighting',
-                style: 'skirmish',
-                initialState: {
+                    gender: 'female',
+                    style: 'skirmish',
                     trust: 25,
-                    attribute: {
-                        strength: 8,
-                        agility: 17,
-                        wisdom: 14,
-                        awareness: 16,
-                        will: 9,
-                        cthulhu: 5,
-                    },
-                    vital: {
-                        maxHp: 85,
-                        maxSanity: 100,
-                        maxStamina: 95,
-                        maxVigor: 95,
-                    },
+                    attrs: { strength: 8, agility: 20, wisdom: 16, awareness: 28, will: 10, cthulhu: 6 },
+                    vitals: { maxHp: 90, maxSanity: 95, maxStamina: 100, maxVigor: 95 },
                     quests: [
-                        {
-                            id: 'silent_frequency',
-                            desc: '萨莎希望你潜入情报拦截室，拆下那台仍在运转的信号拦截装置的核心。那个声音日夜折磨着她，而她再也不愿靠近那台机器。让它闭嘴，她会把重新校准好的战术耳机给你。',
-                            goals: [
-                                {
-                                    id: 'interception_core',
-                                    name: '拦截装置核心',
-                                    desc: '信号拦截装置仍在运转的核心部件。',
-                                    type: 'material',
+                        quest(
+                            'silent_frequency',
+                            '情报拦截室里那台机器自发运转的噪波正日夜钻入萨莎的大脑。她恳求你潜入情报室拆下拦截装置的核心，还她哪怕一个小时的绝对清静。',
+                            5,
+                            [
+                                I.material('interception_core', '拦截装置核心', '仍在自动发热振荡的情报设备核心部件。', {
                                     grade: 'military',
-                                    size: [2, 1],
-                                },
+                                    size: [2, 1]
+                                })
                             ],
-                            rewards: [
-                                {
-                                    id: 'comm_earpiece',
-                                    name: '战术通讯耳机',
-                                    desc: '萨莎重新校准过的通讯耳机，能让你在战场噪声中捕捉到最细微的动静。',
-                                    type: 'accessory',
-                                    grade: 'military',
-                                    size: [1, 1],
-                                    effects: [
-                                        ['awareness', 3],
-                                        ['maxSanity', 5],
-                                    ],
-                                },
-                            ],
-                            difficulty: 5,
-                        },
+                            [
+                                I.accessory(
+                                    'comm_earpiece',
+                                    '战术通讯耳机',
+                                    '萨莎亲手改装并校准阻抗的防噪耳机，能大幅滤除环境恶念。',
+                                    [['awareness', 3], ['maxSanity', 5]],
+                                    { grade: 'military' }
+                                )
+                            ]
+                        )
                     ],
-                },
-                canBeInvited: {
-                    trust: 55,
-                    isSanctuarySafe: { food: 20 },
-                },
-                willRoam: {
-                    speed: 40,
-                    route: ['barracks', 'mess_hall', 'officers_quarters'],
-                },
-            },
-        },
-        barracks: {
-            name: '士兵营房',
-            desc: '双层床铺整齐的排列，有些床上还有未收拾的个人物品。储物柜大多被撬开。墙上贴着家人的照片和剪报。角落里有一个简易的急救站。最触目的是一面墙上钉满了士兵们的集体合照——每张照片上都有人的脸被用黑色记号笔涂掉了。被涂掉的人越来越多，最后一张照片上只剩下一个人没有被涂掉。',
-            visualPrompt: 'Rows of bunk beds with messy sheets, walls plastered with photos and open empty lockers, group photos with increasingly more faces blacked out, small first aid station',
-            isDangerous: 2,
+                    canBeInvited: { trust: 55, isSanctuarySafe: { food: 20 } },
+                    willRoam: roam.route(40, ['barracks', 'mess_hall', 'officers_quarters'])
+                }
+            )
+        }
+    ),
+
+    node(
+        'barracks',
+        '士兵营房',
+        '双层角铁床铺沿墙排开，很多铺位上的被褥依然保持着紧急起床时的掀开状态。储物铁柜大多被强行撬开，角落里有一面挂满士兵合影的告示板——多数面孔已被黑记号笔抹去，唯独最右下角的一张新兵脸颊依然清晰。',
+        'Rows of bunk beds with messy sheets, walls plastered with photos and open empty lockers, group photos with increasingly more faces blacked out, small first aid station',
+        {
+            danger: danger.level(2),
             items: [
-                {
-                    id: 'combat_knife',
-                    name: '战斗匕首',
-                    desc: '标准军用匕首，刀刃依然锋利。',
-                    type: 'weapon',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 10,
-                    weaponType: 'prick',
-                    weaponDamageType: 'melee',
-                    range: 1,
-                    damage: 10,
-                    crit: { chance: 0.25, bonus: 6 },
-                    maxUses: 12,
-                },
-                {
-                    id: 'soldier_letter',
-                    name: '未寄出的信',
-                    desc: '一封写给家人的信，字迹越来越潦草。',
-                    type: 'data',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 5,
-                    documentContent: '亲爱的妈妈：我很好，不用担心。这里的情况……比预想的复杂。他们说很快就能回家，但我不确定。昨晚有人失踪了。长官说是逃兵，但我看到了血迹。如果我回不去了，请告诉小明，哥哥爱他。（信的最后几行被撕掉了）',
-                },
-                {
-                    id: 'soldier_helmet',
-                    name: '旧制式头盔',
-                    desc: '内衬写着多个不同名字的旧头盔，似乎曾被不同士兵轮流使用。',
-                    type: 'accessory',
-                    grade: 'standard',
+                I.weapon(
+                    'combat_knife',
+                    '制式战斗匕首',
+                    '锋刃经过哑光发黑处理的军用格斗刺刀，握把缠有粗糙的防滑帆布绳。',
+                    'prick',
+                    1,
+                    12,
+                    [0.25, 6],
+                    20,
+                    { grade: 'military', size: [1, 1], threshold: 10 }
+                ),
+                I.data(
+                    'soldier_letter',
+                    '未寄出的家书',
+                    '折叠整齐但沾有泥土的信纸，笔迹在末尾几行近乎穿透纸背。',
+                    '亲爱的阿梅：这里的情况远比演习报告危险。昨夜巡逻时，老张听到外围树林里有人用我妈妈的声音喊我。我端着枪没出去，但老张翻过了铁丝网。如果这封信最后落到你手里，答应我，离任何防空设施远一点。',
+                    { threshold: 5 }
+                ),
+                I.accessory('soldier_helmet', '旧制式芳纶头盔', '悬挂系统经过多次加固的防片头盔，内部衬垫写满阵亡老兵的呼号。', [['maxHp', 10]], {
                     size: [2, 2],
-                    discoveryThreshold: 10,
-                    effects: [['maxHp', 10]],
-                },
+                    threshold: 10
+                })
             ],
-            interactions: [
-                {
-                    desc: '搜索储物柜',
-                    results: {
-                        timeCost: 15,
-                        soundEffect: 'item_pickup',
-                        narrative: '你在一个上锁的柜子后面找到了一些被藏起来的补给。还有一张照片——照片上的年轻士兵笑得很灿烂，背面写着等我回来。但这个柜子的名牌和墙上最后那张合照中唯一没被涂掉的脸对应。',
-                        stateChange: {
-                            gain: [
-                                {
-                                    id: 'hidden_ration',
-                                    name: '私藏口粮',
-                                    desc: '被士兵藏起来的额外食物。',
-                                    type: 'consumable',
-                                    grade: 'standard',
-                                    size: [1, 1],
-                                    effects: [['hp', 15]],
-                                },
-                            ],
-                        },
-                    },
-                },
-            ],
-        },
-        mess_hall: {
-            name: '战术食堂',
-            desc: '翻倒的金属桌椅成了临时掩体。打饭窗口已经被钢板焊死。地板上有着大片风干的血迹——但更诡异的是，血迹的形状不像是人倒下后流淌形成的，而是像什么东西从天花板上滴落的。抬头一看，天花板上有一个完美的圆形腐蚀痕迹。',
-            visualPrompt: 'Overturned metal tables forming barricades, welded-shut serving window, huge dried blood stains on floor, circular corrosion mark on ceiling directly above',
-            isDangerous: 3,
-            items: [
-                {
-                    id: 'emergency_ration',
-                    name: '应急口粮',
-                    desc: '真空包装的压缩饼干，保质期已过但似乎还能吃。',
-                    type: 'consumable',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 5,
-                    effects: [['hp', 15]],
-                },
-            ],
-            interactions: [
-                {
-                    desc: '翻找食物残渣',
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'search',
-                        narrative: '你在一个破裂的塑料桶中找到了一点剩余的净水和口粮包。桶底有一面被塞进去的手写标语：战友们，我已经无法确定食物里是否被掺了东西。但饿死和未知之间，我选择吃。如果我明天变成了它们中的一个——别犹豫，开枪。',
-                        stateChange: {
-                            gain: [
-                                {
-                                    id: 'emergency_ration',
-                                    name: '应急口粮',
-                                    desc: '桶底被小心保存的罐头。',
-                                    type: 'consumable',
-                                    grade: 'standard',
-                                    size: [1, 1],
-                                    effects: [['hp', 15]],
-                                },
-                            ],
-                        },
-                    },
-                },
-            ],
-        },
-        quarantine_cell: {
-            name: '重症隔离区',
-            desc: '位于营房深处的透明隔离室。强化玻璃上有裂纹，内部墙壁上满是抓痕和血手印。这里曾关押着第一批出现症状的士兵。隔离室的对讲机还在通电——偶尔会自行发出几秒的白噪音，像是有人按下了对讲按钮但没有说话。仔细听，对讲机中偶尔会传出微弱的求救声，令人毛骨悚然的是，那声音与你之前失踪的某位队友极为相似。',
-            visualPrompt: 'Transparent isolation cell with reinforced glass, glass cracked, scratches and bloody handprints on interior walls, intercom light occasionally blinking',
-            isDangerous: 6,
-            items: [
-                {
-                    id: 'painkillers',
-                    name: '止痛药',
-                    desc: '只能麻痹肉体。恢复少量 HP。',
-                    type: 'consumable',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 15,
-                    effects: [['hp', 15]],
-                },
-            ],
-            interactions: [
-                {
-                    desc: '查看医疗记录板',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'typing_1',
-                        narrative: '记录显示病人的体温在死亡后持续升高，脑电波异常活跃。最后一行备注：不要打开门，不管听到什么声音。在记录下方有人用颤抖的笔迹补了一行：他在门里面说我的名字。但他已经死了三天了。',
-                        stateChange: { sanity: -5 },
-                    },
-                },
-                {
-                    desc: '搜查隔离区药品柜',
-                    results: {
-                        timeCost: 15,
-                        soundEffect: 'search',
-                        narrative: '你撬开变形的药品柜，里面只剩下破碎的空瓶和凝固的黑色药渣。就在你准备离开时，隔离玻璃后传来湿滑的撞击声，仿佛有什么东西一直在等待你靠近。',
-                        stateChange: {
-                            spawnEnemy: [
-                                {
-                                    type: 'cthulhu',
-                                    id: 'quarantine_subject',
-                                    name: '隔离对象-114',
-                                    gender: 'both',
-                                    desc: '曾经的第一批感染者。隔离服与皮肤融合成一层半透明的膜，胸腔以不自然的频率起伏。它的眼睑被自身分泌物封死，却能准确朝向你的呼吸声。',
-                                    visualPrompt:
-                                        'Humanoid patient in torn isolation gown, translucent fused skin membrane, chest cavity pulsing irregularly, sealed eyelids, dim isolation cell lighting',
-                                    range: 2,
-                                    speed: 24,
-                                    damage: 22,
-                                    defense: 12,
-                                    evasion: 18,
-                                    intentDistribution: {
-                                        attack: 56,
-                                        defense: 12,
-                                        buff: 6,
-                                        debuff: 18,
-                                        observe: 8,
-                                    },
-                                    lootTable: [
-                                        {
-                                            id: 'contaminated_sample',
-                                            name: '污染样本',
-                                            desc: '密封在破裂培养管中的活性组织，仍在轻微收缩。',
-                                            type: 'material',
-                                            grade: 'prototype',
-                                            size: [1, 1],
-                                            dropProbability: 0.8,
-                                        },
-                                        {
-                                            id: 'painkillers',
-                                            name: '止痛药',
-                                            desc: '只能麻痹肉体。恢复少量 HP。',
-                                            type: 'consumable',
-                                            grade: 'standard',
-                                            size: [1, 1],
-                                            effects: [['hp', 15]],
-                                            dropProbability: 0.35,
-                                        },
-                                    ],
-                                },
-                            ],
-                        },
-                    },
-                },
-            ],
-        },
-        chapel_bunker: {
-            name: '军用礼拜室',
-            desc: '一间用储藏室改造的简陋礼拜堂。几排折叠椅面向一个木头十字架。十字架下堆满了士兵们留下的物品——军牌、家书、照片、玩具。有人在墙上用白漆写着：GOD IS NOT HERE. BUT WE ARE. 时间久了，白漆下面渗透出了更早的红色字迹，但你无法辨认那些字写的是什么语言。',
-            visualPrompt: 'Makeshift chapel in a storage room, folding chairs, wooden cross, offerings of dog tags and photos, faded white paint slogan over older red stains, dim solemn lighting',
-            items: [
-                {
-                    id: 'pilgrim_token',
-                    name: '朝圣者护符',
-                    desc: '用弹壳和布条缠成的简陋护符，摸起来异常温热。',
-                    type: 'accessory',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 10,
-                    effects: [['maxSanity', 10]],
-                },
-            ],
-            nodeNpc: {
-                id: 'npc_father_thomas',
-                name: '托马斯神父',
-                gender: 'male',
-                desc: '原本是掩体的随军牧师，灾变后依靠某种未知的信仰和变异的真菌维持着生命。他的半个身体已经与墙壁上的菌毯融合，但眼神依然清澈。',
-                visualPrompt:
-                    'An elderly priest half fused with glowing wall fungus, wearing a tattered priest collar, remarkably clear calm eyes, dim chapel lighting, religious atmosphere',
-                style: 'defense',
-                initialState: {
-                    trust: 40,
-                    attribute: {
-                        strength: 4,
-                        agility: 5,
-                        wisdom: 24,
-                        awareness: 16,
-                        will: 28,
-                        cthulhu: 20,
-                    },
-                    vital: {
-                        maxHp: 55,
-                        maxSanity: 200,
-                        maxStamina: 55,
-                        maxVigor: 60,
-                    },
-                    quests: [
-                        {
-                            id: 'echo_of_faith',
-                            desc: '托马斯神父希望你在深层掩体中找到「最初接触记录」。他想确认，那场实验的终点究竟是人类的傲慢，还是某种更高层级的回应。',
-                            goals: [
-                                {
-                                    id: 'first_contact_record',
-                                    name: '最初接触记录',
-                                    desc: '被保存在防爆箱内的黑色数据盘，表面有被融化的痕迹。',
-                                    type: 'data',
-                                    grade: 'corporate',
-                                    size: [1, 1],
-                                    documentContent:
-                                        '协议：深渊凝视。我们挖出了它。它在休眠。我们试图唤醒它以获取科技，但这完全是个错误。当它睁开眼睛时，我们的时空被重写了。它不需要传播病毒，它传播的是物理法则本身的变异。原谅我们。',
-                                },
-                            ],
-                            rewards: [
-                                {
-                                    id: 'blessed_water',
-                                    name: '祝圣纯水',
-                                    desc: '托马斯神父祝福过的少量纯水，能短暂安抚被深渊噪声侵蚀的精神。',
-                                    type: 'consumable',
-                                    grade: 'military',
-                                    size: [1, 1],
-                                    effects: [
-                                        ['sanity', 25],
-                                        ['hp', 10],
-                                    ],
-                                },
-                                {
-                                    id: 'martyr_stole',
-                                    name: '殉道者圣带',
-                                    desc: '托马斯神父赠予的旧圣带，织物里缠着早已干枯的荧光菌丝。握住它时，深渊的低语会退成遥远的背景音。',
-                                    type: 'accessory',
-                                    grade: 'corporate',
-                                    size: [2, 1],
-                                    effects: [
-                                        ['will', 4],
-                                        ['maxSanity', 20],
-                                    ],
-                                },
-                            ],
-                            difficulty: 9,
-                        },
-                    ],
-                },
+            interacts: [
+                act(
+                    '搜寻床铺与柜底',
+                    '你在松动的床板夹层里翻出了半包用油纸严密包裹的压缩干粮，塑料膜上用圆珠笔写着「撑到换防」。',
+                    {
+                        cost: 15,
+                        sound: 'item_pickup',
+                        gain: [
+                            I.consumable('hidden_ration', '私藏军用口粮', '被细心防潮封存的高热量压缩饼干与肉脯。', [
+                                ['hp', 15],
+                                ['stamina', 20]
+                            ])
+                        ]
+                    }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'mess_hall',
+        '战术食堂',
+        '翻倒的长条铁桌被堆叠成抵御内部冲击的掩体。打饭铁窗口已被生锈的钢板焊死。地板上凝固着大片深褐色的干涸污迹——仰头望去，正上方的混凝土吊顶上赫然有一处规则的强酸蚀穿孔洞，露出断裂的钢筋。',
+        'Overturned metal tables forming barricades, welded-shut serving window, huge dried blood stains on floor, circular corrosion mark on ceiling directly above',
+        {
+            danger: danger.level(3),
+            facility: {
+                id: 'facility_bunker_mess',
+                name: '战术食堂配给口',
+                desc: '战术食堂的军用热食分发窗，利用地热与电热板烹饪脱水军粮与烂炖罐头，是地下掩体内仅存的凡俗烟火气。',
+                function: { food: 6, water: -2 }
             },
-            interactions: [
-                {
-                    desc: '在十字架前静坐',
-                    results: {
-                        timeCost: 30,
-                        soundEffect: 'success',
-                        narrative: '你坐下来，闭上眼睛。沉默中，你听到了自己的心跳，稳定而有力。在杀戮和恐惧之后，这种简单的、证明你还活着的声音带来了意想不到的安慰。你的双手不再颤抖。',
-                        stateChange: { sanity: 15 },
-                    },
-                },
-            ],
-        },
-        officers_quarters: {
-            name: '军官寝室',
-            desc: '与士兵营房相比，这里的条件好得多——独立的床铺、小书桌、甚至还有一台便携式唱片机。但空气中弥漫着一股刺鼻的化学气味——有人用双氧水彻底清洗过这里。桌上的笔记本被翻到最后一页。唱片机的唱针还在转动，但唱片早已播放完毕，只有无尽的沙沙声。',
-            visualPrompt: 'Officer room, single bed, desk with journal, portable record player still spinning silently, chemical clean smell, sterile compared to the rest of the bunker',
-            isDangerous: 3,
             items: [
-                {
-                    id: 'officer_diary',
-                    name: '军官日记',
-                    desc: '一本皮面笔记本，最后几页的字迹越来越潦草。',
-                    type: 'data',
-                    grade: 'military',
-                    size: [1, 1],
-                    discoveryThreshold: 10,
-                    documentContent: '我知道高层在隐瞒什么。深层掩体的门为什么突然需要新的安保协议？隔壁寝室的上校昨晚没有回来。今天早上他出现在食堂，微笑着，但——他的笑法不对。像是在模仿人类的微笑，但肌肉运动的顺序是错的。我把备用钥匙藏在了作战室的沙盘下面。如果你在读这些，你需要它。',
-                },
-                {
-                    id: 'record_player_battery',
-                    name: '唱片机电池',
-                    desc: '以备不时之需的电池。',
-                    type: 'consumable',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 15,
-                    effects: [['battery', 40]],
-                },
+                I.consumable('emergency_ration', '应急军用罐头', '密封良好的马口铁军用红烧肉罐头，保质期虽然过期但内部依然真空完好。', [
+                    ['hp', 15],
+                    ['stamina', 15]
+                ], { threshold: 5 })
             ],
-            interactions: [
-                {
-                    desc: '播放唱片',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'error',
-                        narrative: '你将唱针放回唱片起始位置。传出的不是音乐——而是一段录音。一个疲惫的男声：最终报告。日期……已不重要。深层掩体的收容全面失败。铁壁计划从一开始就不是为了制造武器。上面的人想要和异变对话。他们成功了。但对话的代价——录音在一声尖锐的电子噪音中变成了沉默。',
-                        stateChange: { sanity: -5 },
-                    },
-                },
-            ],
-        },
-        water_purification: {
-            name: '公共净水室',
-            desc: '庞大的金属水箱排列在房间两侧，维持着前哨站的生命循环。过滤主泵仍在发出沉闷的低吼。其中一个水箱的观察玻璃窗被内部某种黑色的絮状生物膜糊满了，依稀能看到里面有什么庞然大物在缓慢游动。',
-            visualPrompt: 'Large industrial water purification room, massive metal tanks, pumping machinery, one tank window obscured by dark web-like biofilm from the inside, a vague giant silhouette swimming within',
-            isDangerous: 4,
+            interacts: [
+                act(
+                    '翻检配膳台密封桶',
+                    '你在翻倒的配给保温桶中找到了残存的未开封口粮。桶身内壁用刺刀刻着一行遗言：「如果我明天开始像隔壁床那样用喉咙哼歌，别犹豫，对着我的额头扣扳机」。',
+                    {
+                        cost: 10,
+                        sound: 'search',
+                        gain: [
+                            I.consumable('emergency_ration', '应急军用罐头', '保温桶底被小心保存的罐头。', [
+                                ['hp', 15],
+                                ['stamina', 15]
+                            ])
+                        ]
+                    }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'quarantine_cell',
+        '重症隔离区',
+        '位于营房最深处的加厚有机玻璃隔离间。玻璃内壁布满了令人心悸的疯狂抓痕与断裂的指甲碎片。对讲扬声器仍通着微弱电流，断断续续喷出混浊的喘息音，仔细辨认，那呼唤声竟然在模仿着某位熟识同伴的语调。',
+        'Transparent isolation cell with reinforced glass, glass cracked, scratches and bloody handprints on interior walls, intercom light occasionally blinking',
+        {
+            danger: danger.level(6),
             items: [
-                {
-                    id: 'clean_water_flask',
-                    name: '应急纯水储备',
-                    desc: '未被污染的纯净水，饮用后能极大缓解心理与生理干渴。',
-                    type: 'consumable',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 12,
-                    effects: [
-                        ['sanity', 10],
-                        ['hp', 5],
-                    ],
-                },
+                I.consumable('painkillers', '强效止痛药', '军用麻醉性镇痛胶囊，能麻痹剧烈伤痛并稳定体征。', [['hp', 15]], { threshold: 15 })
             ],
-            interactions: [
-                {
-                    desc: '尝试清洗观察窗',
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'terrifying',
-                        narrative: '你找了块破布，试着擦去玻璃外侧的污垢。就在你看清内部全貌的瞬间，水箱里的庞然大物猛地撞击在玻璃上——那是一团纠缠在一起的无数人类四肢形成的肉球，每一只手都在徒劳地抓挠着水流！玻璃发出了危险的龟裂声。',
-                        stateChange: { sanity: -12 },
-                    },
-                },
-            ],
-        },
-        decon_shower: {
-            name: '洗消淋浴间',
-            desc: '瓷砖墙面布满褐色水垢，金属喷头像一排失去视力的眼睛。地面上残留着洗消粉的白色粉末，排水口附近却有一圈不自然的黑色绒毛。这里的空气比外面更冷，也更干净——干净得让人怀疑它刚刚被什么东西过滤过。',
-            visualPrompt: 'Military decontamination shower room, stained tiles, rusted shower heads, white decon powder on floor, dark organic fibers near drain, cold bunker lighting',
-            isDangerous: 3,
+            interacts: [
+                act(
+                    '查阅床头病历挂牌',
+                    '体温记录显示患者在脑电波平直后，体内脏器温度仍在持续升高至摄氏45度。末行批注用发颤的字体写着：「他在里面隔着玻璃叫我的小名，但我三天前亲手核验了他的死亡报告」。',
+                    { cost: 5, sound: 'typing_1', san: -5 }
+                ),
+                act(
+                    '强行搜查受损药柜',
+                    '你刚用撬棍别开变形的铁柜，隔离舱的泄压阀突然失控爆开，浓烈的腐氨恶臭喷涌而出，一具被结缔组织完全包裹的非人躯体向你扑来！',
+                    {
+                        cost: 15,
+                        sound: 'search',
+                        spawnEnemy: [
+                            enemy.cthulhu(
+                                'quarantine_subject',
+                                '隔离对象-114',
+                                '曾经的前线哨兵，如今病号服与外翻的皮下结缔组织融为一体。胸腔内寄生着脉动的星神质囊泡，虽双眼被分泌物封闭，却能对活人的呼吸产生狂暴的扑杀冲动。',
+                                'Humanoid patient in torn isolation gown, translucent fused skin membrane, chest cavity pulsing irregularly, sealed eyelids, dim isolation cell lighting',
+                                [22, 22, 14, 16, 2],
+                                {
+                                    intents: { attack: 56, defense: 12, buff: 6, debuff: 18, observe: 8 },
+                                    loot: [
+                                        loot(
+                                            I.material('contaminated_sample', '轻度污染样本', '装在破裂离心管内的深渊活性生物组织。', {
+                                                grade: 'prototype'
+                                            }),
+                                            0.8
+                                        ),
+                                        loot(I.consumable('painkillers', '强效止痛药', '军用麻醉性镇痛胶囊。', [['hp', 15]]), 0.35)
+                                    ]
+                                }
+                            )
+                        ]
+                    }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'chapel_bunker',
+        '军用礼拜室',
+        '由备用储藏室改建的简陋战地祷告所。粗糙的松木十字架下堆满了死者留下的军牌、泛黄的婴儿照片与手编毛线符。墙壁上用白漆刷着醒目的字标：「上帝不在这里，但我们仍在此处」。然而白漆底层，某种古老暗红的几何图形正在缓缓渗出。',
+        'Makeshift chapel in a storage room, folding chairs, wooden cross, offerings of dog tags and photos, faded white paint slogan over older red stains, dim solemn lighting',
+        {
             items: [
-                {
-                    id: 'decon_solution',
-                    name: '洗消消毒液',
-                    desc: '军用洗消药剂，气味刺鼻，但至少证明这里曾试图维持人类的卫生标准。',
-                    type: 'consumable',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 8,
-                    effects: [
-                        ['sanity', 8],
-                        ['hp', 5],
-                    ],
-                },
+                I.accessory('pilgrim_token', '朝圣者护符', '用击发过的重机枪弹壳与军礼服金线缠绕制成的简易吊坠，握在掌心有一股微弱的温热感。', [['maxSanity', 10]], {
+                    threshold: 10
+                })
             ],
-            interactions: [
-                {
-                    desc: '启动残余喷淋',
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'item_use',
-                        narrative: '你扳下锈蚀的阀门。管道咳嗽了几声，喷出一阵混着铁锈的冷水。水流落在皮肤上的瞬间，你短暂地感觉自己仍然是人类。',
-                        stateChange: { sanity: 6, hp: 3 },
-                    },
-                },
+            interacts: [
+                act(
+                    '在木十字架前默祷',
+                    '你坐在冰冷的铁折叠椅上，在幽暗的菌毯微光中闭目凝神。周围狂乱的深渊低语退潮般化为白噪音，你听到了自己平稳的心跳，颤抖的双手重新恢复了稳定。',
+                    { cost: 30, san: 15 }
+                )
             ],
-        },
-        laundry_room: {
-            name: '洗衣房',
-            desc: '几台工业洗衣机被固定在地板上，舱门半开，里面塞着发霉的军服。墙角的晾衣绳上还挂着成排的姓名布条，有些名字已经被黑色菌丝缝成了新的单词。',
-            visualPrompt: 'Underground bunker laundry room, industrial washing machines, moldy uniforms, hanging name tags, fungal threads weaving through fabric, dim utility lighting',
-            isDangerous: 2,
+            npc: npc(
+                'npc_father_thomas',
+                '托马斯神父',
+                '原基地的随军天主教神甫。大灾变降临后，他的下半身已与墙体上滋生的淡金色发光菌毯不可逆地融为一体。尽管神经系统承受着高维常数的重构，他的双眸却异乎寻常地沉静清澈，用微弱的嗓音为所有迷茫的生还者诵念悼词。',
+                'An elderly priest half fused with glowing wall fungus, wearing a tattered priest collar, remarkably clear calm eyes, dim chapel lighting, religious atmosphere',
+                {
+                    gender: 'male',
+                    style: 'defense',
+                    trust: 40,
+                    attrs: { strength: 4, agility: 4, wisdom: 32, awareness: 22, will: 45, cthulhu: 35 },
+                    vitals: { maxHp: 80, maxSanity: 240, maxStamina: 60, maxVigor: 70 },
+                    quests: [
+                        quest(
+                            'echo_of_faith',
+                            '托马斯神父希望你能从零号收容区带回军方最初接触异变源头的「最初接触记录」。他渴望证实，这场降临究竟源自人类傲慢的自毁，还是深空彼岸神性对凡尘苦难的真正回应。',
+                            9,
+                            [
+                                I.data('first_contact_record', '最初接触记录', '封存在钛合金防爆盒内的黑色记录仪核心，表面有被等离子射线灼烧融化的痕迹。', {
+                                    grade: 'corporate'
+                                })
+                            ],
+                            [
+                                I.consumable('blessed_water', '祝圣纯水', '经过神甫祈祷与菌丝微滤的纯净水，能抚慰遭受剧烈震荡的神经。', [
+                                    ['sanity', 25],
+                                    ['hp', 10]
+                                ], { grade: 'military' }),
+                                I.accessory('martyr_stole', '殉道者圣带', '带有微弱生物荧光的祭披织物，持有时能显著构筑精神锚点。', [
+                                    ['will', 4],
+                                    ['maxSanity', 20]
+                                ], { grade: 'corporate', size: [2, 1] })
+                            ]
+                        )
+                    ]
+                }
+            )
+        }
+    ),
+
+    node(
+        'officers_quarters',
+        '军官寝室',
+        '比起士兵营房，这里的单人铁床与橡木办公桌显得齐整得多。空气中有一股强烈的双氧水气味，显示出有人曾试图消灭某种看不见的污染。便携式黑胶唱机上的唱针早已在空槽中划磨出尖锐刺耳的白噪音。',
+        'Officer room, single bed, desk with journal, portable record player still spinning silently, chemical clean smell, sterile compared to the rest of the bunker',
+        {
+            danger: danger.level(3),
             items: [
-                {
-                    id: 'cloth_bandage',
-                    name: '撕碎的绷带布',
-                    desc: '从相对干净的军服上撕下来的布条，勉强可以充当应急包扎材料。',
-                    type: 'material',
+                I.data(
+                    'officer_diary',
+                    '少校指挥日记',
+                    '一本磨损严重的牛皮封面日记本，记录了封锁命令背后的阴谋。',
+                    '深层掩体的隔离锁死根本不是为了防范生化泄漏——基金会的特派员早就知道会发生什么。他们要的不是防务武器，他们试图借由实验体的肉身让高维存在在三维现实中发出第一个音节。作战室沙盘下有备用钥匙，如果读到这行字的人还没疯，不要相信任何穿着基金会制服的人。',
+                    { grade: 'military', threshold: 10 }
+                ),
+                I.consumable('record_player_battery', '小型储能电池', '军官私藏的便携电池模块，状态良好。', [['battery', 40]], {
+                    threshold: 15
+                })
+            ],
+            interacts: [
+                act(
+                    '重置唱机音轨',
+                    '唱针落入唱片内圈，扬声器里传出的却是一个疲惫男人的军务口令录音：「……如果有人打开了门，切断氧气……他们已经不是在微笑了，他们的面部神经是由菌丝在牵引……」。录音在一声枪响中归于寂静。',
+                    { cost: 5, sound: 'error', san: -5 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'water_purification',
+        '公共净水室',
+        '两座三层楼高的圆柱形加压净水塔巍然耸立，工业滤泵正发出沉重低沉的轰鸣。其中一座主水箱的钢化玻璃观察视窗已被内部滋生的黑色黏网彻底糊死，隐约能看到某个庞大的暗色轮廓在水下缓慢翻滚舒展。',
+        'Large industrial water purification room, massive metal tanks, pumping machinery, one tank window obscured by dark web-like biofilm from the inside, a vague giant silhouette swimming within',
+        {
+            danger: danger.level(4),
+            facility: {
+                id: 'facility_bunker_purifier',
+                name: '公共净水循环塔',
+                desc: '工程舱净水装置残骸被重新焊接疏通，勉强维持前哨饮用水循环。水质浑浊但已脱毒，每一滴都带着浓烈的铁锈与漂白剂气味。',
+                function: { water: 8, electricity: -2 }
+            },
+            items: [
+                I.consumable('clean_water_flask', '军用密封水壶', '装满多重超滤后纯净水的不锈钢军用水壶，能有效驱散焦渴与疲惫。', [
+                    ['sanity', 10],
+                    ['hp', 5]
+                ], { threshold: 12 })
+            ],
+            interacts: [
+                act(
+                    '擦拭水箱观察窗',
+                    '你用布条擦拭外壁的水汽。刹那间，水箱深处翻腾起剧烈的气泡，一张由数百条苍白人类断臂虬结而成的巨大肉质水母猛地拍打在玻璃内壁上！厚达五公分的钢化玻璃发出令人牙酸的龟裂声。',
+                    { cost: 10, sound: 'terrifying', san: -12 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'decon_shower',
+        '洗消淋浴间',
+        '苍白的瓷砖墙面凝结着泛黄的水垢，数排工业洗消喷头像失明眼球般悬挂在头顶。地面残留着白色洗消粉末，地漏滤网周围丛生着一圈带电弧般微光的黑色绒毛，散发着刺鼻的次氯酸与臭氧气味。',
+        'Military decontamination shower room, stained tiles, rusted shower heads, white decon powder on floor, dark organic fibers near drain, cold bunker lighting',
+        {
+            danger: danger.level(3),
+            items: [
+                I.consumable('decon_solution', '高效洗消液', '配发给重装防化防务部队的广谱去污浓缩剂。', [
+                    ['sanity', 8],
+                    ['hp', 5]
+                ], { threshold: 8 })
+            ],
+            interacts: [
+                act(
+                    '扳动应急喷淋阀',
+                    '锈蚀的水阀在一阵沉闷咳嗽后喷出一股混杂着铁锈的冰冷强压水流。强烈的冲洗刺激让你痛彻骨髓，但也彻底洗净了皮肤表层粘连的致幻孢子。',
+                    { cost: 10, sound: 'item_use', hp: 3, san: 6 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'laundry_room',
+        '洗衣房',
+        '几台庞大的工业滚筒洗衣机被沉重的螺栓死死焊在地板上。半开的洗涤舱门内塞满发黑的作训服，晾衣铁丝上悬挂的布质姓名条已被黑色菌丝侵蚀重织成了难以名状的诡异图腾。',
+        'Underground bunker laundry room, industrial washing machines, moldy uniforms, hanging name tags, fungal threads weaving through fabric, dim utility lighting',
+        {
+            danger: danger.level(2),
+            items: [
+                I.material('cloth_bandage', '整洁的备用绷带布', '从干燥密封袋中拆出的医用脱脂棉布条，可用于简易止血包扎。', {
                     grade: 'salvaged',
-                    size: [1, 1],
-                    discoveryThreshold: 6,
-                    quantity: 3,
-                },
+                    threshold: 6,
+                    qty: 3
+                })
             ],
-            interactions: [
-                {
-                    desc: '翻找未污染的布料',
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'search',
-                        narrative: '你从一台洗衣机里拽出几件还算完整的衣物。它们在你手里轻微地收缩了一下，像是仍然记得某个人的体温。',
-                        stateChange: {
-                            gain: [
-                                {
-                                    id: 'cloth_bandage',
-                                    name: '撕碎的绷带布',
-                                    desc: '从相对干净的军服上撕下来的布条。',
-                                    type: 'material',
-                                    grade: 'salvaged',
-                                    size: [1, 1],
-                                },
-                            ],
-                        },
-                    },
-                },
-            ],
-        },
-        cold_storage: {
-            name: '冷藏储藏室',
-            desc: '低温让这里的时间变得迟缓。金属货架上挂着结霜的补给袋，最深处几扇肉钩在无人触碰的情况下轻轻晃动。温度计显示零下，但某些货架表面却凝着温热的雾气。',
-            visualPrompt: 'Cold storage room in military bunker, frosted metal shelves, hanging supply bags, meat hooks swaying slightly, warm mist on cold surfaces, eerie industrial lighting',
-            isDangerous: 4,
+            interacts: [
+                act(
+                    '翻找未污染衣物',
+                    '你从密封滚筒中扯出几套干燥的作训服。当你的手指划过衣料时，织物似乎在你的掌温下产生了一阵极其微弱的舒展反冲。',
+                    {
+                        cost: 10,
+                        sound: 'search',
+                        gain: [
+                            I.material('cloth_bandage', '整洁的备用绷带布', '从干燥密封袋中拆出的医用脱脂棉布条。', {
+                                grade: 'salvaged'
+                            })
+                        ]
+                    }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'cold_storage',
+        '冷藏储藏室',
+        '厚重的冷库门锁已结满白霜。这里的冷气沉降如浓雾，悬挂在半空的重型不锈钢肉钩在毫无气流的环境下无声地轻轻摆动。尽管温度计读数直逼零下二十度，金属货架表层却凝结着诡异的温热蒸汽。',
+        'Cold storage room in military bunker, frosted metal shelves, hanging supply bags, meat hooks swaying slightly, warm mist on cold surfaces, eerie industrial lighting',
+        {
+            danger: danger.level(4),
             items: [
-                {
-                    id: 'frozen_ration',
-                    name: '冻结军粮',
-                    desc: '被低温封存的军用口粮，外包装仍然完整。',
-                    type: 'consumable',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 8,
-                    effects: [['hp', 12]],
-                },
+                I.consumable('frozen_ration', '速冻军粮块', '在极低温下妥善封存的高能量冷冻战备军粮，解冻后可安全食用。', [['hp', 12]], {
+                    threshold: 8
+                })
             ],
-            interactions: [
-                {
-                    desc: '检查悬挂的补给袋',
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'search',
-                        narrative: '你取下几个冻结的补给袋。其中一个袋子内部突然顶出五根细小的指印，随后又缓缓平息。你决定不去确认它到底是什么。',
-                        stateChange: {
-                            sanity: -4,
-                            gain: [
-                                {
-                                    id: 'frozen_ration',
-                                    name: '冻结军粮',
-                                    desc: '被低温封存的军用口粮。',
-                                    type: 'consumable',
-                                    grade: 'standard',
-                                    size: [1, 1],
-                                    effects: [['hp', 12]],
-                                },
-                            ],
-                        },
-                    },
-                },
-            ],
-        },
-        engineering_bay: {
-            name: '重装备工程走廊',
-            desc: '通往动力源和武器库的粗犷通道。墙壁两侧排列着粗大管道，偶尔喷出白色的蒸汽。可以闻到刺鼻机油味。走廊尽头有一扇标着红色警示标志的重型安保门——通往深层掩体。门上的电子读卡器闪着待机的蓝光。',
-            visualPrompt: 'Rough industrial tunnel, thick pipes lining the walls spewing occasional bursts of steam, oily puddles on the ground, heavy security door at end with card reader',
-            isDangerous: 5,
-            childrenIds: [
+            interacts: [
+                act(
+                    '检查速冻食品包装箱',
+                    '你拽下一个结霜的铝箔储藏袋。撕开胶带的瞬间，冷冻袋内部突然顶出数枚清晰微小的婴儿掌印，随后在你的注视下如冰雪消融般平息。你迅速将几块军粮塞入口袋。',
+                    {
+                        cost: 10,
+                        sound: 'search',
+                        san: -4,
+                        gain: [I.consumable('frozen_ration', '速冻军粮块', '妥善封存的高能量冷冻战备军粮。', [['hp', 12]])]
+                    }
+                )
+            ]
+        }
+    ),
+
+    // =========================================================================
+    // 4. 重装备工程走廊 (8 节点)
+    // =========================================================================
+    node(
+        'engineering_bay',
+        '重装备工程走廊',
+        '贯穿前哨基底的重工业主轴，两侧裸露的蒸汽管线不时发出凄厉的泄压啸叫。地面积满油污与冷却液。走廊尽头矗立着一扇涂有辐射警示菱形徽记的加厚合金重型安保门——通往深层掩体。门禁面板上的读卡器正闪烁着冷酷的蓝光。',
+        'Rough industrial tunnel, thick pipes lining the walls spewing occasional bursts of steam, oily puddles on the ground, heavy security door at end with card reader',
+        {
+            danger: danger.level(5),
+            children: [
                 'power_station',
                 'armory_room',
                 'ventilation_control',
                 'waste_disposal',
                 'maintenance_bay',
                 'coolant_control',
-                'pump_room',
+                'pump_room'
             ],
             items: [
-                {
-                    id: 'field_repair_kit',
-                    name: '神经链接维修套件',
-                    desc: '军用电子维护套件，内含微型焊笔、导电凝胶与备用微电极片，可用于临时修复神经链接仪。',
-                    type: 'consumable',
-                    grade: 'military',
-                    size: [2, 1],
-                    discoveryThreshold: 18,
-                    effects: [['integrity', 25]],
-                },
+                I.consumable(
+                    'field_repair_kit',
+                    '神经链接维修套件',
+                    '配发给技术工兵的高阻微焊套件，内含导电生物硅胶与微电极晶片，可修复受损的神经链接仪。',
+                    [['integrity', 25]],
+                    { grade: 'military', size: [2, 1], threshold: 18 }
+                )
             ],
-            interactions: [
-                {
-                    desc: '开启深层掩体安保门',
-                    requirements: {
-                        items: ['deep_access_card'],
-                    },
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'unlock',
-                        narrative: '你将红色磁卡刷过读卡器。绿灯亮起，伴随着沉重的气动锁开启声。一股冰冷的、带着福尔马林味的空气从门缝中涌出。门后是一条通往地下深处的阶梯。',
-                        stateChange: {
-                            unlock: [['deep_bunker', '进入深层掩体']],
-                        },
-                    },
-                },
-            ],
-        },
-        power_station: {
-            name: '聚变动力源',
-            desc: '巨大的动力枢纽将微型聚变核心与船用柴油-生物混合发电机粗暴地焊接在一起。仪表盘上的指针在危险区域边缘徘徊，备用燃料桶与有机废料投料口堆在角落。热浪扑面而来，这里的温度高得异常。发电机的铭牌上写着预计使用寿命：50 年。安装日期标注的是 3 年前，但机器已经像运转了半个世纪一样老旧了。',
-            visualPrompt: 'Massive industrial generator dominating the room, analog gauges vibrating in red zones, stacked fuel drums, organic feed intake, heat haze effect, prematurely aged machinery',
-            isDangerous: 6,
+            interacts: [
+                act(
+                    '解锁深层掩体安保门',
+                    '红色磁卡刷过读卡器。机械锁芯在一连串沉重的爆裂声中逐级退开，气密密封圈喷出一股带着刺鼻福尔马林与臭氧气味的极冷寒流。通往深渊隔离层的幽暗阶梯在你面前徐徐展开。',
+                    {
+                        cost: 5,
+                        sound: 'unlock',
+                        reqItems: ['deep_access_card'],
+                        unlock: [['deep_bunker', '进入深层掩体']]
+                    }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'power_station',
+        '聚变动力源',
+        '前哨的心脏枢纽。微型聚变稳压堆被粗暴地焊在六冲程巨型柴油燃烧机组上方，仪表盘的转速指针深陷红线警戒区。热浪裹挟着机油与生物体焦糊味扑面而来，沉重的震动让整个房间的铁架台都在嗡嗡作响。',
+        'Massive industrial generator dominating the room, analog gauges vibrating in red zones, stacked fuel drums, organic feed intake, heat haze effect, prematurely aged machinery',
+        {
+            danger: danger.level(6),
+            facility: {
+                id: 'facility_bunker_bio_generator',
+                name: '柴油-生物混合发电机',
+                desc: '以微型聚变核心作为稳压中枢，外接巨型船用燃烧室的改装动力源。它吞噬柴油、有机废弃物乃至深渊残渣，换取前哨宝贵的电能。',
+                function: { electricity: 14, erosion: 2 }
+            },
             items: [
-                {
-                    id: 'power_cell',
-                    name: '军用电池',
-                    desc: '高容量电池组，可以为设备充电。',
-                    type: 'consumable',
+                I.consumable('power_cell', '军用电池', '高容量密封电容组，能迅速恢复外设电力。', [['battery', 80]], {
                     grade: 'military',
-                    size: [1, 1],
-                    discoveryThreshold: 20,
-                    effects: [['battery', 80]],
-                },
-                {
-                    id: 'fuel_reserve',
-                    name: '燃料储备',
-                    desc: '一桶柴油，可以转化为补给。',
-                    type: 'material',
-                    grade: 'standard',
+                    threshold: 20
+                }),
+                I.material('fuel_reserve', '重柴油储备桶', '密封完好的军用重油桶，是驱动前哨重型发电机的基石材料。', {
                     size: [2, 2],
-                    discoveryThreshold: 10,
-                    quantity: 2,
-                },
+                    threshold: 10,
+                    qty: 2
+                })
             ],
-            interactions: [
-                {
-                    desc: '检查发电机状态',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'search',
-                        narrative: '发电机运行在临界状态，但暂时还能坚持。维护日志的最后一条写着：如果它停了，深层掩体的电磁收容场就会失效。如果收容场失效——上帝保佑我们所有人。',
-                    },
-                },
-                {
-                    desc: '修复核心线路',
-                    requirements: {
-                        puzzleSolved: {
-                            title: '冷却重置',
-                            lore: '动力核心的冷却线缆被扯断了，需重新接驳接口。接口类型：接口 1（HV 高压火线），接口 2（GND 接地），接口 3（COOL 温度控制）。线缆颜色：红线、绿线、蓝线。请根据工业通用标准选择正确的配对方案：',
-                            body: {
-                                type: 'choice',
-                                body: [
-                                    '1-红 2-蓝 3-绿',
-                                    '1-红 2-绿 3-蓝',
-                                    '1-绿 2-蓝 3-红',
-                                    '1-蓝 2-绿 3-红',
+            interacts: [
+                act(
+                    '巡检发电机状态',
+                    '仪表指示发电机处在过载与临界的脆弱平衡点。维修手记的末尾写着红字警告：如果聚变稳压器停转，深层掩体的电磁收容场将在三秒内坍塌，届时深处的东西将畅通无阻。',
+                    { cost: 5, sound: 'search' }
+                ),
+                act(
+                    '接驳应急冷却线路',
+                    '随着接线扣紧，冷却液泵发出深沉有力的轰鸣，温度指针迅速从暴躁的红线回落至安全区间。白色的高压照明重新洒满车间，你的手腕虽然被电火花灼出红印，但成功挽救了动力网。',
+                    {
+                        cost: 20,
+                        hp: 10,
+                        san: 5,
+                        puzzle: P.choice(
+                            '冷却重置',
+                            '动力机组的高压冷却线路短路熔断，必须重新将三相插座与主控回路正确并联。线缆：红线、绿线、蓝线；接口：HV（高压火线）、GND（安全接地）、COOL（温控逻辑）。请按顺序选出正确的接驳标准：',
+                            ['1-红 2-蓝 3-绿', '1-红 2-绿 3-蓝', '1-绿 2-蓝 3-红', '1-蓝 2-绿 3-红'],
+                            '1-红 2-绿 3-蓝',
+                            {
+                                hints: [
+                                    '工业电气通用标准：红线始终承担主要高压荷载 (HV)。',
+                                    '安全接地线 (GND) 在旧世国家电气标准中恒定使用绿色标识。',
+                                    '剩下的蓝色线缆即为温控回路信号线。'
                                 ],
-                                answer: '1-红 2-绿 3-蓝',
-                            },
-                            hints: [
-                                '工业通用标准：红线通常承担高压荷载(HV)。',
-                                '保护性的接地线路(GND)常被标为绿色。',
-                                '排查出前两项后，剩下的蓝色显然属于温度控制系统。',
-                            ],
-                            restrictions: {
-                                timeCostPerAttempt: 20,
+                                timeCost: 20,
                                 maxAttempts: 2,
-                            },
-                            penalties: { hp: -15 },
-                        },
-                    },
-                    results: {
-                        timeCost: 20,
-                        soundEffect: 'success',
-                        narrative: '随着线缆正确连接，动力核心发出深沉平稳的嗡鸣，备用照明被稳定的白光取代。你成功阻止了过热，并为掩体恢复了部分主能源。',
-                        stateChange: { hp: 10, sanity: 5 },
-                    },
-                },
-            ],
-        },
-        armory_room: {
-            name: '核心军械库',
-            desc: '重型武器架和弹药箱整齐排列。虽然大部分武器已经被取走，但还有一些装备留了下来。保险柜的门被强行炸开，地上有干涸的血迹。最诡异的是角落里那批没人碰过的弹药——它们的弹头被替换成了某种半透明的、像凝胶一样的材料。箱子上印着「铁壁专用」。',
-            visualPrompt: 'Military armory with metal weapon racks and stacked ammo boxes, blasted open safe, dried blood on the floor, suspicious gel-tipped ammunition marked Project Iron Wall',
-            isDangerous: 6,
+                                penalties: { hp: -15 }
+                            }
+                        )
+                    }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'armory_room',
+        '核心军械库',
+        '厚重的防爆钢门被气割炸开。虽然大批单兵武器已被撤离部队搬空，但深处的特种武器柜中依然陈列着加固军械。角落里堆放着一批漆有黄色「铁壁专用」封条的子弹箱，弹头透出半透明凝胶状的微光。',
+        'Military armory with metal weapon racks and stacked ammo boxes, blasted open safe, dried blood on the floor, suspicious gel-tipped ammunition marked Project Iron Wall',
+        {
+            danger: danger.level(6),
+            map: 'bunker_armory',
             items: [
-                {
-                    id: 'tactical_vest',
-                    name: '战术背心',
-                    desc: '防弹背心，提供额外的防护。',
-                    type: 'armor',
-                    grade: 'military',
-                    size: [3, 3],
-                    discoveryThreshold: 15,
-                    defense: 0.2,
-                    maxUses: 20,
-                },
-                {
-                    id: 'frag_grenade',
-                    name: '破片手雷',
-                    desc: '标准军用手雷。使用后消耗。',
-                    type: 'weapon',
-                    grade: 'military',
-                    size: [1, 1],
-                    discoveryThreshold: 20,
-                    weaponType: 'throw',
-                    weaponDamageType: 'range',
-                    range: 3,
-                    damage: 38,
-                    crit: { chance: 0.1, bonus: 12 },
-                    maxUses: 1,
-                },
-                {
-                    id: 'bio_mask',
-                    name: '生化防护面罩',
-                    desc: '军用级防护面罩，滤芯已经发黄但仍可使用。',
-                    type: 'accessory',
+                I.armor(
+                    'tactical_vest',
+                    '四级战术防弹背心',
+                    '内置碳化硼陶瓷插板的重型战术防弹衣，能抵御大口径穿甲弹的动能冲击。',
+                    0.25,
+                    25,
+                    { grade: 'military', size: [3, 3], threshold: 15 }
+                ),
+                I.weapon(
+                    'frag_grenade',
+                    'M67 破片手雷',
+                    '军用高爆手雷，拉开保险销投掷后引发范围破片打击。单次投掷消耗品。',
+                    'throw',
+                    3,
+                    38,
+                    [0.1, 12],
+                    1,
+                    { damageType: 'range', grade: 'military', size: [1, 1], threshold: 20 }
+                ),
+                I.accessory('bio_mask', '防化过滤面罩', '配发给防化部队的全封闭防毒面具，内置多层活性炭与树脂滤芯。', [['maxSanity', 20]], {
                     grade: 'military',
                     size: [2, 1],
-                    discoveryThreshold: 15,
-                    effects: [['maxSanity', 20]],
-                },
-                {
-                    id: 'ballistic_helmet',
-                    name: '弹道防护头盔',
-                    desc: '加装了辅助观瞄接口的重型头盔，视野边缘会浮现淡绿色准线。',
-                    type: 'accessory',
-                    grade: 'military',
-                    size: [2, 2],
-                    discoveryThreshold: 18,
-                    effects: [
-                        ['maxHp', 15],
-                        ['awareness', 2],
-                    ],
-                },
+                    threshold: 15
+                }),
+                I.accessory(
+                    'ballistic_helmet',
+                    '弹道防护头盔',
+                    '配有夜视仪基座与抗破片悬挂的重型防暴头盔。',
+                    [['maxHp', 15], ['awareness', 2]],
+                    { grade: 'military', size: [2, 2], threshold: 18 }
+                )
             ],
-            interactions: [
-                {
-                    desc: '检查铁壁弹药',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'terrifying',
-                        narrative: '你拿起一枚凝胶弹头。它在你手指的温度下微微变软，你能感觉到它在……脉动。像是某种极其微小的心跳。你立刻把它放了回去。箱子背面贴着使用说明：射入目标体内后，凝胶将在 72 小时内完成同化。请勿在未穿戴全套防护装备时接触。',
-                        stateChange: { sanity: -8 },
-                    },
-                },
-            ],
-        },
-        ventilation_control: {
-            name: '通风管控枢纽',
-            desc: '巨大的排风扇在这里交汇，组成了前哨站庞大的呼吸器官。控制台布满了厚厚的灰尘。管道深处传来的风声极其浑浊，听起来像是某种沉睡怪物的巨大喘息。这里的空气质量极差，弥漫着浓烈的铁锈与腐败气味。',
-            visualPrompt: 'Massive ventilation hub with giant rusty fan blades, dust-covered control panel, gloomy lighting, airborne particulate matter visible in the light beams',
-            isDangerous: 5,
-            interactions: [
-                {
-                    desc: '尝试重启主循环风机',
-                    requirements: {
-                        puzzleSolved: {
-                            title: '主循环风机重启',
-                            lore: '风机控制台的启动序列因为数据损坏出现了缺失，你需要根据残余的递增规律填补阵列空白才能完成重启指令。当前阵列数据：[1], [2], [?], [7], [11]',
-                            body: {
-                                type: 'cloze',
-                                body: [['1', '2', '', '7', '11']],
-                                answer: ['4'],
-                            },
-                            hints: [
-                                '观察数字之间的差值。',
-                                '1 到 2 差了 1，从空白到 7，以及 7 到 11 之间的差值逐渐扩大。',
-                                '如果差值分别是 1、2、3、4 的等差数列，那么第二个数加 2 就是……',
-                            ],
-                            restrictions: {
-                                timeCostPerAttempt: 15,
+            interacts: [
+                act(
+                    '检查铁壁凝胶弹药',
+                    '你拿起一枚凝胶弹头。弹体在接触你皮肤温度的瞬间微微变软，你甚至隔着铜壳感受到了类似心房搏动的微弱脉跳。说明书残页注明：凝胶将在射入生物体内 72 小时内完成神经同化，严禁徒手接触。',
+                    { cost: 5, sound: 'terrifying', san: -8 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'ventilation_control',
+        '通风管控枢纽',
+        '前哨庞大的呼吸器官。几具四层楼高的巨大轴流风扇在此交汇，扇叶切裂空气的钝响震耳欲聋。中央控制台被厚厚的黑色粉尘覆盖，空气中弥漫着高浓度铁锈与酸腐臭气。',
+        'Massive ventilation hub with giant rusty fan blades, dust-covered control panel, gloomy lighting, airborne particulate matter visible in the light beams',
+        {
+            danger: danger.level(5),
+            interacts: [
+                act(
+                    '校准主循环风机序列',
+                    '指令键入完毕，沉重的电磁继电器接连扣合，巨大的轴流风扇发出一声凄厉的金属啸叫后平稳加速。新鲜干燥的冷空气贯穿管道，将积蓄的毒雾一扫而空。',
+                    {
+                        cost: 15,
+                        hp: 10,
+                        puzzle: P.cloze(
+                            '主循环风机重启',
+                            '风机电控板遭遇高压脉冲损坏，部分启停控制时钟数据丢失。必须根据残余的差值递增规律补全数组空缺以激活气流重载程序：[1], [2], [?], [7], [11]',
+                            [['1', '2', '', '7', '11']],
+                            ['4'],
+                            {
+                                hints: [
+                                    '分析相邻项之间的增量差值。',
+                                    '1 到 2 差值为 1；从未知项到 7，以及 7 到 11 的差值按自然数阶梯扩大。',
+                                    '若差值序列为公差为 1 的递增数列（+1, +2, +3, +4），则第二项加上 2 即为缺失值。'
+                                ],
+                                timeCost: 15,
                                 maxAttempts: 3,
-                            },
-                            penalties: { sanity: -5, hp: -5 },
-                        },
-                    },
-                    results: {
-                        timeCost: 15,
-                        soundEffect: 'success',
-                        narrative: '随着序列输入正确，巨大的扇叶发出了刺耳的摩擦声并缓缓转动起来。沉闷的浊气被抽走，新鲜的空气终于灌入了这个封闭的棺材，你感觉呼吸顺畅了许多。',
-                        stateChange: { hp: 10 },
-                    },
-                },
-            ],
-        },
-        waste_disposal: {
-            name: '废料处理池',
-            desc: '一个深不见底的圆柱形处理池，边缘挂着残破的黄黑相间警告条带。池底翻滚着荧光绿色的化学废液，散发着刺鼻的酸性蒸汽。几具穿着厚重防化服的尸体漂浮在上面，防毒面具的内侧完全被干涸发黑的血迹糊满。',
-            visualPrompt: 'Cylindrical hazard waste pit, glowing neon green chemical sludge at the bottom, tattered yellow and black hazard tape, hazmat suit corpses floating in the toxic stew',
-            isDangerous: 7,
-            interactions: [
-                {
-                    desc: '打捞漂浮的防化服',
-                    results: {
-                        timeCost: 15,
-                        soundEffect: 'item_pickup',
-                        narrative: '你忍住剧烈的腐蚀性恶臭，用一根长棍将其中一具尸体勾了过来。当你试图剥开防化服寻找物资时，尸体由于鼓胀突然爆裂，喷射出带有腐蚀性的毒液。但你确实在夹层里找到了一块特种合金。',
-                        stateChange: {
-                            hp: -10,
-                            gain: [
+                                penalties: { sanity: -5, hp: -5 }
+                            }
+                        )
+                    }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'waste_disposal',
+        '废料处理池',
+        '一个深不见底的垂直圆柱形防腐深坑。池底蓄满了咕嘟翻滚的荧光绿色化学洗消废液，刺鼻的硝酸蒸汽熏得人眼眶生疼。几具身披重装防化服的遗体半沉在液体中，防毒面罩内部早已被发黑的黏液浸满。',
+        'Cylindrical hazard waste pit, glowing neon green chemical sludge at the bottom, tattered yellow and black hazard tape, hazmat suit corpses floating in the toxic stew',
+        {
+            danger: danger.level(7),
+            facility: {
+                id: 'facility_bunker_reclaimer',
+                name: '重型废料回收棚',
+                desc: '搭建在工程走廊与废料池之间的水压冲切机，把重型装甲残片与武器废料冲压成标准化加固板。',
+                function: { scraps: 8, electricity: -2, erosion: 1 }
+            },
+            interacts: [
+                act(
+                    '打捞废液中的遗体装备',
+                    '你忍住腐烂恶臭，用铁钩将漂浮的尸首拖近。防化服在接触空气的瞬间因腔压膨胀爆裂，带有强烈腐蚀性的毒液溅射开来，但你成功剥离了死者胸前的特种装甲板。紧接着，整池废液如沸腾般剧烈涌动！',
+                    {
+                        cost: 15,
+                        sound: 'item_pickup',
+                        hp: -10,
+                        gain: [
+                            I.material('high_tier_scrap', '特种合金装甲废料', '深渊基金会防务装甲采用的特种耐酸合金，锻造高阶装备的无上材料。', {
+                                grade: 'corporate',
+                                size: [2, 1]
+                            })
+                        ],
+                        spawnEnemy: [
+                            enemy.cthulhu(
+                                'sludge_amalgam',
+                                '废液聚合体',
+                                '在强酸与星神质共同浸泡下催生的高抗性有机肉块。防化服的橡胶碎片与多具残肢绞成一体，挥舞着被骨化的附肢发出下水道回涌般的低吼。',
+                                'Amalgam of hazmat suit fragments and human limbs bound by glowing green sludge, rising from waste pit, acidic steam',
+                                [12, 18, 26, 6, 2],
                                 {
-                                    id: 'high_tier_scrap',
-                                    name: '特种合金废料',
-                                    desc: '极其稀有的高强度军用合金，可以用来锻造高级装备。',
-                                    type: 'material',
-                                    grade: 'corporate',
-                                    size: [2, 1],
-                                },
-                            ],
-                            spawnEnemy: [
-                                {
-                                    type: 'cthulhu',
-                                    id: 'sludge_amalgam',
-                                    name: '废液聚合体',
-                                    gender: 'both',
-                                    desc: '从处理池底部浮起的酸性肉块，防化服碎片与人类四肢被绿色絮状物缠成一体。它移动时发出类似排水口堵塞的咕噜声。',
-                                    visualPrompt:
-                                        'Amalgam of hazmat suit fragments and human limbs bound by glowing green sludge, rising from waste pit, acidic steam',
-                                    range: 2,
-                                    speed: 12,
-                                    damage: 18,
-                                    defense: 26,
-                                    evasion: 6,
-                                    intentDistribution: {
-                                        attack: 50,
-                                        defense: 24,
-                                        buff: 6,
-                                        debuff: 12,
-                                        observe: 8,
-                                    },
-                                    lootTable: [
-                                        {
-                                            id: 'corrosive_gland',
-                                            name: '腐蚀性腺体',
-                                            desc: '充满酸性分泌物的异化腺体，可用于制作危险弹药。',
-                                            type: 'material',
-                                            grade: 'military',
-                                            size: [1, 1],
-                                            dropProbability: 0.9,
-                                        },
-                                        {
-                                            id: 'fuel_reserve',
-                                            name: '燃料储备',
-                                            desc: '一桶柴油，可以转化为补给。',
-                                            type: 'material',
-                                            grade: 'standard',
-                                            size: [2, 2],
-                                            dropProbability: 0.4,
-                                        },
-                                    ],
-                                },
-                            ],
-                        },
-                    },
-                },
-            ],
-        },
-        maintenance_bay: {
-            name: '维修湾',
-            desc: '这里堆满了被拆解到一半的设备：伺服电机、液压臂、损坏的探照灯和烧毁的电路板。工作台上固定着一只机械手掌，手指仍在以极慢的速度敲击桌面，仿佛在等待维修者回来。',
-            visualPrompt: 'Military maintenance bay, disassembled machinery, hydraulic arms, burnt circuit boards, mechanical hand fixed to workbench, sparks and dim industrial lighting',
-            isDangerous: 5,
+                                    intents: { attack: 50, defense: 24, buff: 6, debuff: 12, observe: 8 },
+                                    loot: [
+                                        loot(
+                                            I.material('corrosive_gland', '腐蚀性强酸腺体', '深渊聚合体体内生成的耐酸腺泡，可提炼极度致命的炼金试剂。', {
+                                                grade: 'military'
+                                            }),
+                                            0.9
+                                        ),
+                                        loot(
+                                            I.material('fuel_reserve', '重柴油储备桶', '密封完好的军用重油桶。', {
+                                                size: [2, 2]
+                                            }),
+                                            0.4
+                                        )
+                                    ]
+                                }
+                            )
+                        ]
+                    }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'maintenance_bay',
+        '维修湾',
+        '散落着车床、气焊炬与重型液压臂的工兵车间。地面油污中混杂着细碎的金属铜屑。一张铁工作台上用重型台虎钳夹着一只剥离了外壳的机械义手，手指伺服电机仍在以极缓慢且精准的节奏敲击着桌面。',
+        'Military maintenance bay, disassembled machinery, hydraulic arms, burnt circuit boards, mechanical hand fixed to workbench, sparks and dim industrial lighting',
+        {
+            danger: danger.level(5),
             items: [
-                {
-                    id: 'repair_parts',
-                    name: '标准维修零件',
-                    desc: '一组仍能使用的螺栓、轴承与密封垫。',
-                    type: 'material',
+                I.material('repair_parts', '工兵标准备件包', '一组经过防锈浸油处理的军用高强度螺栓、密封垫圈与精密轴承。', {
                     grade: 'reinforced',
                     size: [2, 1],
-                    discoveryThreshold: 12,
-                    quantity: 2,
-                },
-                {
-                    id: 'maintenance_capacitor',
-                    name: '维护电容',
-                    desc: '工程设备用的备用电容，可用于临时修复神经链接仪完整度。',
-                    type: 'consumable',
+                    threshold: 12,
+                    qty: 2
+                }),
+                I.consumable('maintenance_capacitor', '工程维修电容', '为工程外骨骼备用的高抗阻电容器，可稳压修补神经链接仪。', [['integrity', 15]], {
                     grade: 'military',
-                    size: [1, 1],
-                    discoveryThreshold: 16,
-                    effects: [['integrity', 15]],
-                },
+                    threshold: 16
+                })
             ],
-            interactions: [
-                {
-                    desc: '修复破损伺服架',
-                    results: {
-                        timeCost: 15,
-                        soundEffect: 'success',
-                        narrative: '你替换了烧毁的轴承，并重新校准了液压杆。伺服架发出一声如释重负的嗡鸣。旁边的机械手掌也随之停下敲击，缓缓向你竖起拇指。',
-                        stateChange: {
-                            hp: -5,
-                            gain: [
-                                {
-                                    id: 'repair_parts',
-                                    name: '标准维修零件',
-                                    desc: '一组仍能使用的螺栓、轴承与密封垫。',
-                                    type: 'material',
-                                    grade: 'reinforced',
-                                    size: [2, 1],
-                                },
-                            ],
-                        },
-                    },
-                },
-            ],
-        },
-        coolant_control: {
-            name: '冷却剂控制室',
-            desc: '墙面布满压力表与手动阀门，绿色冷却剂在粗玻璃管中缓慢流动。某些阀门上缠着写有「不要同时开启」的布条，但布条下方却有人用指甲刻出了相反的指令。',
-            visualPrompt: 'Coolant control room, pressure gauges, manual valves, green coolant flowing through glass pipes, warning cloth strips, scratched contradictory orders under valves',
-            isDangerous: 6,
+            interacts: [
+                act(
+                    '修复液压维修架',
+                    '你清理了轴承卡死的铜屑，更换密封圈并合上气动阀门。液压架发出一声平顺的吐息重归原位。旁边夹持的机械义手随之停止敲击，五指齐平向你致以军礼。',
+                    {
+                        cost: 15,
+                        hp: -5,
+                        gain: [
+                            I.material('repair_parts', '工兵标准备件包', '一组经过防锈处理的军用高强度螺栓与精密轴承。', {
+                                grade: 'reinforced',
+                                size: [2, 1]
+                            })
+                        ]
+                    }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'coolant_control',
+        '冷却剂控制室',
+        '密布着抗震压力表与铜质手动截止阀的窄室，荧光绿色的冷却液在粗壮的高压玻璃管道中缓缓搏动。某些阀门手轮上缠绕着手写白布条，字迹凌乱地写着「切勿反转」，但布条下方的铁管上却有人用指甲划下了反向箭头。',
+        'Coolant control room, pressure gauges, manual valves, green coolant flowing through glass pipes, warning cloth strips, scratched contradictory orders under valves',
+        {
+            danger: danger.level(6),
             items: [
-                {
-                    id: 'coolant_canister',
-                    name: '冷却剂罐',
-                    desc: '密封良好的冷却剂罐，摸起来冰凉刺骨。',
-                    type: 'material',
+                I.material('coolant_canister', '重型冷却剂密封罐', '盛装低温氟化物冷却剂的高压合金罐，触手冰冷刺骨。', {
                     grade: 'military',
-                    size: [1, 1],
-                    discoveryThreshold: 15,
-                    quantity: 2,
-                },
+                    threshold: 15,
+                    qty: 2
+                })
             ],
-            interactions: [
-                {
-                    desc: '平衡冷却剂压力',
-                    requirements: {
-                        puzzleSolved: {
-                            title: '冷却剂压力平衡',
-                            lore: '控制室压力失衡，必须按照安全规程开启阀门。当前有三组阀门：主阀、回流阀、支路阀。请选择正确的开启顺序。',
-                            body: {
-                                type: 'choice',
-                                body: [
-                                    '先开主阀，再开回流阀，最后开支路阀',
-                                    '先开回流阀，再开主阀，最后开支路阀',
-                                    '先开支路阀，再开主阀，最后开回流阀',
+            interacts: [
+                act(
+                    '平衡三级回流压力',
+                    '阀门伴随蒸汽鸣响依次锁定，玻璃管内的激流渐渐平缓下来，压力表指针稳稳落回绿色中段。地下掩体那令人窒息的过载感稍稍减退。',
+                    {
+                        cost: 15,
+                        san: 6,
+                        puzzle: P.choice(
+                            '冷却剂压力平衡',
+                            '管道回路背压失衡，若直接硬开主阀将导致管壁在高压差下瞬间碎裂。必须根据热力安全规程执行启闭程序。',
+                            ['先开主阀，再开回流阀，最后开支路阀', '先开回流阀，再开主阀，最后开支路阀', '先开支路阀，再开主阀，最后开回流阀'],
+                            '先开回流阀，再开主阀，最后开支路阀',
+                            {
+                                hints: [
+                                    '主阀承受着聚变源头的全部动压，盲目硬开会导致水锤效应。',
+                                    '回流阀能够先行泄放管道中积存的高温残余气泡。',
+                                    '支路阀门通常在整体流场平衡后作为末端流量分配。'
                                 ],
-                                answer: '先开回流阀，再开主阀，最后开支路阀',
-                            },
-                            hints: [
-                                '直接开启主阀会让压力冲击未预热的回路。',
-                                '回流阀可以先释放残压。',
-                                '支路阀通常最后开启，用于分配稳定后的流量。',
-                            ],
-                            restrictions: {
-                                timeCostPerAttempt: 15,
+                                timeCost: 15,
                                 maxAttempts: 3,
-                            },
-                            penalties: { hp: -10 },
-                        },
-                    },
-                    results: {
-                        timeCost: 15,
-                        soundEffect: 'success',
-                        narrative: '阀门依次开启，冷却剂在管道中形成稳定的低鸣。压力表的指针从红色区域缓缓退回安全线。你感觉自己短暂地从这座掩体手里抢回了一点控制权。',
-                        stateChange: { sanity: 6 },
-                    },
-                },
-            ],
-        },
-        pump_room: {
-            name: '辅助泵房',
-            desc: '这里比净水室更接近掩体的血管系统。数台辅助泵浸在浅浅的积水中，每一次启动都让脚下的格栅微微震颤。积水表面偶尔会浮现出类似肺泡的气泡群。',
-            visualPrompt: 'Auxiliary pump room, flooded floor, industrial pumps, vibrating metal grating, bubble clusters resembling alveoli on water surface, dark industrial horror',
-            isDangerous: 6,
+                                penalties: { hp: -10 }
+                            }
+                        )
+                    }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'pump_room',
+        '辅助泵房',
+        '比起地表的净水塔，这里宛如掩体深埋地下的黑色内脏。四台重型铸铁污水分离泵半浸在冰凉的积水中，每一次冲程都在脚下的金属网格格栅上引发令人发慌的共振。积水表面浮动着一层层类似生物肺泡的细密泡沫。',
+        'Auxiliary pump room, flooded floor, industrial pumps, vibrating metal grating, bubble clusters resembling alveoli on water surface, dark industrial horror',
+        {
+            danger: danger.level(6),
             items: [
-                {
-                    id: 'pressure_gauge',
-                    name: '压力表',
-                    desc: '从泵体上拆下的压力表，指针仍会偶尔自行跳动。',
-                    type: 'material',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 10,
-                },
+                I.material('pressure_gauge', '工业耐震压力表', '从老式泵体上卸下的高灵敏度压力表，内部指针偶尔会自行微颤。', {
+                    threshold: 10
+                })
             ],
-            interactions: [
-                {
-                    desc: '手动复位水泵',
-                    results: {
-                        timeCost: 15,
-                        soundEffect: 'unlock',
-                        narrative: '你钻进泵体下方，用撬棍卡住复位的棘轮。金属呻吟着回到原位，积水开始缓慢排出。你在泵体夹层里摸到一个密封水袋，外壁温热得不像话。',
-                        stateChange: {
-                            hp: -5,
-                            gain: [
-                                {
-                                    id: 'purified_water_pouch',
-                                    name: '密封净水袋',
-                                    desc: '从泵体夹层中取出的水袋，至少外包装仍然完整。',
-                                    type: 'consumable',
-                                    grade: 'standard',
-                                    size: [1, 1],
-                                    effects: [
-                                        ['sanity', 8],
-                                        ['hp', 4],
-                                    ],
-                                },
-                            ],
-                        },
-                    },
-                },
-            ],
-        },
-        deep_bunker: {
-            name: '深层掩体走廊',
-            desc: '阶梯通向地下更深处。温度骤降，你能看到自己呼出的白气。走廊的照明是紫外线灯管——所有的表面都呈现出诡异的荧光色调。某些墙面上有用肉眼看不到、但在紫外线下清晰可见的生物污染标记。空气中有一种甜腻的、类似烂水果的气味。每当天花板上的紫外线灯管由于电压不稳而短暂熄灭时，你总会确信走廊的尽头比刚才缩短了几分。远处偶尔传来的金属碰撞声，节奏规律得令人心悸。走廊中段，一具穿着全封闭认知过滤面甲的尸体靠在墙边——清理人的装备。他的神经链接仪已经熔毁，面甲内侧的滤网上结着一层黑色晶体。',
-            visualPrompt: 'Deep underground corridor, UV lighting casting everything in eerie fluorescent glow, biohazard markings visible under UV, cold breath visible, descending staircase, dead cleaner soldier in sealed cognitive-filter visor leaning against wall',
-            isDangerous: 9,
-            childrenIds: [
+            interacts: [
+                act(
+                    '手动复位主抽水泵',
+                    '你涉入刺骨的水洼，用撬棍别开锈死的排污棘轮。随着沉重的咯噔声，地面积水迅速旋转退去。你在泵体缝隙深处捞出一只被防水油纸层层包裹的急救水袋。',
+                    {
+                        cost: 15,
+                        sound: 'unlock',
+                        hp: -5,
+                        gain: [
+                            I.consumable('purified_water_pouch', '军用密封净水袋', '在恶劣环境下保持绝对纯净的饮用储备水。', [
+                                ['sanity', 8],
+                                ['hp', 4]
+                            ])
+                        ]
+                    }
+                )
+            ]
+        }
+    ),
+
+    // =========================================================================
+    // 5. 深层掩体走廊 (10 节点，高危物理锁定区)
+    // =========================================================================
+    node(
+        'deep_bunker',
+        '深层掩体走廊',
+        '长长的下行混凝土梯道尽头，温度骤降至冰点，口鼻呼出的水汽在空中凝成白雾。整条走廊全部采用紫外线灯管照明，所有物体表面都泛出幽冷的荧光紫。走廊中段，一具身着全封闭认知过滤装甲的尸骸倚靠在断壁前——那是基金会的清理人先遣特工。他的神经链接仪早已发生过载熔毁，面甲内侧的视网膜滤网上析出了一层细密的黑色高维晶体。',
+        'Deep underground corridor, UV lighting casting everything in eerie fluorescent glow, biohazard markings visible under UV, cold breath visible, descending staircase, dead cleaner soldier in sealed cognitive-filter visor leaning against wall',
+        {
+            danger: danger.level(9),
+            children: [
                 'bio_lab',
                 'cryo_chamber',
                 'server_room',
@@ -1625,745 +1241,561 @@ export const ZONE_BUNKER: SanctuaryTemplate = {
                 'incinerator',
                 'patient_zero_containment',
                 'observation_gallery',
-                'disposal_chute',
+                'disposal_chute'
             ],
             items: [
-                {
-                    id: 'cleaner_neural_link',
-                    name: '清理人神经链接仪残件',
-                    desc: '从清理人颅骨上撬下的试作型神经链接仪。微电极阵列已经烧蚀，但认知过滤算法的核心芯片仍完整——这是「第二次看见」的物证。',
-                    type: 'material',
-                    grade: 'foundation',
-                    size: [1, 1],
-                    discoveryThreshold: 15,
-                },
+                I.material(
+                    'cleaner_neural_link',
+                    '清理人神经链接仪残件',
+                    '从阵亡清理人颅骨上撬下的试作型神经链接仪核心。电极虽然大半烧焦，但认知过滤芯片仍保留了部分解构算法——这是经历「第二次看见」后留存的冷酷物证。',
+                    { grade: 'foundation', threshold: 15, cognitiveErosion: 35 }
+                )
             ],
-            interactions: [
-                {
-                    desc: '检查紫外线灯下的生物污染标记',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'terrifying',
-                        narrative: '你靠近墙面。紫外线灯下，那些看似普通污渍的痕迹显现出清晰的轮廓——那不是喷溅的血迹，而是一行行被反复书写、又被反复擦去的同一句话：它不在容器里。它在我们之间。天花板深处随即传来细密的爬行声。',
-                        stateChange: {
-                            sanity: -6,
-                            spawnEnemy: [
+            interacts: [
+                act(
+                    '查阅紫外灯下的隐形标记',
+                    '在紫光照射下，那些看似普通的水渍显露出狰狞的真相：整面墙壁密密麻麻写满了同一句话——「容器是空的，它正在我们的大脑皮层里舒张」。头顶天花板的管道缝隙内瞬间传来密集的骨节摩擦爬行声！',
+                    {
+                        cost: 5,
+                        sound: 'terrifying',
+                        san: -6,
+                        spawnEnemy: [
+                            enemy.cthulhu(
+                                'uv_crawler',
+                                '紫外爬行者',
+                                '攀附于深层走廊顶部的高速异化体。其角质皮肤在紫外线照射下泛出荧光蓝斑，外翻的脊椎如蜈蚣步足般紧扣管线，能敏锐捕捉空气微弱的气流扰动。',
+                                'Pale humanoid crawler clinging to ceiling under UV light, fluorescent blue veins, external spine feelers, twitching limbs, deep bunker corridor',
+                                [32, 24, 10, 26, 1],
                                 {
-                                    type: 'cthulhu',
-                                    id: 'uv_crawler',
-                                    name: '紫外爬行者',
-                                    gender: 'both',
-                                    desc: '贴着深层走廊天花板移动的畸形实体。它的皮肤在紫外灯下呈现荧光蓝，脊椎外翻成一排细长的感应触须，能够捕捉呼吸与心跳造成的气流变化。',
-                                    visualPrompt:
-                                        'Pale humanoid crawler clinging to ceiling under UV light, fluorescent blue veins, external spine feelers, twitching limbs, deep bunker corridor',
-                                    range: 1,
-                                    speed: 32,
-                                    damage: 24,
-                                    defense: 10,
-                                    evasion: 26,
-                                    intentDistribution: {
-                                        attack: 62,
-                                        defense: 8,
-                                        buff: 6,
-                                        debuff: 14,
-                                        observe: 10,
-                                    },
-                                    lootTable: [
-                                        {
-                                            id: 'contaminated_sample',
-                                            name: '污染样本',
-                                            desc: '密封在破裂培养管中的活性组织，仍在轻微收缩。',
-                                            type: 'material',
-                                            grade: 'prototype',
-                                            size: [1, 1],
-                                            dropProbability: 0.5,
-                                        },
-                                    ],
-                                },
-                            ],
-                        },
-                    },
-                },
-                {
-                    desc: '搜查清理人遗体',
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'search',
-                        narrative: '你蹲在清理人尸体旁。他的全封闭认知过滤面甲已经碎裂，露出下方空洞的眼眶——不是被挖出的，而是从内部被某种几何结构撑开的。他的胸甲内侧刻着一行小字：不要试图理解滤网背后的东西。你在他的腰包里找到了一支未使用的广谱抗侵蚀注射剂。',
-                        stateChange: {
-                            sanity: -4,
-                            gain: [
-                                {
-                                    id: 'anti_erosion_injector',
-                                    name: '广谱抗侵蚀注射剂',
-                                    desc: '基金会配发给清理人的试作型抗侵蚀药剂。标签警告：注射后 72 小时内禁止直视任何非欧几何结构。',
-                                    type: 'consumable',
-                                    grade: 'foundation',
-                                    size: [1, 1],
-                                    effects: [
-                                        ['sanity', 30],
-                                        ['hp', 15],
-                                    ],
-                                },
-                            ],
-                        },
-                    },
-                },
+                                    intents: { attack: 62, defense: 8, buff: 6, debuff: 14, observe: 10 },
+                                    loot: [
+                                        loot(
+                                            I.material('contaminated_sample', '轻度污染样本', '深渊活性生物组织。', {
+                                                grade: 'prototype'
+                                            }),
+                                            0.5
+                                        )
+                                    ]
+                                }
+                            )
+                        ]
+                    }
+                ),
+                act(
+                    '检索清理人装备包',
+                    '你忍住寒意扳开清理人的胸甲。面甲内侧刻有一行微小的绝笔：「不要试图看清滤网后的几何真相」。你在其战术腰包中找到了一支完好无损的广谱抗侵蚀注射剂。',
+                    {
+                        cost: 10,
+                        sound: 'search',
+                        san: -4,
+                        gain: [
+                            I.consumable('anti_erosion_injector', '广谱抗侵蚀注射剂', '深渊基金会配发给清理人特遣队的试作型阻断剂，能在短时间内极强地重塑理性防线。', [
+                                ['sanity', 35],
+                                ['hp', 15]
+                            ], { grade: 'foundation' })
+                        ]
+                    }
+                )
             ],
-            exits: [{ targetId: 'engineering_bay', label: '返回重装备工程走廊', type: 'local' }],
-        },
-        bio_lab: {
-            name: '生化实验室',
-            desc: '密封的玻璃隔间中排列着培养皿和离心机。大部分设备已经损毁，但有一台培养箱还在运行——里面的培养基上生长着某种珊瑚状的有机物，它的颜色在你注视的过程中缓慢变化。实验台上散落着注射器和手术工具，一些工具上沾着的血迹是蓝绿色的。',
-            visualPrompt: 'Biohazard lab with sealed glass chambers, destroyed equipment, one active incubator with color-shifting coral-like organism, blue-green blood stains on surgical tools',
-            isDangerous: {
-                isAmbushed: 0.4,
-                level: 10,
-            },
+            exits: [E.to('engineering_bay', '返回重装备工程走廊')]
+        }
+    ),
+
+    node(
+        'bio_lab',
+        '生化实验室',
+        '被高压气密舱分隔的双层科研温室。成排的离心机与培养槽早已砸毁，唯独中央恒温箱依然亮着黄光——里面的一团深蓝色珊瑚状有机质正在伴随注视缓慢改变褶皱与色差。解剖台上的不锈钢托盘内盛满发蓝发绿的凝固血浆。',
+        'Biohazard lab with sealed glass chambers, destroyed equipment, one active incubator with color-shifting coral-like organism, blue-green blood stains on surgical tools',
+        {
+            danger: danger.ambush(10, 0.4),
             items: [
-                {
-                    id: 'military_experiment_log',
-                    name: '军方实验日志',
-                    desc: '盖着最高机密印戳的活页夹。大量内容被墨水涂抹。',
-                    type: 'data',
-                    grade: 'corporate',
-                    size: [1, 1],
-                    discoveryThreshold: 20,
-                    documentContent: '项目代号：铁壁。目标：利用异变组织样本开发生化武器。第 17 天：样本表现出高度智能。它在用莫尔斯电码敲击培养皿。第 23 天：样本突破了第一层收容。两名研究员被同化。第 24 天：军令——封锁深层掩体，所有被感染人员就地处决。第 25 天：[最后一行被鲜血覆盖]',
-                },
-                {
-                    id: 'bio_stimulant',
-                    name: '实验型增强剂',
-                    desc: '标签上写着「仅供铁壁项目人员使用」。效果强烈但来源可疑。',
-                    type: 'consumable',
+                I.data(
+                    'military_experiment_log',
+                    '铁壁绝密实验日志',
+                    '带有基金会与军方联合印鉴的活页夹，大段段落被强酸墨水涂销。',
+                    '项目代号：铁壁。目标：借助深渊星神质实现肉体物理常数改写。第 17 天：样本通过敲击玻璃模仿人类莫尔斯码。第 23 天：主玻璃舱破裂，两名高级研究员在 40 秒内完成组织同化。第 24 天：军令到达，即刻执行绝对封锁，所有感染人员就地处决。第 25 天：[整页被深蓝血迹浸透]。',
+                    { grade: 'corporate', threshold: 20 }
+                ),
+                I.consumable('bio_stimulant', '实验型强化药剂', '贴有「仅供铁壁特勤组」标签的高浓度肾上腺素合成物，能狂暴压榨肉体生机。', [['hp', 45]], {
                     grade: 'military',
-                    size: [1, 1],
-                    discoveryThreshold: 25,
-                    effects: [['hp', 45]],
-                },
-                {
-                    id: 'neural_filter_prototype',
-                    name: '神经过滤原型插件',
-                    desc: '从清理人装备上拆下的实验插件，外壳上刻着基金会资产编号。',
-                    type: 'accessory',
-                    grade: 'prototype',
-                    size: [1, 1],
-                    discoveryThreshold: 25,
-                    effects: [
-                        ['maxSanity', 40],
-                        ['will', 6],
-                    ],
-                },
+                    threshold: 25
+                }),
+                I.accessory(
+                    'neural_filter_prototype',
+                    '神经过滤原型插件',
+                    '从清理人高级指挥官面甲上拆下的芯片，外壳蚀刻着基金会第一序列资产编号。',
+                    [['maxSanity', 40], ['will', 6]],
+                    { grade: 'prototype', threshold: 25 }
+                )
             ],
-            interactions: [
-                {
-                    desc: '检查运行中的培养箱',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'terrifying',
-                        narrative: '你靠近培养箱。珊瑚状有机物突然停止了颜色变化，整体变成了与你皮肤完全相同的色调。它迅速重组——在你眼前形成了一只微型的、完美复刻的人类手掌。五根手指朝着你张开，仿佛在打招呼。培养箱玻璃内侧随之传来缓慢敲击声。',
-                        stateChange: {
-                            sanity: -15,
-                            spawnEnemy: [
+            interacts: [
+                act(
+                    '贴近观察运行中的恒温箱',
+                    '你走近恒温箱。那团珊瑚状肉块突然止住变色，整体转化为与你手指皮肤完全一致的质感。它迅速重塑成一只五指张开的微缩人类手掌，掌心睁开一只湿漉漉的眼球与你对视！伴随沉闷的撞击，身后实验服堆中猛地跃出一个扭曲的身影！',
+                    {
+                        cost: 5,
+                        sound: 'terrifying',
+                        san: -15,
+                        spawnEnemy: [
+                            enemy.cthulhu(
+                                'iron_wall_specimen',
+                                '铁壁实验体-Γ',
+                                '曾经的生化首席科学家。如今上半身完全被深青色的深渊珊瑚晶簇刺穿同化，晶簇尖端生长着无数未成熟的感光眼胞。其四肢反曲贴地飞奔，骨节与水泥摩擦迸发出刺耳的刮擦声。',
+                                'A horrifying humanoid mutation, upper half covered in blue-green coral-like alien growths, underdeveloped eyeballs sprouting at coral branch ends, exposed bone and torn hazmat suit, dim UV lighting',
+                                [30, 34, 18, 20, 2],
                                 {
-                                    type: 'cthulhu',
-                                    id: 'iron_wall_specimen',
-                                    name: '铁壁实验体-Γ',
-                                    gender: 'both',
-                                    desc: '它曾是一名研究员——至少实验服上的门禁卡这样显示。但现在，它的上半身已被蓝绿色的珊瑚状组织覆盖，每一个枝桠的末端都长着一只未发育完全的眼球。它用四肢以不自然的速度爬行，发出金属与骨骼摩擦的声响。',
-                                    visualPrompt:
-                                        'A horrifying humanoid mutation, upper half covered in blue-green coral-like alien growths, underdeveloped eyeballs sprouting at coral branch ends, exposed bone and torn hazmat suit, dim UV lighting',
-                                    range: 2,
-                                    speed: 30,
-                                    damage: 34,
-                                    defense: 18,
-                                    evasion: 20,
-                                    intentDistribution: {
-                                        attack: 56,
-                                        defense: 10,
-                                        buff: 12,
-                                        debuff: 14,
-                                        observe: 8,
-                                    },
-                                    lootTable: [
-                                        {
-                                            id: 'mutated_tissue',
-                                            name: '异变组织样本',
-                                            desc: '具有极高科研价值，但非常危险。',
-                                            type: 'material',
-                                            grade: 'prototype',
-                                            size: [1, 1],
-                                            dropProbability: 1.0,
-                                        },
-                                        {
-                                            id: 'unstable_stimulant',
-                                            name: '不稳定增强剂',
-                                            desc: '从实验体残骸中回收的注射器，液体颜色不断变化。',
-                                            type: 'consumable',
-                                            grade: 'military',
-                                            size: [1, 1],
-                                            effects: [['hp', 30]],
-                                            dropProbability: 0.35,
-                                        },
-                                        {
-                                            id: 'bio_mask',
-                                            name: '生化防护面罩',
-                                            desc: '军用级防护面罩，滤芯已经发黄但仍可使用。',
-                                            type: 'accessory',
-                                            grade: 'military',
-                                            size: [2, 1],
-                                            effects: [['maxSanity', 20]],
-                                            dropProbability: 0.2,
-                                        },
-                                    ],
-                                },
-                            ],
-                        },
-                    },
-                },
-            ],
-        },
-        cryo_chamber: {
-            name: '低温冻存室',
-            desc: '一排排液氮冷冻舱在黑暗中散发着白色的冷气。大部分冷冻舱是空的——盖子被从里面撞开了。只有最后一排还有三个处于密封状态。透过结了霜的观察窗，你看到里面的标本不像任何你认识的生物——它没有明确的形状，更像是一团凝固的噩梦。',
-            visualPrompt: 'Rows of liquid nitrogen cryogenic pods in darkness, most pods opened from inside, three sealed pods with frost-covered viewports showing amorphous dark shapes, white vapor',
-            isDangerous: 11,
+                                    intents: { attack: 56, defense: 10, buff: 12, debuff: 14, observe: 8 },
+                                    loot: [
+                                        loot(
+                                            I.material('mutated_tissue', '异变组织样本', '具有极高科研价值与未知深渊活性的组织，封存在防爆管内。', {
+                                                grade: 'prototype',
+                                                fleshFusion: 50
+                                            }),
+                                            1.0
+                                        ),
+                                        loot(
+                                            I.consumable('unstable_stimulant', '不稳定兴奋注射剂', '从实验体残骸体内抽取的变异体液，药力极其狂暴。', [['hp', 30]], {
+                                                grade: 'military'
+                                            }),
+                                            0.35
+                                        ),
+                                        loot(
+                                            I.accessory('bio_mask', '防化过滤面罩', '军用级防护面罩。', [['maxSanity', 20]], {
+                                                grade: 'military',
+                                                size: [2, 1]
+                                            }),
+                                            0.2
+                                        )
+                                    ]
+                                }
+                            )
+                        ]
+                    }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'cryo_chamber',
+        '低温冻存室',
+        '十余座加压液氮冷冻立柜在极寒死寂中喷吐着刺骨白雾。大部分冻存舱的重型铅盖被从内部生生顶开变形，只剩下08、09、10三座舱门保持着闭锁状态。透过冰晶封冻的石英观察口，内部的浸泡物不具备任何已知的脊椎结构，更像是一团悬浮在零下二百度虚空中的黑色几何噩梦。',
+        'Rows of liquid nitrogen cryogenic pods in darkness, most pods opened from inside, three sealed pods with frost-covered viewports showing amorphous dark shapes, white vapor',
+        {
+            danger: danger.level(11),
             items: [
-                {
-                    id: 'cryo_specimen',
-                    name: '冻存标本',
-                    desc: '密封在液氮容器中的半透明组织。即使在极低温下，它仍在缓慢蠕动。',
-                    type: 'material',
+                I.material('cryo_specimen', '液氮冻存标本', '密封在极低温双层真空瓶内的半透明深渊组织，即便在严寒中仍在发生微观蠕动。', {
                     grade: 'prototype',
                     size: [2, 1],
-                    discoveryThreshold: 25,
-                },
-                {
-                    id: 'cryo_manifest',
-                    name: '冻存清单',
-                    desc: '严重霜冻损坏的文件。',
-                    type: 'data',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 15,
-                    documentContent: '冻存单元 01-07：已脱离收容。状态：活跃。冻存单元 08-10：密封完好。状态：休眠。紧急协议：在任何情况下不得解冻 08-10 号单元。手写补充：08 号在沉睡中微笑了。',
-                },
-                {
-                    id: 'cryo_sealant',
-                    name: '低温密封凝胶',
-                    desc: '原本用于冷冻舱应急密封的凝胶，涂抹在太阳穴附近时会带来刺痛但清醒的感觉。',
-                    type: 'consumable',
-                    grade: 'military',
-                    size: [1, 1],
-                    discoveryThreshold: 20,
-                    effects: [
-                        ['sanity', 20],
-                        ['vigor', 20],
-                    ],
-                },
+                    threshold: 25,
+                    fleshFusion: 55
+                }),
+                I.data(
+                    'cryo_manifest',
+                    '冻存样本交接单',
+                    '被严寒冻脆的塑料文档夹，字迹斑驳。',
+                    '单元 01~07：已脱离收容，确认处于游荡活跃态。单元 08~10：绝对休眠。终极协议：任何情况下严禁开启 08 号舱。手写补注：08 号样本昨晚在液氮循环泵停机的一分钟里，隔着金属舱壁微笑了。',
+                    { threshold: 15 }
+                ),
+                I.consumable('cryo_sealant', '低温密封凝胶', '配发给低温舱密封工程的特种耐寒凝胶，涂抹于神经穴位能瞬间驱散昏沉。', [
+                    ['sanity', 20],
+                    ['vigor', 20]
+                ], { grade: 'military', threshold: 20 })
             ],
-            interactions: [
-                {
-                    desc: '靠近密封的冷冻舱',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'terrifying',
-                        narrative: '你贴近 08 号冻存舱的观察窗，用手擦去凝结的霜。里面的东西——你拒绝称它为生物——静静地悬浮在零下 196 度的寂静中。然后，就在你的手掌还贴在玻璃上时，它缓缓地把一个类似手掌的附肢贴在了你手掌的正对面。舱内温度计跳了一下。',
-                        stateChange: { sanity: -12 },
-                    },
-                },
-            ],
-        },
-        server_room: {
-            name: '中央数据中心',
-            desc: '服务器机柜发出低沉的嗡鸣。满地的网线和光纤像是电子丛林。主终端还在运行，屏幕上滚动着无尽的日志。这里是铁壁计划所有数据的存储中心——如果你能解锁加密终端，就能了解军方到底做了什么。一台自动安保炮塔在机柜间缓慢转动枪口，红色传感器扫过每一寸地面。',
-            visualPrompt: 'Server racks humming, green LED lights blinking in rows, tangled cables covering the floor, active main terminal with scrolling logs, automated security turret sweeping red sensor',
-            isDangerous: [
-                {
-                    type: 'immovable',
-                    id: 'security_turret',
-                    name: '自律安保炮塔',
-                    desc: '一座焊死在服务器机柜间的自动炮塔。它的光学传感器仍在执行最后的守卫指令，把任何移动的物体都判定为入侵者。装甲厚重，无法移动，也无需闪避。',
-                    visualPrompt: 'Automated security turret bolted between server racks, red optical sensor sweeping, heavy armored housing, dim green server lights',
-                    range: 10,
-                    speed: 16,
-                    damage: 28,
-                    defense: 42,
-                    lootTable: [
-                        {
-                            id: 'high_tier_scrap',
-                            name: '特种合金废料',
-                            desc: '极其稀有的高强度军用合金，可以用来锻造高级装备。',
-                            type: 'material',
-                            grade: 'corporate',
-                            size: [2, 1],
-                            dropProbability: 0.7,
-                        },
-                        {
-                            id: 'power_cell',
-                            name: '军用电池',
-                            desc: '高容量电池组，可以为设备充电。',
-                            type: 'consumable',
-                            grade: 'military',
-                            size: [1, 1],
-                            effects: [['battery', 80]],
-                            dropProbability: 0.4,
-                        },
-                    ],
-                },
-            ],
+            interacts: [
+                act(
+                    '凝视 08 号密封冷冻舱',
+                    '你抹去石英视窗上的白霜。舱内悬浮的一团非欧结晶正缓慢舒张。就在你指尖贴在玻璃上的瞬间，冷冻液内部也浮起了一只苍白的人形轮廓，严丝合缝地隔着玻璃将手掌贴在了你的掌心对面！舱顶的电子温度计数字骤降十度。',
+                    { cost: 5, sound: 'terrifying', san: -12 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'server_room',
+        '中央数据中心',
+        '巨型机柜阵列发出深沉而稳定的共鸣，光缆交错如热带丛林中的绞杀藤蔓。中央主终端仍在不间断滚动着铁壁计划的原始数据流。而在主通道正中央，一座焊死在立柱上的重装自律安保机炮正缓慢摆动着红外传感器，冰冷地检索着任何非授权生物质。',
+        'Server racks humming, green LED lights blinking in rows, tangled cables covering the floor, active main terminal with scrolling logs, automated security turret sweeping red sensor',
+        {
+            danger: danger.narrative(
+                enemy.immovable(
+                    'security_turret',
+                    '自律安保炮塔',
+                    '基座焊死在承重钢柱上的重型自律双联机炮。厚重的合金装甲与红外目标解算模块仍在一丝不苟地执行着最后的保密净化条例。它不具备任何机动能力，但射程与穿甲力极度致命。',
+                    'Automated security turret bolted between server racks, red optical sensor sweeping, heavy armored housing, dim green server lights',
+                    [16, 28, 42, 10],
+                    {
+                        loot: [
+                            loot(
+                                I.material('high_tier_scrap', '特种合金装甲废料', '特种耐酸合金，锻造高阶装备的无上材料。', {
+                                    grade: 'corporate',
+                                    size: [2, 1]
+                                }),
+                                0.7
+                            ),
+                            loot(
+                                I.consumable('power_cell', '军用电池', '高容量密封电容组。', [['battery', 80]], {
+                                    grade: 'military'
+                                }),
+                                0.4
+                            )
+                        ]
+                    }
+                )
+            ),
+            map: 'bunker_server',
             items: [
-                {
-                    id: 'encrypted_disk_core',
-                    name: '核心数据盘',
-                    desc: '军方级加密存储设备。指示灯仍在微弱闪烁。',
-                    type: 'data',
-                    grade: 'military',
-                    size: [1, 1],
-                    discoveryThreshold: 20,
-                    documentContent: '[解密后] 铁壁计划核心摘要：军方从异变区域回收了一个活体信号源。他们没有销毁它，而是试图与它通讯。它回答了。回答内容被标记为人类语言无法准确翻译，但最接近的翻译是：我们接受了你们的邀请。',
-                },
+                I.data(
+                    'encrypted_disk_core',
+                    '铁壁核心数据盘',
+                    '密封在铅封外壳内的核心数据库镜像盘，记录了实验失控的最终推导。',
+                    '项目终局推导：深渊高维存在并非外星生物侵略，它更像是一种物理学底层常数的重塑。我们捕获的信号不是命令，而是它睁开眼睛时引力场泛起的涟漪。我们以为在研究它，而实际上，我们的神经系统不过是它在此方宇宙投影出的一排琴键。',
+                    { grade: 'military', threshold: 20 }
+                )
             ],
-            interactions: [
-                {
-                    desc: '破解加密终端',
-                    requirements: {
-                        items: ['signal_decoder'],
-                        puzzleSolved: {
-                            title: '铁壁加密终端',
-                            lore: '终端屏幕上闪烁着绿色的提示符：请输入铁壁协议启动日期以获取深层解密权限。根据你之前在其他区块得到的情报，该生化实验立项始于 2023 年 10 月，随后在第 24 天全面失控并下达了封锁军令。请按系统默认的 DDMMYY 格式组合 6 位数字密码：',
-                            body: {
-                                type: 'type',
-                                answer: '241023',
-                            },
-                            hints: [
-                                '协议启动日期和异变全面爆发并封锁掩体的日子相关。',
-                                '第 24 天发生了一项决定性事件——军令下达封锁深层掩体。并且实验始于 10 月初。',
-                                '密码系统通常遵循 DDMMYY 格式：对应的正是第 24 天，10 月，2023 年。',
-                            ],
-                            restrictions: {
-                                timeCostPerAttempt: 10,
+            interacts: [
+                act(
+                    '破解主服务器加密',
+                    '红色警戒锁死界面在一声清脆的蜂鸣后变为绿色。你完整导出了铁壁项目的核心日志，得知了军方曾主动向信号源发射邀请脉冲的骇人真相。看清一切后，你心中的恐惧逐渐被冰冷的清醒取代。',
+                    {
+                        cost: 15,
+                        sound: 'typing_1',
+                        san: 5,
+                        reqItems: ['signal_decoder'],
+                        puzzle: P.type(
+                            '铁壁加密终端',
+                            '屏幕光标规律跳动：请输入「铁壁协议」执行封锁与处决命令的基准日期。根据已搜集的情报，该项目立项于 2023 年 10 月初，并在全面失控的第 24 天正式下达全域封锁指令。请按系统约定的 DDMMYY 格式键入 6 位数字代码：',
+                            '241023',
+                            {
+                                hints: [
+                                    '密码对应着深层掩体由军方全面下达就地处决与锁死指令的决定性日子。',
+                                    '事件发生在立项第 24 天，月份为 10 月，年份为 2023 年。',
+                                    '组合遵循标准的 DDMMYY 顺序：即日(24)、月(10)、年(23)。'
+                                ],
+                                timeCost: 10,
                                 maxAttempts: 3,
-                            },
-                            penalties: { hp: -5 },
-                        },
-                    },
-                    results: {
-                        timeCost: 15,
-                        soundEffect: 'typing_1',
-                        narrative: '终端的红色锁定界面切换为绿色。所有数据文件已解密。你看到了铁壁计划的全部真相：军方从异变区域回收了一个活体信号源。他们没有销毁它——他们试图与它通讯。而它回答了。回答的内容被标记为人类语言无法准确翻译，但最接近的翻译是：我们接受了你们的邀请。',
-                        stateChange: { sanity: 5 },
-                    },
-                },
-            ],
-        },
-        escape_tunnel: {
-            name: '紧急逃生通道',
-            desc: '一条狭窄的混凝土隧道，由应急灯照明。大约二十米处发生了部分塌方，碎石和断裂的钢筋堵住了大半通道，但还有一个人勉强能够挤过的缝隙。从缝隙的另一侧传来冷风——以及某种类似呼吸的有节奏的气流。隧道墙壁上有用红色化学发光棒写的字：不要回头。',
-            visualPrompt: 'Narrow concrete escape tunnel, emergency lighting, partial collapse creating tight squeeze point, red chemlight writing on wall, wind from beyond the rubble',
-            isDangerous: 8,
+                                penalties: { hp: -5 }
+                            }
+                        )
+                    }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'escape_tunnel',
+        '紧急逃生通道',
+        '一条窄小的加固逃生坑道，墙壁上每隔数米挂着一支荧光微弱的红色化学发光棒。行进约二十米处发生了严重坍方，巨石与扭曲的工字钢封死了大部分通道，只留下一道勉强能让成年人侧身挤过的黑暗缝隙，从缝隙另一端徐徐吹来带着体温的暖风。',
+        'Narrow concrete escape tunnel, emergency lighting, partial collapse creating tight squeeze point, red chemlight writing on wall, wind from beyond the rubble',
+        {
+            danger: danger.level(8),
             items: [
-                {
-                    id: 'escape_map',
-                    name: '逃生通道地图',
-                    desc: '手绘的通道示意图，某些路径被红笔标注了「已塌方」。',
-                    type: 'data',
-                    grade: 'military',
-                    size: [1, 1],
-                    discoveryThreshold: 10,
-                    documentContent: '紧急逃生通道——仅限 A 级以上军官。路线：深层掩体 → 通风竖井 → 地表出口（距掩体约 800 米）。注意：通道于灾变第三天部分塌方。最后一批撤离人员报告看到了墙壁在移动。此后无人尝试使用此路线。',
-                },
-                {
-                    id: 'tactical_flashlight',
-                    name: '战术手电',
-                    desc: '高亮度军用手电。光束坚定如刀，切开黑暗。',
-                    type: 'material',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 10,
-                },
+                I.data(
+                    'escape_map',
+                    '竖井逃生草图',
+                    '手绘在防水布上的通道截面图，某些分支被红笔打叉并标注「已活化」。',
+                    '紧急撤离路线指引：深层防爆区 → 3号排气竖井 → 废弃采矿场出口。注意：第3天坍方后，排风管内壁开始分泌粘稠组织。最后一名逃生工兵报告在管口看见了墙壁在主动咀嚼。',
+                    { grade: 'military', threshold: 10 }
+                ),
+                I.material('tactical_flashlight', '军用强光战术手电', '带有铝合金攻击头的高流明手电筒，光束如重剑般刺破阴霾。', {
+                    threshold: 10
+                })
             ],
-            interactions: [
-                {
-                    desc: '尝试挤过塌方处',
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'terrifying',
-                        narrative: '你侧身挤过碎石间的缝隙。另一侧的隧道完好无损，但有什么不对——墙壁是湿的，带着体温。你的手电照亮了前方：隧道的尽头不是出口，而是一面由肉色组织构成的脉动的膜。它随着那有节奏的呼吸起伏着。你选择退回来。',
-                        stateChange: { sanity: -15 },
-                    },
-                },
+            interacts: [
+                act(
+                    '侧身探查坍方狭缝',
+                    '你屏住呼吸侧身挤过冰冷刺骨的岩石狭缝。在强光手电的照耀下，狭缝尽头的景象让你浑身血液冻结：坑道尽头根本不是通往地表的出口，而是一堵正在随呼吸剧烈起伏、由粉色肌纤维与无数血管紧密织就的活体肉膜！你踉跄着退了回来。',
+                    { cost: 10, sound: 'terrifying', san: -15 }
+                )
             ],
-            exits: [{ label: '穿越逃生通道', type: 'zone_transfer' }],
-        },
-        training_room: {
-            name: '训练场',
-            desc: '一个开阔的地下空间，曾用于近战训练和体能测试。地面铺着防震橡胶垫，角落里摆放着沙袋和武器训练架。有些沙袋被劈开了——里面不是沙子，而是某种黑色的、已经干燥结块的有机物。训练用的木质人形靶上有不属于任何武器造成的创伤痕迹。',
-            visualPrompt: 'Underground training hall with rubber floor mats, punching bags, weapon racks, some bags split open revealing dried black organic matter, damaged wooden dummies with alien claw marks',
-            isDangerous: 7,
+            exits: [E.transfer('穿越逃生通道离开前哨')]
+        }
+    ),
+
+    node(
+        'training_room',
+        '训练场',
+        '开阔的地下近战与格斗训诫所。地面铺装的防震橡胶垫多处破损，沙袋被整齐的利刃切开——漏出的不是砂石，而是一坨坨风干发黑的组织凝块。角落里的木质人形标靶上留存着深达数寸、绝非人类指骨或常规军刺所能造成的撕裂创痕。',
+        'Underground training hall with rubber floor mats, punching bags, weapon racks, some bags split open revealing dried black organic matter, damaged wooden dummies with alien claw marks',
+        {
+            danger: danger.level(7),
+            map: 'bunker_training',
             items: [
-                {
-                    id: 'training_knife',
-                    name: '训练刀',
-                    desc: '训练用的真刀，刀刃上有细微的缺口——以及一些你无法辨认的蓝绿色残留物。',
-                    type: 'weapon',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 5,
-                    weaponType: 'prick',
-                    weaponDamageType: 'melee',
-                    range: 1,
-                    damage: 7,
-                    crit: { chance: 0.15, bonus: 4 },
-                    maxUses: 8,
-                },
-                {
-                    id: 'training_manual',
-                    name: '反同化训练手册',
-                    desc: '封面印有「仅限深层掩体人员」的军用手册。',
-                    type: 'data',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 8,
-                    documentContent: '第 7 课：当肢体被异变组织附着超过 3 秒，立即执行自我截肢。第 8 课：若听见已死亡队友呼叫你的姓名，不要回应。第 9 课：不要试图理解它们的语言。理解即污染。附录：训练有效率 12%。',
-                },
+                I.weapon(
+                    'training_knife',
+                    '合金格斗训练刀',
+                    '全钢打造的未开刃训练刺刀，虽无锐利刀锋，但坚固厚重。',
+                    'prick',
+                    1,
+                    8,
+                    [0.15, 4],
+                    15,
+                    { size: [1, 1], threshold: 5 }
+                ),
+                I.data(
+                    'training_manual',
+                    '反侵蚀肉搏条令',
+                    '封面打上深层特勤密级的格斗教材，内容残酷至极。',
+                    '第 3 课：当敌方附肢触及面甲，立刻放弃枪械并以刺刀剜除接触面皮肉。第 7 课：若肉体被深渊组织寄生超过 3 秒，拔出防身手雷引爆对应肢体。第 9 课：严禁倾听击倒目标的任何祷告。实战生还率：12%。',
+                    { threshold: 8 }
+                )
             ],
-            interactions: [
-                {
-                    desc: '检查训练日志',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'search',
-                        narrative: '训练日志的最后几页记录了一种新的格斗训练课程——不是教士兵如何攻击，而是教他们如何在被同化部位缠住时自行截肢。附带的图示令人作呕。最后一条注释：训练有效率：12%。其他人来不及截肢就被完全同化了。',
-                        stateChange: { sanity: -5 },
-                    },
-                },
-            ],
-        },
-        incinerator: {
-            name: '高炉焚化室',
-            desc: '为了快速处理被感染的尸体和生物组织，军方临时征用了这座巨型工业高炉。尽管已经停机，靠近时依然能感受到从内部传出的骇人余温。厚重的铸铁大门半掩着，一条长长且呈现碳化的血污拖痕从炉内一直延伸到下水管道口。',
-            visualPrompt: 'Massive industrial blast furnace repurposed as an incinerator, still radiating heat, iron doors slightly ajar, charred drag marks leading from the furnace to a dark drainage grate',
-            isDangerous: 9,
+            interacts: [
+                act(
+                    '翻阅训练日志手抄本',
+                    '训练手记详细记录了一套如何在队友发生肉体异化的瞬间以最快速度精准切断其颈椎的手法。每一页边缘都用血手印按压确认，最后几页所有参与签名的士兵都用同一个词替代了姓名：「祭品」。',
+                    { cost: 5, sound: 'search', san: -5 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'incinerator',
+        '高炉焚化室',
+        '为彻底销毁同化尸骸而紧急改建的重工业焚化高炉。尽管鼓风机已熄火数日，靠近厚重的铸铁炉门时仍能感受到骇人的热浪与刺鼻的骨灰焦臭。一条宽阔且已彻底碳化的黑色血垢拖痕，从炉门深处一直延伸至排污排水井口。',
+        'Massive industrial blast furnace repurposed as an incinerator, still radiating heat, iron doors slightly ajar, charred drag marks leading from the furnace to a dark drainage grate',
+        {
+            danger: danger.level(9),
             items: [
-                {
-                    id: 'charred_iron_pipe',
-                    name: '烧焦的铁棍',
-                    desc: '原本用来拨弄炉火的粗重铁棍，一端已经碳化。',
-                    type: 'weapon',
-                    grade: 'standard',
-                    size: [3, 1],
-                    discoveryThreshold: 8,
-                    weaponType: 'wave',
-                    weaponDamageType: 'melee',
-                    range: 1,
-                    damage: 16,
-                    crit: { chance: 0.1, bonus: 8 },
-                    maxUses: 15,
-                },
-                {
-                    id: 'refractory_plate',
-                    name: '耐热合金板',
-                    desc: '从高炉内壁上剥落的合金板，仍然带着异常余温。',
-                    type: 'material',
+                I.weapon(
+                    'charred_iron_pipe',
+                    '碳化重型拨火棍',
+                    '高炉配用的粗壮耐热铸铁拨棍，前端在千度高温下碳化硬化，挥舞时势大力沉。',
+                    'wave',
+                    1,
+                    16,
+                    [0.1, 8],
+                    20,
+                    { size: [3, 1], threshold: 8 }
+                ),
+                I.material('refractory_plate', '特种耐火合金衬板', '从焚化炉内胆剥落的耐高温合金模块，质地极度坚韧。', {
                     grade: 'military',
                     size: [2, 2],
-                    discoveryThreshold: 15,
-                    quantity: 2,
-                },
+                    threshold: 15,
+                    qty: 2
+                })
             ],
-            interactions: [
-                {
-                    desc: '探查高炉内部',
-                    results: {
-                        timeCost: 10,
-                        soundEffect: 'terrifying',
-                        narrative: '你小心翼翼地推开沉重的铁门，探头看向还在冒烟的炉栅。突然，一阵低沉的咳嗽声从灰烬深处传来。紧接着，一只完全焦黑、只剩骨骼和几缕发光肉质的手臂猛地探出，抓向你的脚踝。你立刻重重地关上了铁门。',
-                        stateChange: { sanity: -10 },
-                    },
-                },
-            ],
-        },
-        patient_zero_containment: {
-            name: '零号收容单元',
-            desc: '深层掩体的禁忌核心。这里没有任何常规病房的设施，只有一个悬挂在半空中的庞大钛合金球体。令人绝望的是，球体被某种难以想象的力量从内部暴力撕裂了。断裂的边缘向外翻卷，厚达三十厘米的装甲仿佛纸片一般被剥开。周围的墙壁上布满了由高温射线烧灼出的同心圆放射状烙印。',
-            visualPrompt: 'Ultimate containment core, a massive titanium sphere suspended in mid-air, violently torn open from the inside out, 30cm thick armor peeled like foil, concentric radioactive scorch marks on surrounding walls, intense oppressive atmosphere',
-            isDangerous: [
-                {
-                    type: 'cthulhu',
-                    id: 'patient_zero_echo',
-                    name: '零号回声',
-                    gender: 'both',
-                    desc: '它没有固定的生物学形态，像是由成千上万个惨死者的怨念、血肉与扭曲的重力场揉捏而成的混沌结块。周遭的空气由于它的存在而产生剧烈的畸变，每一次闪烁都伴随着刺耳的低频噪音，直刺大脑皮层。',
-                    visualPrompt: 'A horrific floating amalgamation of human flesh and dark swirling gravity distortion, no fixed shape, tormented faces emerging and dissolving within the mass, air warping violently around it, intense cosmic horror aesthetic',
-                    range: 8,
-                    speed: 48,
-                    damage: 62,
-                    defense: 38,
-                    evasion: 40,
-                    intentDistribution: {
-                        attack: 46,
-                        defense: 8,
-                        buff: 18,
-                        debuff: 20,
-                        observe: 8,
-                    },
-                    lootTable: [
-                        {
-                            id: 'zero_core',
-                            name: '零号核心',
-                            desc: '散发着奇异光芒的结晶体，似乎蕴含着某种高维度的能量。',
-                            type: 'material',
-                            grade: 'corporate',
-                            size: [1, 1],
-                            dropProbability: 1.0,
-                        },
-                        {
-                            id: 'echo_membrane',
-                            name: '回声膜片',
-                            desc: '从零号回声边缘剥落的半透明组织，仍在折射不存在的光。',
-                            type: 'material',
-                            grade: 'prototype',
-                            size: [1, 1],
-                            dropProbability: 0.45,
-                        },
-                        {
-                            id: 'echo_lens',
-                            name: '回声透镜',
-                            desc: '由零号回声残骸凝结出的透镜，佩戴后会听见极远处的低语。',
-                            type: 'accessory',
-                            grade: 'corporate',
-                            size: [1, 1],
-                            effects: [
-                                ['will', 8],
-                                ['maxSanity', 25],
-                            ],
-                            dropProbability: 0.25,
-                        },
-                    ],
-                },
-            ],
+            interacts: [
+                act(
+                    '推开焚化炉铸铁重门',
+                    '你用铁棍撬开门缝。在尚有暗红余烬的灰堆中，突然传出一阵干涩的咳嗽声。一截完全焦黑、只剩骨节与发光结缔组织的干瘪手臂猛然从炉栅探出抓向你的裤脚！你在惊恐中猛地将炉门合上锁死。',
+                    { cost: 10, sound: 'terrifying', san: -10 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'patient_zero_containment',
+        '零号收容单元',
+        '铁壁计划的终极禁忌核心。这里没有任何医疗设施，只有一个悬吊于半空的巨大钛合金装甲球体。然而，厚达三十公分的实心外壳竟被某种来自高维的暴力由内而外生生撕开，卷曲的金属边缘如花瓣般绽裂。周围墙壁上留存着多道呈同心圆放射状的焦灼烧痕。',
+        'Ultimate containment core, a massive titanium sphere suspended in mid-air, violently torn open from the inside out, 30cm thick armor peeled like foil, concentric radioactive scorch marks on surrounding walls, intense oppressive atmosphere',
+        {
+            danger: danger.narrative(
+                enemy.cthulhu(
+                    'patient_zero_echo',
+                    '零号回声',
+                    '从破碎球体内降临的高维存在物质化投影。它没有恒定的外形，而是由上千具死者的怨念骨肉、破碎的引力场透镜与虚空黑晶揉捏而成的重力畸变体。其周身的光线狂暴弯曲，每一次空间闪烁都伴随着直接震颤脑髓的低频尖啸。',
+                    'A horrific floating amalgamation of human flesh and dark swirling gravity distortion, no fixed shape, tormented faces emerging and dissolving within the mass, air warping violently around it, intense cosmic horror aesthetic',
+                    [48, 62, 38, 40, 8],
+                    {
+                        intents: { attack: 46, defense: 8, buff: 18, debuff: 20, observe: 8 },
+                        loot: [
+                            loot(
+                                I.material('zero_core', '零号奇点核心', '散发着深邃黑紫光晕的非欧晶体，其内部不断进行着自我拓扑重构。', {
+                                    grade: 'corporate',
+                                    causalInversion: 70
+                                }),
+                                1.0
+                            ),
+                            loot(
+                                I.material('echo_membrane', '回声时空膜片', '从实体边缘剥落的高维薄膜，折射出三维光谱不存在的异色。', {
+                                    grade: 'prototype',
+                                    causalInversion: 40
+                                }),
+                                0.45
+                            ),
+                            loot(
+                                I.accessory(
+                                    'echo_lens',
+                                    '零号回声透镜',
+                                    '由零号回声残骸凝铸出的目镜片，佩戴后能够抵御高强度的精神崩塌。',
+                                    [['will', 8], ['maxSanity', 25]],
+                                    {
+                                        grade: 'corporate',
+                                        cognitiveErosion: 45,
+                                        causalInversion: 30
+                                    }
+                                ),
+                                0.25
+                            )
+                        ]
+                    }
+                )
+            ),
+            map: 'bunker_core_containment',
             items: [
-                {
-                    id: 'first_contact_record',
-                    name: '最初接触记录',
-                    desc: '被保存在防爆箱内的黑色数据盘，表面有被融化的痕迹。',
-                    type: 'data',
-                    grade: 'corporate',
-                    size: [1, 1],
-                    discoveryThreshold: 20,
-                    documentContent: '协议：深渊凝视。我们挖出了它。它在休眠。我们试图唤醒它以获取科技，但这完全是个错误。当它睁开眼睛时，我们的时空被重写了。它不需要传播病毒，它传播的是物理法则本身的变异。原谅我们。',
-                },
-            ],
-        },
-        observation_gallery: {
-            name: '观测回廊',
-            desc: '一条围绕零号收容单元外侧的观测走廊，防爆玻璃上布满细密裂纹。墙上的观测仪器仍在记录不存在的数据，屏幕上的波形偶尔会拼成一张张模糊的人脸。你不想靠近玻璃，但玻璃后面似乎有什么东西正在等待对视。',
-            visualPrompt: 'Observation gallery around containment unit, cracked blast glass, old monitoring instruments, waveforms forming faint human faces, oppressive deep bunker lighting',
-            isDangerous: 9,
+                I.data(
+                    'first_contact_record',
+                    '最初接触记录',
+                    '被保存在钛合金防爆盒内的黑色记录仪核心，表面有等离子灼蚀痕迹。',
+                    '项目代号：深渊凝视。我们从地下七千米深处掘出了它。它本在沉睡，而军方与基金会的联合钻探将其唤醒。当它睁开眼的那一秒，我们这片时空的引力常数就被改写了。它不需要释放毒气，它的存在本身就在否定经典物理学。原谅我们，我们亲手按下了终末的门铃。',
+                    { grade: 'corporate', threshold: 20, cognitiveErosion: 60 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'observation_gallery',
+        '观测回廊',
+        '呈半弧形环绕在零号收容球体四周的加高走廊。厚重的防辐射石英视窗上布满蛛网般的细密微裂隙。控制台的脑电波监视仪依然在绘制平稳的曲线，而曲线的起伏规律在几秒后竟缓缓拼凑出一张张清晰的活人五官轮廓。',
+        'Observation gallery around containment unit, cracked blast glass, old monitoring instruments, waveforms forming faint human faces, oppressive deep bunker lighting',
+        {
+            danger: danger.level(9),
             items: [
-                {
-                    id: 'observation_log',
-                    name: '观测记录',
-                    desc: '一本被固定在金属台上的观测记录，纸张边缘被高温烤焦。',
-                    type: 'data',
-                    grade: 'corporate',
-                    size: [1, 1],
-                    discoveryThreshold: 18,
-                    documentContent: '观测对象：零号。第 41 次记录：它不再尝试突破容器。它开始模仿容器的形状。第 44 次记录：观测窗内侧出现手印。我们确认没有人进入过收容单元。第 45 次记录：手印与观测员的手掌完全吻合。建议：停止直视。',
-                },
+                I.data(
+                    'observation_log',
+                    '特派观察员日志',
+                    '被铆钉固定在观测台上的牛皮记录本，部分纸页边缘被高温炙烤卷曲。',
+                    '观察记录第 41 次：零号不再撞击容器。它开始将自身分子的振动频率调整得与球体钛合金完全一致。第 44 次：石英视窗内侧浮现出五指手印，我们确认无人进入过内部。第 45 次：手印的指纹与我本人的右手完全相同。结论：停止直视，拔枪自决。',
+                    { grade: 'corporate', threshold: 18 }
+                )
             ],
-            interactions: [
-                {
-                    desc: '看向观测窗',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'terrifying',
-                        narrative: '你靠近观测窗。玻璃另一侧的黑暗里，慢慢浮现出你的轮廓。它比你晚半秒眨眼，却比你更早露出微笑。',
-                        stateChange: { sanity: -12 },
-                    },
-                },
-            ],
-        },
-        disposal_chute: {
-            name: '处置滑道',
-            desc: '这是一条用于紧急抛弃污染物料的竖直滑道。滑道内壁覆盖着黑色油脂状残留物，底部堆着扭曲的金属与无法辨认的有机块。偶尔，滑道深处会传来类似吞咽的声音。',
-            visualPrompt: 'Vertical disposal chute in deep bunker, black greasy residue on walls, twisted metal and unidentifiable organic masses at bottom, faint swallowing sounds from below',
-            isDangerous: 8,
+            interacts: [
+                act(
+                    '贴近石英视窗俯瞰',
+                    '你站在破碎的玻璃窗前。对面的虚无黑暗中，慢慢倒映出你的身影。令你背脊发凉的是，镜中的你比真实的你晚了整整半秒才眨眼，却更早露出了一个意味深长的诡异微笑。',
+                    { cost: 5, sound: 'terrifying', san: -12 }
+                )
+            ]
+        }
+    ),
+
+    node(
+        'disposal_chute',
+        '处置滑道',
+        '用于紧急抛弃重度感染污染物的垂直滑井。井壁涂满了厚厚的黑色油脂状残留物，井底堆积着被重力压扁的防爆桶与无法辨认的人形有机块。每隔数分钟，井道深处便会传出一阵类似胃肠蠕动般的吞咽回声。',
+        'Vertical disposal chute in deep bunker, black greasy residue on walls, twisted metal and unidentifiable organic masses at bottom, faint swallowing sounds from below',
+        {
+            danger: danger.level(8),
             items: [
-                {
-                    id: 'biohazard_scrap',
-                    name: '污染金属块',
-                    desc: '从滑道底部捡回的金属块，表面仍附着缓慢蠕动的黑膜。',
-                    type: 'material',
+                I.material('biohazard_scrap', '污染合金重块', '从滑井底层捞回的重金属残块，表层覆盖着轻微搏动的生物黑膜。', {
                     grade: 'salvaged',
                     size: [2, 1],
-                    discoveryThreshold: 12,
-                    quantity: 2,
-                },
+                    threshold: 12,
+                    qty: 2
+                })
             ],
-            interactions: [
-                {
-                    desc: '翻检滑道底部',
-                    results: {
-                        timeCost: 15,
-                        soundEffect: 'search',
-                        narrative: '你用铁钩翻动滑道底部的废弃物。一块「金属」突然张开缝隙，露出里面排列整齐的牙齿。更多的废物开始向你聚拢。',
-                        stateChange: {
-                            hp: -5,
-                            spawnEnemy: [
+            interacts: [
+                act(
+                    '翻检滑道底部分离网',
+                    '你用铁杆翻动底部的沉淀物。一块看似无机金属的碎块突然裂开一条缝隙，暴露出内部整齐排列的惨白人类臼齿！井壁周围的黑色油渍如同活物般迅速向你的脚踝聚拢！',
+                    {
+                        cost: 15,
+                        sound: 'search',
+                        hp: -5,
+                        spawnEnemy: [
+                            enemy.cthulhu(
+                                'disposal_amalgam',
+                                '滑道聚合体',
+                                '由废弃防化装备、金属碎块与半消化生化组织在高压重力下挤压形成的怪物。其行动如同咬合运转的工业垃圾粉碎机，所过之处留下酸腐的黑色涎水。',
+                                'Amalgam of scrap metal, torn hazmat suits and digested organic matter, moving like a chewing industrial compactor, black grease dripping',
+                                [14, 20, 24, 8, 2],
                                 {
-                                    type: 'cthulhu',
-                                    id: 'disposal_amalgam',
-                                    name: '滑道聚合体',
-                                    gender: 'both',
-                                    desc: '由废弃金属、防护服碎片与消化中的有机物挤压而成的聚合实体。它的移动方式像是一台正在咀嚼的压缩机。',
-                                    visualPrompt:
-                                        'Amalgam of scrap metal, torn hazmat suits and digested organic matter, moving like a chewing industrial compactor, black grease dripping',
-                                    range: 2,
-                                    speed: 14,
-                                    damage: 20,
-                                    defense: 24,
-                                    evasion: 8,
-                                    intentDistribution: {
-                                        attack: 48,
-                                        defense: 18,
-                                        buff: 6,
-                                        debuff: 16,
-                                        observe: 12,
-                                    },
-                                    lootTable: [
-                                        {
-                                            id: 'contaminated_scrap',
-                                            name: '污染金属块',
-                                            desc: '从滑道聚合体残骸中剥离的金属块，仍带有微弱脉动。',
-                                            type: 'material',
-                                            grade: 'salvaged',
-                                            size: [2, 1],
-                                            dropProbability: 0.8,
-                                        },
-                                        {
-                                            id: 'painkillers',
-                                            name: '止痛药',
-                                            desc: '只能麻痹肉体。恢复少量 HP。',
-                                            type: 'consumable',
-                                            grade: 'standard',
-                                            size: [1, 1],
-                                            effects: [['hp', 15]],
-                                            dropProbability: 0.3,
-                                        },
-                                    ],
-                                },
-                            ],
-                        },
-                    },
-                },
-            ],
-        },
-        field_medical: {
-            name: '野战医务室',
-            desc: '一间用帆布和钢管搭建的简易医务室，紧邻安保检查站。折叠手术台上还残留着碘伏的黄褐色痕迹。药品柜基本被搬空了，但在角落的一个上锁铁箱里可能还有遗留物资。有人在手术台旁的墙上用红十字和箭头画了一套简化的伤口处理流程——最后一步写的不是包扎，而是祈祷。',
-            visualPrompt: 'Canvas and steel pipe field medical station, folding surgery table with iodine stains, mostly empty medicine cabinet, locked iron case, crude medical procedure chart ending with pray',
+                                    intents: { attack: 48, defense: 18, buff: 6, debuff: 16, observe: 12 },
+                                    loot: [
+                                        loot(
+                                            I.material('contaminated_scrap', '污染合金重块', '残骸中剥离的金属块。', {
+                                                grade: 'salvaged',
+                                                size: [2, 1]
+                                            }),
+                                            0.8
+                                        ),
+                                        loot(I.consumable('painkillers', '强效止痛药', '军用麻醉性镇痛胶囊。', [['hp', 15]]), 0.3)
+                                    ]
+                                }
+                            )
+                        ]
+                    }
+                )
+            ]
+        }
+    ),
+
+    // =========================================================================
+    // 6. 外部周边与安全过渡区 (2 节点)
+    // =========================================================================
+    node(
+        'field_medical',
+        '野战医务室',
+        '由厚帆布与脚手架钢管临时搭设的急救站，紧贴安保检查站后侧。便携式折叠手术台上凝固着大片黄褐色的碘伏与止血药斑痕。药品架基本已被清空，角落里的一只加固铁箱用挂锁牢牢锁住。墙上张贴着简化的外伤处理流程，末尾一步写的不是包扎，而是大大的「祈祷」二字。',
+        'Canvas and steel pipe field medical station, folding surgery table with iodine stains, mostly empty medicine cabinet, locked iron case, crude medical procedure chart ending with pray',
+        {
+            facility: {
+                id: 'facility_bunker_pharmacy',
+                name: '药剂调配站',
+                desc: '在野战医务室搭建的提纯台，把回收的过期药剂与残余药材精制为抗感染试剂。',
+                function: { medicine: 3, electricity: -1 }
+            },
             items: [
-                {
-                    id: 'bandage',
-                    name: '急救绷带',
-                    desc: '简单的止血用品。恢复 HP。',
-                    type: 'consumable',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 5,
-                    effects: [['hp', 25]],
-                },
-                {
-                    id: 'painkillers',
-                    name: '止痛药',
-                    desc: '只能麻痹肉体。恢复少量 HP。',
-                    type: 'consumable',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 10,
-                    effects: [['hp', 15]],
-                },
-                {
-                    id: 'sedative',
-                    name: '军用镇静剂',
-                    desc: '标签已被撕掉一半，剩余文字警告不得连续使用。',
-                    type: 'consumable',
-                    grade: 'military',
-                    size: [1, 1],
-                    discoveryThreshold: 12,
-                    effects: [
-                        ['sanity', 18],
-                        ['vigor', 12],
-                    ],
-                },
+                I.consumable('bandage', '医用急救绷带', '经过环氧乙烷灭菌的弹力压迫止血带，能有效恢复物理生命。', [['hp', 25]], {
+                    threshold: 5
+                }),
+                I.consumable('painkillers', '强效止痛药', '军用麻醉性镇痛胶囊。恢复少量 HP。', [['hp', 15]], { threshold: 10 }),
+                I.consumable('sedative', '军用中枢镇静剂', '标签被撕毁大半的神经安定注射针，能强行压制精神狂乱并补充精力。', [
+                    ['sanity', 18],
+                    ['vigor', 12]
+                ], { grade: 'military', threshold: 12 })
             ],
-            interactions: [
-                {
-                    desc: '处理外伤',
-                    results: {
-                        timeCost: 20,
-                        soundEffect: 'item_use',
-                        narrative: '你用残余碘伏和绷带处理伤口。疼痛让你清醒，但至少血止住了。',
-                        stateChange: { hp: 10 },
-                    },
-                },
-                {
-                    desc: '撬开铁箱',
-                    results: {
-                        timeCost: 15,
-                        soundEffect: 'success',
-                        narrative: '铁箱锁扣已经锈蚀，用力一拉就断了。里面有一套军用急救包——酒精、手术缝合线、止血带。还有三支没有标签的注射器，里面的液体呈现不自然的荧光绿色。你决定只拿急救包。',
-                        stateChange: {
-                            gain: [
-                                {
-                                    id: 'military_medkit',
-                                    name: '军用急救包',
-                                    desc: '完整的野战急救套件。',
-                                    type: 'consumable',
-                                    grade: 'military',
-                                    size: [2, 1],
-                                    effects: [['hp', 40]],
-                                },
-                            ],
-                        },
-                    },
-                },
+            interacts: [
+                act(
+                    '处理外伤创口',
+                    '你用棉球蘸着碘伏清理伤口边缘的坏死组织并扎紧绷带。钻心的剧痛让你头脑清醒，渗血总算被彻底止住了。',
+                    { cost: 20, sound: 'item_use', hp: 10 }
+                ),
+                act(
+                    '撬开角落加固药箱',
+                    '挂锁锁梁锈蚀严重，在撬棍的猛力扳动下应声断裂。箱内整齐码放着一套高规格野战急救套件。此外还有三支无标签的淡绿色荧光针剂，出于对深渊异化的本能戒备，你只取走了急救包。',
+                    {
+                        cost: 15,
+                        gain: [
+                            I.consumable('military_medkit', '军用急救包', '完好的野战外伤急救套件。', [['hp', 40]], {
+                                grade: 'military',
+                                size: [2, 1]
+                            })
+                        ]
+                    }
+                )
             ],
-            exits: [{ targetId: 'security_checkpoint', label: '返回安保检查站', type: 'local' }],
-        },
-        blast_door: {
-            name: '主防爆门',
-            desc: '一扇半米厚的铅制大门将这里与外界隔绝。巨大的转轮门锁上警示红灯闪烁。门外的盖格计数器正在疯狂鸣叫，读数远超安全范围。门的内侧有人用焊接枪写了两行字：上面一行是 ABANDON ALL HOPE，下面一行歪歪扭扭地写着中文——但希望从来不是活下去的必需品。',
-            visualPrompt: 'Thick lead blast door, massive wheel lock with flashing red warning light, geiger counter nearby clicking frantically, welded English and Chinese text on inner surface',
-            isDangerous: 6,
+            exits: [E.to('security_checkpoint', '返回安保检查站')]
+        }
+    ),
+
+    node(
+        'blast_door',
+        '主防爆门',
+        '半米厚的铅硼重合金气动大门将整座地下前哨与外界死寂荒原彻底隔开。巨大的机械转轮锁盘上方闪烁着猩红的危险警报灯。固定在门框旁的盖格计数器正在以狂暴的频率发出噼啪电离爆鸣。大门内壁有人用电焊枪烙下了两行滚烫的字标：上面是 ABANDON ALL HOPE，下方歪歪扭扭地焊着一行汉字：「但希望从来不是活下去的必需品」。',
+        'Thick lead blast door, massive wheel lock with flashing red warning light, geiger counter nearby clicking frantically, welded English and Chinese text on inner surface',
+        {
+            danger: danger.level(6),
+            map: 'bunker_blast_gate',
             items: [
-                {
-                    id: 'dog_tags',
-                    name: '军牌',
-                    desc: '沾染血迹的身份铭牌。',
-                    type: 'material',
-                    grade: 'standard',
-                    size: [1, 1],
-                    discoveryThreshold: 5,
-                },
+                I.material('dog_tags', '阵亡军牌串', '沾染暗黑血垢的合金身份铭牌，串连着数名年轻步兵的名字。', {
+                    threshold: 5
+                })
             ],
-            interactions: [
-                {
-                    desc: '贴耳倾听',
-                    results: {
-                        timeCost: 5,
-                        soundEffect: 'terrifying',
-                        narrative: '你把耳朵贴在冰冷的铅门上，听到门外有沉重的呼吸声和无数利爪抓挠金属的刺耳声。然后——声音停了。取而代之的是一种更令人恐惧的声音：完美的、带有人类语调的敲门声。三下。你屏住呼吸，没有回应。又是三下。然后是一个你认识的人的声音，在门外说：是我，让我进去。',
-                        stateChange: { sanity: -10 },
-                    },
-                },
+            interacts: [
+                act(
+                    '贴耳倾听门外动静',
+                    '你将耳朵贴近冰冷的铅门。门外沉重的低吼与无数指甲抓挠合金的杂音突然瞬间归于绝对寂静。三秒后，门外传来了极其礼貌、带有完美人类节奏的敲门声——扣门三下。接着，一个你曾在旧世界极其熟悉的声音在门缝外轻轻呼唤着你的名字。',
+                    { cost: 5, sound: 'terrifying', san: -10 }
+                )
             ],
-            exits: [
-                { targetId: 'security_checkpoint', label: '返回安保检查站', type: 'local' },
-                { label: '强行开启大门离开', type: 'zone_transfer' },
-            ],
-        },
-    },
-};
+            exits: [E.to('security_checkpoint', '返回安保检查站'), E.transfer('强行开启大门踏入荒原')]
+        }
+    )
+)

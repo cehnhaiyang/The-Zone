@@ -176,7 +176,6 @@ const App: React.FC = () => {
         counterPrompt,
         resolveCounterPrompt,
         counterSkip,
-        weaponStates,
         setCounterSkip,
         insertAction,
         endInsertAction,
@@ -678,7 +677,6 @@ const App: React.FC = () => {
                                 onResolveCounterPrompt={resolveCounterPrompt}
                                 counterSkip={counterSkip}
                                 onToggleCounterSkip={setCounterSkip}
-                                weaponStates={weaponStates}
                                 insertAction={insertAction}
                                 onEndInsertAction={endInsertAction}
                                 onGenerateEnemyVisual={handleGenerateEnemyImage}

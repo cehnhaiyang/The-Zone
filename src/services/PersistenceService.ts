@@ -1,15 +1,21 @@
 import type {
     Dialogue,
     GameStateData,
-    HorrorAesthetic,
-    HorrorAtom,
-    HorrorDomain,
     ItemTemplate,
     MemoryPyramid,
+    NarrativeLibrary,
     NarrativeMode,
     Settings,
     ZoneTemplate,
 } from '../meta';
+
+/**
+ * 玩家自建叙事库。
+ *
+ * 契约定义在 `meta/interface.ts`，此处仅按持久化模块的对外契约转出，
+ * 避免服务层与 meta 各持一份同构类型后逐渐漂移。
+ */
+export type { NarrativeLibrary };
 
 //=============================================================================
 // 1. 持久化桥接类型
@@ -43,18 +49,6 @@ export interface NpcProfileMeta {
     name: string;
     lastModified: number;
     turnsCount?: number;
-}
-
-/**
- * 玩家自建叙事库。
- *
- * 与游戏存档解耦：作为全局用户资产持久化，任何存档、任何叙事链都可选用。
- * 只承载自建内容，预设库始终来自常量，不写入本地文件。
- */
-export interface NarrativeLibrary {
-    domains: HorrorDomain[];
-    atoms: HorrorAtom[];
-    aesthetics: HorrorAesthetic[];
 }
 
 export type PersistedDialogue = Dialogue | Dialogue[];

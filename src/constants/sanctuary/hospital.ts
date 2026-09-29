@@ -1,6 +1,3 @@
-/**
- * 圣伊丽莎白纪念医院
- */
 import type { SanctuaryTemplate } from '../../meta';
 
 export const ZONE_HOSPITAL: SanctuaryTemplate = {
@@ -39,7 +36,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                 desc: '拆卸报废军械与医疗设备得到的工程材料，可充作升级设施的代价。',
                 icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 7h16v10H4z"></path><path d="M8 7v10M16 7v10"></path></svg>',
                 value: 50
-            },
+            }
         ],
         population: 32,
         erosion: 12,
@@ -278,6 +275,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                                             type: 'material',
                                             size: [1, 1],
                                             grade: 'military',
+                                            fleshFusionState: 4,
                                             dropProbability: 0.6
                                         }
                                     ]
@@ -309,7 +307,8 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                                     desc: '印有螺旋标志的黑色磁卡，材质冰凉得不正常，散发出浓厚的不祥气息。',
                                     type: 'material',
                                     size: [1, 1],
-                                    grade: 'military'
+                                    grade: 'military',
+                                    cognitiveErosionState: 2
                                 }
                             ]
                         }
@@ -593,6 +592,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                                             type: 'material',
                                             size: [1, 1],
                                             grade: 'standard',
+                                            fleshFusionState: 2,
                                             dropProbability: 0.8
                                         }
                                     ]
@@ -740,6 +740,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                     type: 'data',
                     size: [1, 1],
                     grade: 'military',
+                    cognitiveErosionState: 3,
                     discoveryThreshold: 10,
                     documentContent: 'X光检查记录 - 未知编号\n\n受检者：无（扫描室当时无人）\n影像所见：胸腔内出现多组对称性眼球结构；颅腔内存在第二套完整颌骨；脊柱末端分叉为三支。\n附注：胶片显影后仍在持续生长，画面边缘已出现新增的骨骼轮廓。'
                 }
@@ -878,7 +879,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                 id: 'survivor_leon',
                 name: '利昂',
                 gender: 'male',
-                desc: '曾是这座医院的机修工。异变爆发时侥幸躲在机房深处逃过第一波收割。如今他攥着失踪女儿唯一留下的照片，在极度的自责与绝望的缝隙间，苦等一个永远不会到来的奇迹。偶尔他会提起"楼上的护士长"——语气里有感激，也有不敢直视的愧疚：艾拉拉曾借给他镇静剂，而他没能修好 B1 的发电机回报她。',
+                desc: '医院的机修工。异变爆发时侥幸躲在机房深处逃过第一波收割。如今他攥着失踪女儿唯一留下的照片，在极度的自责与绝望的缝隙间，苦等一个永远不会到来的奇迹。偶尔他会提起"楼上的护士长"——语气里有感激，也有不敢直视的愧疚：护士长曾借给他镇静剂，而他没能修好 B1 的发电机回报她。',
                 visualPrompt: 'A weary middle-aged man in dirty technician overalls, sitting motionless on a bed, staring at an old photo with profound, hollow sadness.',
                 style: 'defense',
                 initialState: {
@@ -906,7 +907,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                                 currentUses: 15
                             },
                             side: null
-                        },
+                        }
                     },
                     trust: 20,
                     quests: [
@@ -1063,7 +1064,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                 visualPrompt: 'An exhausted female nurse in her late 30s with tired eyes and messy brown hair tied in a loose bun, wearing worn blood-stained medical scrubs layered with a makeshift tactical vest made from hospital supplies, intricate cybernetic neural ports visible on her neck, holding a glowing sci-fi medical scanner, emergency red lights casting dramatic shadows, hospital corridor backdrop with quarantine tape and flickering lights, gritty survival horror atmosphere, high detail.',
                 style: 'balance',
                 initialState: {
-                    attribute: { strength: 8, agility: 16, wisdom: 24, awareness: 20, will: 0, cthulhu: 12 },
+                    attribute: { strength: 8, agility: 16, wisdom: 24, awareness: 20, will: 16, cthulhu: 12 },
                     vital: { maxHp: 100, maxSanity: 220, maxStamina: 125, maxVigor: 165 },
                     inventory: [
                         {
@@ -1099,7 +1100,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                             ]
                         },
                         {
-                            id: 'sedative_starter',
+                            id: 'high_potency_sedative',
                             name: '强效镇静剂',
                             desc: '来自过去的处方药。大幅恢复理智。',
                             type: 'consumable',
@@ -1113,22 +1114,22 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                             type: 'D',
                             id: 'nurse_triage',
                             name: '检伤分类',
-                            desc: '快速评估战场态势，提升所有友方单位的感知与判断。',
+                            desc: '快速评估战场态势，提升所有友方单位的命中与暴击倾向，持续 2 回合。',
                             apCost: 1,
                             tacticEffect: [
-                                ['all_allies', 'awareness', 2, 0],
-                                ['all_allies', 'wisdom', 1, 0]
+                                ['all_allies', 'aim', 2, 2],
+                                ['all_allies', 'crit_chance', 0.05, 2]
                             ]
                         },
                         {
                             type: 'D',
                             id: 'nurse_steady_hands',
                             name: '稳定手法',
-                            desc: '调整呼吸与操作节奏，短暂提升自身医学判断与处置精度。',
+                            desc: '调整呼吸与操作节奏，短暂提升自身处置精度与致命弱点捕捉率，持续 1 回合。',
                             apCost: 1,
                             tacticEffect: [
-                                ['self', 'wisdom', 2, 0],
-                                ['self', 'awareness', 1, 0]
+                                ['self', 'aim', 3, 1],
+                                ['self', 'crit_chance', 0.1, 1]
                             ]
                         },
                         {
@@ -1146,12 +1147,12 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                             type: 'A',
                             id: 'nurse_surgical_strike',
                             name: '外科切口',
-                            desc: '以手术刀精确攻击敌方薄弱处，削弱其力量与感知，持续 2 回合。',
+                            desc: '以手术刀精确切断敌方肌肉与视觉神经纤维，削弱其攻击伤害与命中精度，持续 2 回合。',
                             apCost: 2,
                             requireWeapon: 'prick',
                             tacticEffect: [
-                                ['single_enemy', 'strength', -2, 2],
-                                ['single_enemy', 'awareness', -2, 2]
+                                ['single_enemy', 'damage', -4, 2],
+                                ['single_enemy', 'aim', -3, 2]
                             ]
                         }
                     ],
@@ -1298,7 +1299,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                                     effects: [['hp', 100]]
                                 },
                                 {
-                                    id: 'sedative_starter',
+                                    id: 'high_potency_sedative',
                                     name: '强效镇静剂',
                                     desc: '药品柜深层取出的高纯度镇静剂，比散落在病房的普通版本强得多。',
                                     type: 'consumable',
@@ -1339,6 +1340,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                                     type: 'consumable',
                                     size: [1, 1],
                                     grade: 'corporate',
+                                    cognitiveErosionState: 1,
                                     effects: [['sanity', 100]]
                                 },
                                 {
@@ -1537,6 +1539,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                                     type: 'consumable',
                                     size: [1, 1],
                                     grade: 'corporate',
+                                    cognitiveErosionState: 1,
                                     effects: [
                                         ['sanity', 80],
                                         ['hp', 30]
@@ -1698,6 +1701,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                             type: 'material',
                             size: [1, 1],
                             grade: 'corporate',
+                            cognitiveErosionState: 4,
                             dropProbability: 1.0
                         },
                         {
@@ -1709,6 +1713,8 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                             grade: 'corporate',
                             weaponType: 'prick',
                             weaponDamageType: 'melee',
+                            fleshFusionState: 3,
+                            cognitiveErosionState: 2,
                             range: 1,
                             damage: 20,
                             crit: {
@@ -1731,6 +1737,8 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                     grade: 'corporate',
                     weaponType: 'prick',
                     weaponDamageType: 'melee',
+                    cognitiveErosionState: 4,
+                    causalInversionState: 2,
                     range: 1,
                     damage: 15,
                     crit: {
@@ -1854,6 +1862,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                             type: 'material',
                             size: [1, 1],
                             grade: 'military',
+                            cognitiveErosionState: 3,
                             dropProbability: 0.7
                         }
                     ]
@@ -2017,6 +2026,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                                             type: 'data',
                                             size: [1, 1],
                                             grade: 'corporate',
+                                            cognitiveErosionState: 3,
                                             documentContent: '回声转录：...[错乱的多重重唱]...理智是束缚，疯狂是飞升...[令人血液凝固的尖啸]...',
                                             audioScript: '...[错乱的多重重唱]...理智是束缚，疯狂是飞升...[令人血液凝固的尖啸]...',
                                             dropProbability: 1.0
@@ -2080,6 +2090,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                     type: 'data',
                     size: [1, 1],
                     grade: 'standard',
+                    cognitiveErosionState: 2,
                     discoveryThreshold: 10,
                     documentContent: '艺术治疗记录 - 团体画作\n\n本周主题：《我的家》。病人们不约而同地画了同一栋楼。\n我询问其中一名患者，他指着楼顶用平静的声音说："那是它出生的地方。"\n当我追问"它"是谁时，他微笑着指了指天花板，又指了指自己的太阳穴。'
                 }
@@ -2131,6 +2142,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                     type: 'consumable',
                     size: [1, 1],
                     grade: 'corporate',
+                    cognitiveErosionState: 1,
                     effects: [['sanity', 100]],
                     discoveryThreshold: 25
                 }
@@ -2171,7 +2183,8 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                                     desc: '刻有Ω符号的最高权限磁卡，冰冷得烫手。',
                                     type: 'material',
                                     size: [1, 1],
-                                    grade: 'corporate'
+                                    grade: 'corporate',
+                                    cognitiveErosionState: 2
                                 }
                             ]
                         }
@@ -2286,6 +2299,7 @@ export const ZONE_HOSPITAL: SanctuaryTemplate = {
                     type: 'data',
                     size: [1, 1],
                     grade: 'corporate',
+                    cognitiveErosionState: 4,
                     discoveryThreshold: 25,
                     documentContent: '「方舟」计划 · 第13号协议\n\n当世界被不可名状之物吞噬，获准搭乘方舟的成员将进入低温休眠，待灾变结束后再行苏醒。\n代价：需向「彼侧」献上自身认知的一部分作为船票。\n\n附注：第一任院长签署当日即精神崩溃，他在合同背面用血写下一行字："方舟的木材，是我们自己。"'
                 }

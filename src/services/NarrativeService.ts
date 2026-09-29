@@ -1,4 +1,4 @@
-import { normalizeEquipState, safeDeepClone } from '../meta';
+import { normalizeEquipState, resolvePlotPointNet, safeDeepClone } from '../meta';
 import type {
     PlayerState,
     PlotPoint,
@@ -663,10 +663,9 @@ export class ChainNarrativeService {
             return next;
         }
 
-        const target = next.activeArc.plotPoints.find(p => p.id === plotId && !p.isSolved);
-        if (target) {
-            target.isSolved = true;
-        }
+        // 「标记伏笔已解决」的规则由 meta 唯一持有（只对未解决的同 id 伏笔下手），
+        // 服务层只负责深拷贝与叙事链前置校验。
+        next.activeArc.plotPoints = resolvePlotPointNet(next.activeArc.plotPoints, [plotId]).plots;
 
         return next;
     }

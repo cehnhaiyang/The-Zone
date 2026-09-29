@@ -74,7 +74,7 @@ import {
 import type { EffectDeltas, GridSize } from '../meta';
 import { getBackpackGridSize, getItemGridFootprint, getItemGridSize } from '../meta';
 import { AiService, AudioService, PersistenceService } from '../services';
-import type { BattleStartContext } from './useCombat';
+import type { BattleStartContext } from '../meta';
 
 type PuzzleStatus = 'idle' | 'success' | 'error';
 type PuzzleStatusMsg = 'AWAITING_INPUT' | 'ACCESS_GRANTED' | 'ACCESS_DENIED' | 'TIME_EXPIRED';
