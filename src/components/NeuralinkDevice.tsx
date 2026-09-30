@@ -4,48 +4,67 @@
  * 玩家感知、UI 信息层与 AI 噪声注入的核心媒介。
  * 职责：
  * - 承载底层视觉画面（VisualPanel）与四个 HUD 功能面板的路由遮罩
+ * - 内嵌设置页（SettingsPanel）作为装置内可切换页面，取代外部弹窗
  * - 以 CSS 变量驱动故障（glitch）特效，规避高频 setState 重渲染
- * - 暴露左边缘可滑入的页签导航（V / S / I / D 热键）
+ * - 暴露左边缘可滑入的页签导航（V / S / I / D / C 热键）
+ *
+ * 分包说明：
+ * - 五个面板（VISUAL / STATUS / ITEMS / DATA / CONFIG）**全部按需加载**。
+ *   任一时刻最多显示其中一个，静态 import 会把全部面板的求值成本摊到
+ *   「每次进入游戏」上；分包后首次进入只同步求值装置外壳。
+ * - 例外约束：若其它**静态**链路（如 LogPanel）反向依赖某个面板模块，
+ *   该面板就再也拆不出去；此类共享件必须下沉为独立模块
+ *   （例：图标库已从 VisualPanel 抽到 ./Icons）。
  *
  * 契约说明：
  * - 媒体类型统一使用 type.ts 的 AssetType，不再维护本地同义类型
  * - 媒体偏好读取 Settings.preferredMediaType（单一事实源）
  * - 理智临界阈值读取 gameConfig.social.vitals.sanityCritical
  * - 生成状态查询 isTaskGenerating 为必填，按 (媒体, 目标, ID) 精确路由
+ * - 设置页签属装置内 UI 态，不写入元契约的 VisorPanelType
  *
- * @version 3.0.0
+ * @version 3.2.0
  */
 import React, {
+  Suspense,
   useState,
   useEffect,
   useMemo,
   useRef,
   useCallback,
 } from 'react';
-import {
-  VisorPanelType,
-  VisualMode,
-  AssetType,
-  Log,
-  PlayerState,
-  Settings,
-  Zone,
-  Node as GameNode,
-  clamp,
-  getNodeThreatLevel,
-  getPercent,
-  Tactic,
-  ItemInstance,
-  Entity,
-  CompanionTemplate,
-  CompanionDynamicState,
-} from '../meta';
-import type { InventoryGridApi } from '../hooks';
+import { clamp, getNodeThreatLevel, getPercent } from '../consts';
+import { AssetType, CompanionDynamicState, CompanionTemplate, Entity, InventoryGridReturn, ItemInstance, Log, Node as GameNode, PlayerState, Settings, Tactic, VisorPanelType, VisualMode, Zone } from '../contract';
 import { AudioService } from '../services';
-import VisualPanel from './VisualPanel';
-import StatusPanel from './StatusPanel';
-import InventoryPanel from './InventoryPanel';
-import ArchivesPanel from './ArchivesPanel';
+
+// =====================
+// 0. 按需分包的面板
+// =====================
+
+/**
+ * 装置内的四个 HUD 面板与设置页**一律按需加载**。
+ *
+ * 理由：任一时刻最多只显示其中一个（VISUAL / STATUS / ITEMS / DATA / CONFIG），
+ * 而这些面板体量与依赖都不小。静态 import 会把全部面板的求值成本摊到
+ * 「每次进入游戏」上，与其实际显示时机无关；分包后只有玩家真正切到某页时
+ * 才拉取该页代码，首次进入游戏的同步求值量随之下降到仅剩装置外壳。
+ *
+ * 实现约束：
+ * - 各面板均以 default 导出，故可直接由 React.lazy 包装；
+ * - 包装结果是模块级常量，引用恒稳定，不会破坏下游 useMemo / memo 的依赖判断。
+ */
+const VisualPanel = React.lazy(() => import('./VisualPanel'));
+const StatusPanel = React.lazy(() => import('./StatusPanel'));
+const InventoryPanel = React.lazy(() => import('./InventoryPanel'));
+const ArchivesPanel = React.lazy(() => import('./ArchivesPanel'));
+const SettingsPanel = React.lazy(() => import('./SettingsPanel'));
+
+/** 懒加载面板的统一占位，沿用装置自身的终端配色。 */
+const PanelLoading: React.FC<{ label: string }> = ({ label }) => (
+  <div className="w-full h-full flex items-center justify-center font-mono text-[10px] tracking-[0.3em] text-cyan-900/60 select-none">
+    NEURAL_LINK::{label}
+  </div>
+);
 
 // =====================
 // 1. 类型定义
@@ -58,9 +77,17 @@ export type NeuralinkGenTarget =
   | 'npc'
   | 'player';
 
+/**
+ * 装置内部可切换页面的标识。
+ *
+ * 设置页归属于神经链接仪自身，属 UI 态而非游戏态，
+ * 因此在此本地扩展一个页签，不写入元契约的 VisorPanelType。
+ */
+type PanelTabId = VisorPanelType | 'settings';
+
 /** 页签配置。label 首字母即渲染字符，与 hotkey 保持一致。 */
 interface PanelTabConfig {
-  id: VisorPanelType;
+  id: PanelTabId;
   label: string;
   hotkey: string;
   available: boolean;
@@ -114,7 +141,7 @@ export interface NeuralinkDeviceProps {
   onUseItem?: (instanceId: string) => void;
   onDiscardItem?: (instanceId: string) => void;
   /** 背包网格契约：格子背包的落位结果与编辑动作 */
-  inventoryGrid: InventoryGridApi;
+  inventoryGrid: InventoryGridReturn;
   /**
    * 卸下已装备物品。
    *
@@ -130,7 +157,14 @@ export interface NeuralinkDeviceProps {
   onToggleSanctuaryUI?: () => void;
   isCombat?: boolean;
   overrideImageUrl?: string;
-  onOpenSettings?: () => void;
+
+  // ---- 设置页（内嵌于神经链接仪）----
+  /** 提交设置变更。设置页唯一出参。 */
+  onUpdateSettings?: (settings: Settings) => void;
+  onSaveGame?: (saveName?: string) => Promise<string | null>;
+  onLoadGame?: (fileName: string) => Promise<boolean>;
+  onListSaves?: () => Promise<Array<{ name: string; size: number; modified: string }>>;
+  onDeleteSave?: (fileName: string) => Promise<boolean>;
 
   // ---- 神经噪声 / 全屏 ----
   setNeuralNoise?: (level: number) => void;
@@ -152,10 +186,19 @@ export interface NeuralinkDeviceProps {
 interface VisorFrameProps {
   /** 设备是否处于危急状态（低完整 / 低电量 / 低理智）。 */
   critical: boolean;
+  /**
+   * 是否真的有故障源（低于阈值时才为真）。
+   *
+   * 该开关只控制「是否挂载 .visor-glitch 动画类」：故障层的可见度本就由
+   * --glitch-intensity 决定，健康时为 0 即完全不可见；但动画本身仍在运行，
+   * 而 visor-glitch-anim 动的是 clip-path（全屏尺寸下无法走合成器），
+   * 等于让整局游戏持续背着一次全屏重绘。健康时摘掉动画类不影响任何画面。
+   */
+  glitch: boolean;
   children: React.ReactNode;
 }
 
-const VisorFrame = React.memo<VisorFrameProps>(({ critical, children }) => (
+const VisorFrame = React.memo<VisorFrameProps>(({ critical, glitch, children }) => (
   <div className="relative w-full h-full flex flex-col bg-transparent">
     {/* 主内容区域 */}
     <div className="flex-1 flex flex-col relative overflow-hidden">
@@ -171,7 +214,7 @@ const VisorFrame = React.memo<VisorFrameProps>(({ critical, children }) => (
       避免 200ms 高频随机值触发 React 重渲染。
     */}
     <div
-      className="absolute inset-0 pointer-events-none z-[25] visor-glitch"
+      className={`absolute inset-0 pointer-events-none z-[25] ${glitch ? 'visor-glitch' : ''}`}
       style={{ opacity: 'calc(var(--glitch-intensity, 0) * 0.4)' }}
     />
 
@@ -192,8 +235,8 @@ VisorFrame.displayName = 'VisorFrame';
 
 interface VisorTabsProps {
   tabs: PanelTabConfig[];
-  activeTab: VisorPanelType;
-  onTabChange: (tab: VisorPanelType) => void;
+  activeTab: PanelTabId;
+  onTabChange: (tab: PanelTabId) => void;
   vertical?: boolean;
 }
 
@@ -298,10 +341,14 @@ const NeuralinkDeviceBase: React.FC<NeuralinkDeviceProps> = ({
   onToggleSanctuaryUI,
   isCombat = false,
   overrideImageUrl,
+  onUpdateSettings,
+  onSaveGame,
+  onLoadGame,
+  onListSaves,
+  onDeleteSave,
   setNeuralNoise,
   isVisualFullscreen = false,
   setIsVisualFullscreen,
-  onOpenSettings,
   onLevelUp,
   pendingTacticOptions,
   onSelectTactic,
@@ -311,6 +358,8 @@ const NeuralinkDeviceBase: React.FC<NeuralinkDeviceProps> = ({
   // ==========================================================================
   const [noiseColor, setNoiseColor] = useState('cyan');
   const [showTabs, setShowTabs] = useState(false);
+  /** 设置页：作为装置内可切换页面，而非独立弹窗。 */
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const tabsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -423,13 +472,24 @@ const NeuralinkDeviceBase: React.FC<NeuralinkDeviceProps> = ({
     { id: 'Vital', label: 'STATUS', hotkey: 'S', available: true },
     { id: 'inventory', label: 'ITEMS', hotkey: 'I', available: true },
     { id: 'archives', label: 'DATA', hotkey: 'D', available: true },
+    { id: 'settings', label: 'CONFIG', hotkey: 'C', available: true },
   ], [hasCurrentNode]);
 
-  const handlePanelChange = useCallback((panel: VisorPanelType) => {
-    if (panel === activePanel) return;
+  /** 当前生效页签：设置页优先于宿主传入的面板路由。 */
+  const activeTabId: PanelTabId = settingsOpen ? 'settings' : activePanel;
+
+  const handlePanelChange = useCallback((panel: PanelTabId) => {
+    if (panel === 'settings') {
+      if (settingsOpen) return;
+      AudioService.playSfx('ui_click');
+      setSettingsOpen(true);
+      return;
+    }
+    if (!settingsOpen && panel === activePanel) return;
     AudioService.playSfx('ui_click');
+    setSettingsOpen(false);
     onPanelChange(panel);
-  }, [activePanel, onPanelChange]);
+  }, [activePanel, settingsOpen, onPanelChange]);
 
   // ==========================================================================
   // 4.6 键盘快捷键
@@ -498,9 +558,20 @@ const NeuralinkDeviceBase: React.FC<NeuralinkDeviceProps> = ({
     [onInteractWithCompanion],
   );
 
+  /** 设置页入口：视觉面板齿轮按钮与左侧页签共用同一条路由。 */
   const handleOpenSettings = useCallback(() => {
-    onOpenSettings?.();
-  }, [onOpenSettings]);
+    AudioService.playSfx('ui_click');
+    setSettingsOpen(true);
+  }, []);
+
+  const handleCloseSettings = useCallback(() => {
+    AudioService.playSfx('ui_click');
+    setSettingsOpen(false);
+  }, []);
+
+  const handleUpdateSettings = useCallback((next: Settings) => {
+    onUpdateSettings?.(next);
+  }, [onUpdateSettings]);
 
   const handleToggleSanctuaryUI = useCallback(() => {
     onToggleSanctuaryUI?.();
@@ -662,49 +733,51 @@ const NeuralinkDeviceBase: React.FC<NeuralinkDeviceProps> = ({
       style={{ '--glitch-intensity': '0' } as React.CSSProperties}
     >
       {/* 设备框架 */}
-      <VisorFrame critical={frameCritical}>
+      <VisorFrame critical={frameCritical} glitch={glitchActive}>
         <div className="relative w-full h-full">
           {/* LAYER 1：底层视觉画面，始终渲染 */}
           <div className="absolute inset-0 z-0">
             {currentZone && currentNode ? (
-              <VisualPanel
-                imageUrl={currentNode.imageUrl}
-                videoUrl={currentNode.videoUrl}
-                viewMode={effectiveViewMode}
-                onManualGen={generateNewAssetScene}
-                isGenerating={isSceneGenerating}
-                preferredMediaType={mediaPreference}
-                hasVideo={Boolean(currentNode.videoUrl)}
-                nodeId={currentNodeId}
-                zoneId={currentZone.id}
-                zoneName={currentZone.name}
-                nodeName={currentNode.name}
-                nodedesc={currentNode.desc ?? ''}
-                threatLevel={getNodeThreatLevel(currentNode)}
-                interactions={currentNode.interactions}
-                sanity={player.dynamic.sanity}
-                onToggleMode={handleToggleMode}
-                onToggleMediaType={handleToggleMediaType}
-                onAction={handleAction}
-                logs={safeLogs}
-                currentNode={currentNode}
-                isSanctuary={isSanctuary}
-                onToggleSanctuaryUI={handleToggleSanctuaryUI}
-                isCombat={isCombat}
-                overrideImageUrl={overrideImageUrl}
-                neuralNoiseLevel={player.neuralLink.noiseLevel}
-                batteryLevel={player.neuralLink.battery}
-                onSetNoiseLevel={handleSetNoiseLevel}
-                integrity={player.neuralLink.integrity}
-                noiseColor={noiseColor}
-                onSetNoiseColor={setNoiseColor}
-                onRandomSwitch={handleSceneRandomSwitch}
-                hasMultipleVariants={stableHasMultipleVariants}
-                isFullscreenControlled={isVisualFullscreen}
-                onFullscreenChange={handleFullscreenChange}
-                onOpenSettings={handleOpenSettings}
-                currentZone={currentZone}
-              />
+              <Suspense fallback={<PanelLoading label="VISUAL_LOADING" />}>
+                <VisualPanel
+                  imageUrl={currentNode.imageUrl}
+                  videoUrl={currentNode.videoUrl}
+                  viewMode={effectiveViewMode}
+                  onManualGen={generateNewAssetScene}
+                  isGenerating={isSceneGenerating}
+                  preferredMediaType={mediaPreference}
+                  hasVideo={Boolean(currentNode.videoUrl)}
+                  nodeId={currentNodeId}
+                  zoneId={currentZone.id}
+                  zoneName={currentZone.name}
+                  nodeName={currentNode.name}
+                  nodedesc={currentNode.desc ?? ''}
+                  threatLevel={getNodeThreatLevel(currentNode)}
+                  interactions={currentNode.interactions}
+                  sanity={player.dynamic.sanity}
+                  onToggleMode={handleToggleMode}
+                  onToggleMediaType={handleToggleMediaType}
+                  onAction={handleAction}
+                  logs={safeLogs}
+                  currentNode={currentNode}
+                  isSanctuary={isSanctuary}
+                  onToggleSanctuaryUI={handleToggleSanctuaryUI}
+                  isCombat={isCombat}
+                  overrideImageUrl={overrideImageUrl}
+                  neuralNoiseLevel={player.neuralLink.noiseLevel}
+                  batteryLevel={player.neuralLink.battery}
+                  onSetNoiseLevel={handleSetNoiseLevel}
+                  integrity={player.neuralLink.integrity}
+                  noiseColor={noiseColor}
+                  onSetNoiseColor={setNoiseColor}
+                  onRandomSwitch={handleSceneRandomSwitch}
+                  hasMultipleVariants={stableHasMultipleVariants}
+                  isFullscreenControlled={isVisualFullscreen}
+                  onFullscreenChange={handleFullscreenChange}
+                  onOpenSettings={handleOpenSettings}
+                  currentZone={currentZone}
+                />
+              </Suspense>
             ) : (
               <div className="w-full h-full flex items-center justify-center font-mono text-[10px] tracking-[0.3em] text-cyan-900/60 select-none">
                 NEURAL_LINK::NO_SIGNAL
@@ -712,15 +785,33 @@ const NeuralinkDeviceBase: React.FC<NeuralinkDeviceProps> = ({
             )}
           </div>
 
-          {/* LAYER 2：半透明功能面板遮罩 */}
-          {activePanel !== 'visual' && (
+          {/* LAYER 2：半透明功能面板遮罩。设置页同为装置内页面，并入同一遮罩层。 */}
+          {(settingsOpen || activePanel !== 'visual') && (
             <div className="absolute inset-0 z-40 bg-black/85 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200 flex flex-col">
-              <div className="flex-1 relative overflow-hidden p-4">
-                <div className="w-full h-full border border-cyan-900/30 bg-black/20 relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-900/50 to-transparent" />
-                  {overlayContent}
+              {settingsOpen ? (
+                <Suspense fallback={<PanelLoading label="CONFIG_LOADING" />}>
+                  <SettingsPanel
+                    settings={settings}
+                    onUpdate={handleUpdateSettings}
+                    onClose={handleCloseSettings}
+                    isFullscreen
+                    embedded
+                    onSaveGame={onSaveGame}
+                    onLoadGame={onLoadGame}
+                    onListSaves={onListSaves}
+                    onDeleteSave={onDeleteSave}
+                  />
+                </Suspense>
+              ) : (
+                <div className="flex-1 relative overflow-hidden p-4">
+                  <div className="w-full h-full border border-cyan-900/30 bg-black/20 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-900/50 to-transparent" />
+                    <Suspense fallback={<PanelLoading label={`${activePanel.toUpperCase()}_LOADING`} />}>
+                      {overlayContent}
+                    </Suspense>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>
@@ -765,7 +856,7 @@ const NeuralinkDeviceBase: React.FC<NeuralinkDeviceProps> = ({
             <div className="bg-black/80 border border-cyan-900/40 border-l-0 rounded-r-md px-2 py-4 backdrop-blur-md shadow-[4px_0_20px_rgba(0,0,0,0.5)]">
               <VisorTabs
                 tabs={panelTabs}
-                activeTab={activePanel}
+                activeTab={activeTabId}
                 onTabChange={handlePanelChange}
                 vertical
               />

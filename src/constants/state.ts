@@ -1,4 +1,4 @@
-import { State } from '../meta';
+import { State } from '../contract';
 
 /**
  * 依百分比选取状态档位索引。

@@ -22,7 +22,7 @@
  *   - messages（完整 OpenAI 兼容消息，尤其适用于多模态）
  * - 支持解析 Qwen 的 reasoning_content，并映射到 AIResponse.thought。
  */
-import type { Settings, ApiPlatform } from '../../../meta';
+import type { ApiPlatform, Settings } from '../../../contract/meta';
 import { KeyService } from '../../KeyService';
 import {
     BaseProvider,

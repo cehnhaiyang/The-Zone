@@ -1,13 +1,4 @@
-import type {
-    Dialogue,
-    GameStateData,
-    ItemTemplate,
-    MemoryPyramid,
-    NarrativeLibrary,
-    NarrativeMode,
-    Settings,
-    ZoneTemplate,
-} from '../meta';
+import type { Dialogue, GameStateData, ItemTemplate, MemoryPyramid, NarrativeLibrary, NarrativeMode, Settings, ZoneTemplate } from '../contract';
 
 /**
  * 玩家自建叙事库。

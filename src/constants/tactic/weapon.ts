@@ -6,11 +6,12 @@
  * - 依循 `WeaponOwnTactic` 接口，通过 `weaponOwn` 直接绑定至对应 `WeaponType`。
  * - 由装备该类型武器的实体在战斗态 (GameState.COMBAT) 中自动装载，不参与公共战术池抽取。
  * - 严格遵循《背景设定与世界观编年史》第六章十六种军械形态与因果律战斗体系规约。
+ * - 战术数值与持续时间完全对齐引擎规约：aim 与 defense 按百分比点数标定，crit_chance 严格使用 [0, 1] 浮点。
  *
- * @version 2.3.0
+ * @version 2.4.0
  */
 
-import type { Target, TacticEffectType, WeaponType, WeaponOwnTactic } from '../../meta'
+import type { TacticEffectType, Target, WeaponOwnTactic, WeaponType } from '../../contract/meta';
 
 /**
  * 战术效果四元组定义：
@@ -105,8 +106,8 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '利用单手武器的轻盈重心执行变向虚晃，在战壕与障碍间拉开身位，提升下一次攻击判定质量并强化自卫机动。',
         1,
         [
-            ['self', 'aim', 1, 1],
-            ['self', 'evasion', 5, 1],
+            ['self', 'aim', 15, 1],
+            ['self', 'evasion', 18, 1],
         ],
     ),
 
@@ -133,8 +134,8 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '借武器回转离心力横向卷过正前方，强行打乱多名进攻者的突进节奏，迫使其回缩规避。',
         2,
         [
-            ['all_enemies', 'speed', -1, 1],
-            ['all_enemies', 'damage', -1, 1],
+            ['all_enemies', 'speed', -2, 1],
+            ['all_enemies', 'aim', -15, 1],
         ],
     ),
 
@@ -150,7 +151,7 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '收束身形，将锐利刃尖高频刺向目标肢体关节与防护裂隙，争取弱点穿透与暴击判定。',
         1,
         [
-            ['self', 'crit_chance', 10, 0],
+            ['self', 'crit_chance', 0.15, 0],
         ],
     ),
     makeUtil(
@@ -161,6 +162,7 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         1,
         [
             ['self', 'a_sequence', 1, 0],
+            ['self', 'aim', 15, 0],
         ],
     ),
 
@@ -176,8 +178,8 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '双手紧握柄轴完成一次极长纵深的沉重突刺，以破坏性动量贯穿阻碍并撕裂脏器，但短时间内难以迅速回防。',
         2,
         [
-            ['self', 'crit_bonus', 4, 0],
-            ['single_enemy', 'speed', -1, 1],
+            ['self', 'crit_bonus', 6, 0],
+            ['single_enemy', 'speed', -2, 1],
             ['self', 'd_sequence', -1, 1],
         ],
     ),
@@ -188,8 +190,8 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '将长兵后柄抵于地面构成拒马夹角，以枪尖锁定迎面扑来的威胁，迟滞目标速度并建立防守阵位。',
         2,
         [
-            ['single_enemy', 'speed', -2, 1],
-            ['self', 'defense', 10, 1],
+            ['single_enemy', 'speed', -3, 1],
+            ['self', 'defense', 18, 1],
         ],
     ),
 
@@ -205,7 +207,8 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '借冲刺步法以坚实盾面猛烈撞击目标躯干，以钝性震荡破坏其攻击架势与前倾重心。',
         1,
         [
-            ['single_enemy', 'speed', -1, 1],
+            ['single_enemy', 'speed', -2, 1],
+            ['single_enemy', 'aim', -12, 1],
         ],
     ),
     makeDef(
@@ -216,7 +219,8 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         1,
         [
             ['self', 'd_sequence', 1, 1],
-            ['self', 'shield', 6, 1],
+            ['self', 'shield', 8, 1],
+            ['self', 'defense', 12, 1],
         ],
     ),
 
@@ -229,11 +233,11 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         'both_shield',
         'bulwark_ram',
         '盾墙冲撞',
-        '双手紧扣重装塔盾骨架全力向前夯进，以钢铁壁垒强行碾碎敌方阻击阵线，压制其行动速度与输出动量。',
+        '双手紧扣重装塔盾骨架全力向前夯进，以钢铁壁垒强行碾碎敌方阻击阵线，压制其行动速度与外壳防护。',
         2,
         [
-            ['single_enemy', 'speed', -2, 1],
-            ['single_enemy', 'damage', -2, 1],
+            ['single_enemy', 'speed', -3, 1],
+            ['single_enemy', 'defense', -15, 1],
         ],
     ),
     makeDef(
@@ -244,8 +248,8 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         2,
         [
             ['self', 'd_sequence', 2, 1],
-            ['self', 'shield', 16, 1],
-            ['self', 'defense', 20, 1],
+            ['self', 'shield', 20, 1],
+            ['self', 'defense', 30, 1],
         ],
     ),
 
@@ -265,7 +269,8 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '借助手枪极致的拔枪指向性对敌方要害进行快节奏骚扰射击，干扰其索敌瞄准精度。',
         1,
         [
-            ['single_enemy', 'aim', -2, 1],
+            ['single_enemy', 'aim', -18, 1],
+            ['self', 'speed', 1, 1],
         ],
     ),
 
@@ -278,7 +283,7 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         1,
         '以极高射速向目标区域倾泻密集短点射，以高密火网短暂压制敌方的前推势头。',
         [
-            ['single_enemy', 'speed', -1, 0],
+            ['single_enemy', 'speed', -2, 0],
         ],
     ),
     makeAtk(
@@ -288,7 +293,8 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '迅速摆动冲锋枪枪口进行压制性横扫，利用散布弹幕迫使多名敌对实体回缩规避。',
         1,
         [
-            ['all_enemies', 'aim', -1, 1],
+            ['all_enemies', 'aim', -15, 1],
+            ['all_enemies', 'evasion', -12, 1],
         ],
     ),
 
@@ -308,8 +314,8 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '遵循步兵作战规程打出节奏严密的极速三连发，兼顾落点散布与穿甲深度，优化命中并迟滞目标。',
         1,
         [
-            ['self', 'aim', 1, 0],
-            ['single_enemy', 'speed', -1, 1],
+            ['self', 'aim', 18, 0],
+            ['single_enemy', 'speed', -2, 1],
         ],
     ),
 
@@ -322,7 +328,7 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         1,
         '在近距离释放扇形鹿弹风暴，以数十颗破片轰击目标正面，强力冲击敌方肉身并打断其行动节奏。',
         [
-            ['single_enemy', 'speed', -1, 0],
+            ['single_enemy', 'speed', -2, 0],
         ],
     ),
     makeAtk(
@@ -332,7 +338,8 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '近距对准目标护甲或躯干要害释放整发弹药的高压爆震，强行撕裂掩体防线并削弱其免伤防御。',
         1,
         [
-            ['single_enemy', 'defense', -10, 1],
+            ['single_enemy', 'defense', -18, 1],
+            ['single_enemy', 'speed', -2, 1],
         ],
     ),
 
@@ -345,7 +352,7 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         1,
         '单手持截短枪管在咫尺距离骤然击发，破片如火云般爆开，造成难以防备的短距威慑。',
         [
-            ['single_enemy', 'speed', -1, 0],
+            ['single_enemy', 'speed', -2, 0],
         ],
     ),
     makeUtil(
@@ -355,7 +362,8 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '在狭窄战壕或掩体内引爆短管火药，炽烈枪口焰与巨响震荡神经，削弱全体敌人的索敌瞄准。',
         1,
         [
-            ['all_enemies', 'aim', -1, 1],
+            ['all_enemies', 'aim', -18, 1],
+            ['all_enemies', 'speed', -1, 1],
         ],
     ),
 
@@ -377,6 +385,7 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         1,
         [
             ['self', 'a_sequence', 1, 0],
+            ['self', 'aim', 30, 0],
         ],
     ),
 
@@ -391,7 +400,7 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '释放滑轮合金弩臂蓄积的机械高张力，使平直重矢破空击出，极佳的弹道稳定性提升本次命中质量。',
         1,
         [
-            ['self', 'aim', 1, 0],
+            ['self', 'aim', 18, 0],
         ],
     ),
     makeUtil(
@@ -401,7 +410,8 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '踩踏脚蹬拉动机簧上弦并压入合金弩矢，校正游标尺，为下一波精确击发储备暴击增益。',
         1,
         [
-            ['self', 'crit_chance', 15, 1],
+            ['self', 'crit_chance', 0.18, 1],
+            ['self', 'crit_bonus', 4, 1],
         ],
     ),
 
@@ -423,8 +433,8 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '沉肩拉弓，在微光中感知气流与引力扰动，调整呼吸节奏，使下一击的命中与暴击杀伤更为集中。',
         1,
         [
-            ['self', 'aim', 1, 0],
-            ['self', 'crit_bonus', 3, 0],
+            ['self', 'aim', 20, 0],
+            ['self', 'crit_bonus', 5, 0],
         ],
     ),
 
@@ -439,17 +449,18 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         '精准抛掷战术破片弹或高爆炸药，爆风与破片在目标脚下炸裂，剧烈冲击其行进节奏。',
         1,
         [
-            ['single_enemy', 'speed', -1, 1],
+            ['single_enemy', 'speed', -2, 1],
         ],
     ),
     makeUtil(
         'throw',
         'smoke_screen',
         '阻滞投掷',
-        '掷出燃烧物或催泪阻滞剂，释放刺激性浓烟笼罩前方网格，降低敌方全员的索敌瞄准精度。',
+        '掷出燃烧物或催泪阻滞剂，释放刺激性浓烟笼罩前方网格，降低敌方全员索敌瞄准并提升友军回避。',
         1,
         [
-            ['all_enemies', 'aim', -2, 1],
+            ['all_enemies', 'aim', -20, 1],
+            ['all_allies', 'evasion', 15, 1],
         ],
     ),
 
@@ -468,11 +479,12 @@ export const weaponOwnTactics: readonly WeaponOwnTactic[] = Object.freeze([
         'magic',
         'channel',
         '深渊引导',
-        '将意识与深渊回响共振短暂停驻，接引微弱高维能量，激化下一次施法的破坏力并编织一层因果护盾。',
+        '将意识与深渊回响共振短暂停驻，接引微弱高维能量，激化下一次施法的破坏力并回流充沛精力。',
         1,
         [
-            ['self', 'damage', 3, 0],
-            ['self', 'shield', 5, 1],
+            ['self', 'damage', 4, 0],
+            ['self', 'vigor', 3, 0],
+            ['self', 'sanity', -1, 0],
         ],
     ),
 ])

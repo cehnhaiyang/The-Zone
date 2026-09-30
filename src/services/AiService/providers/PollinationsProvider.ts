@@ -5,7 +5,7 @@
  * 基于 BaseProvider 构建。
  * Pollinations 图像生成为直链拼接模式，因此不需要轮询或复杂响应解析。
  */
-import type { Settings } from '../../../meta';
+import type { Settings } from '../../../contract/meta';
 import {
     BaseProvider,
     AIServiceError,
@@ -156,17 +156,16 @@ export class PollinationsProvider extends BaseProvider {
                 error instanceof AIServiceError
                     ? error
                     : new AIServiceError(
-                          `图像链接生成失败: ${
-                              error instanceof Error
-                                  ? error.message
-                                  : String(error)
-                          }`,
-                          this.providerName,
-                          params.model,
-                          undefined,
-                          error,
-                          ErrorType.INVALID_REQUEST
-                      );
+                        `图像链接生成失败: ${error instanceof Error
+                            ? error.message
+                            : String(error)
+                        }`,
+                        this.providerName,
+                        params.model,
+                        undefined,
+                        error,
+                        ErrorType.INVALID_REQUEST
+                    );
 
             if (apiKey && this.shouldReportKeyFailure(normalizedError)) {
                 KeyService.reportFailure(

@@ -1,57 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import {
-    DEFAULT_EPISODIC_TENSION,
-    DEFAULT_STORY_NODE_COUNT,
-    EMPTY_NARRATIVE_LIBRARY,
-    GameState,
-    HALLUCINATION_TEXTS,
-    applyLevelUp,
-    buildCurrentLocation,
-    buildStoryConfigFromPending,
-    calculateNextTickState,
-    clamp,
-    extractPlotPointsFromZone,
-    findAestheticReferences,
-    getEntranceNodeId,
-    getNodeByKey,
-    getNodeThreatLevel,
-    isSanctuary,
-    markNodeVisited,
-    mergeNarrativeLibrary,
-    safeAudioOperation,
-    safeNumber,
-    sanitizeNarrativeLibrary,
-    threatToRatio,
-    validateAesthetic,
-    validateAtom,
-    validateDomain,
-} from '../meta';
-import type {
-    AttributeType,
-    ChainNarrative,
-    CurrentTime,
-    DotSoundType,
-    EnemyTemplate,
-    GameStateData,
-    GameStateUpdaters,
-    HorrorAesthetic,
-    HorrorAtom,
-    HorrorDomain,
-    LogType,
-    NarrativeDraftContext,
-    NarrativeDraftIssue,
-    NarrativeLibrary,
-    NarrativeMode,
-    NarrativePacing,
-    NarrativePhase,
-    PlayerState,
-    PlotPoint,
-    StoryConfig,
-    Tactic,
-    Zone,
-    ZoneDate,
-} from '../meta';
+import { DEFAULT_EPISODIC_TENSION, DEFAULT_STORY_NODE_COUNT, EMPTY_NARRATIVE_LIBRARY, HALLUCINATION_TEXTS, NarrativeDraftContext, applyLevelUp, buildCurrentLocation, buildStoryConfigFromPending, calculateNextTickState, clamp, extractPlotPointsFromZone, findAestheticReferences, getEntranceNodeId, getNodeByKey, getNodeThreatLevel, isSanctuary, markNodeVisited, mergeNarrativeLibrary, safeAudioOperation, safeNumber, sanitizeNarrativeLibrary, threatToRatio, validateAesthetic, validateAtom, validateDomain } from '../consts';
+import { GameState } from '../contract';
+import type { AttributeType, ChainNarrative, CurrentTime, DotSoundType, EnemyTemplate, GameStateData, GameStateUpdaters, HorrorAesthetic, HorrorAtom, HorrorDomain, LogType, NarrativeLibrary, NarrativeMode, NarrativePacing, NarrativePhase, PlayerState, PlotPoint, StoryConfig, Tactic, Zone, ZoneDate } from '../contract';
+import type { NarrativeArchiveIndex, NarrativeDraftIssue, NarrativeFlowStep, NarrativeMutationResult, NarrativeState } from '../contract/hook';
 import {
     HORROR_AESTHETICS,
     HORROR_ATOMS,
@@ -64,42 +16,6 @@ import {
     ChainNarrativeService,
     PersistenceService,
 } from '../services';
-
-type NarrativeFlowStep =
-    | 'mode'
-    | 'pacing'
-    | 'aesthetic'
-    | 'config'
-    | 'details'
-    | 'preview'
-    | 'library'
-    | 'closed';
-
-interface NarrativeState {
-    config?: StoryConfig;
-    analysis: ChainNarrative['analysis'];
-}
-
-/**
- * 已落盘叙事产物的索引。
- *
- * 只承载存档列表的元信息（叙事链摘要与单元剧区域摘要），供归档面板渲染；
- * 与 {@link NarrativeLibrary}（玩家自建的恐怖域 / 元 / 美学）是两套互不相干的数据。
- */
-interface NarrativeArchiveIndex {
-    arcs: Array<{
-        id: string;
-        title: string;
-        mainAxis: string;
-        zoneCount: number;
-    }>;
-    episodic: Array<{
-        id: string;
-        name: string;
-        timestamp: number;
-    }>;
-    isLoading: boolean;
-}
 
 const FLOW_BACK_MAP: Record<string, NarrativeFlowStep> = {
     pacing: 'mode',
@@ -119,34 +35,10 @@ const EMPTY_ARCHIVE_INDEX: NarrativeArchiveIndex = {
     isLoading: false,
 };
 
-/**
- * 一次自建叙事库写入 / 删除操作的结果。
- *
- * 校验失败或删除被拒时 ok 为 false，issues 直接呈现给玩家。
- */
-export interface NarrativeMutationResult {
-    ok: boolean;
-    /** 校验失败项；ok 为 true 时为空数组。 */
-    issues: NarrativeDraftIssue[];
-    /** 删除被拒时，引用该条目的美学名称列表。 */
-    blockedBy?: string[];
-}
-
-/**
- * 预设条目只读守卫。
- *
- * 自建库只承载玩家创作，预设库由常量维护。编辑模式下若目标不在自建库中，
- * 说明玩家试图改动预设条目：此时必须拒绝，否则 map 找不到目标，
- * 会「保存成功」但实际什么都没写入。
- */
 const PRESET_READONLY_ISSUE: NarrativeDraftIssue = {
     field: 'id',
     message: '预设条目不可直接修改，请改用新的 id 另存为自建条目。',
 };
-
-// =====================
-// 钩子契约
-// =====================
 
 interface UseGameStateParams {
     gameData: GameStateData;
@@ -241,10 +133,6 @@ interface UseGameStateReturn {
     /** 从待选战术中选择一个加入角色战术列表。 */
     selectTactic: (tacticId: string) => void;
 }
-
-// =====================
-// 主钩子
-// =====================
 
 export const useGameState = ({
     gameData,

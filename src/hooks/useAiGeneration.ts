@@ -1,9 +1,6 @@
 import { useCallback, useRef } from 'react';
-import {
-    Zone, PlayerState, Settings, ZoneGenerationContext, ChainGenerationContext, EpisodicGenerationContext,
-    ItemInstance, initializeZoneRuntime, Node, LogType, DyGenerationContext, buildZoneGenerationContext,
-    InteractionNpcEntity, CurrentLocation
-} from '../meta';
+import { InteractionNpcEntity, buildZoneGenerationContext, initializeZoneRuntime } from '../consts';
+import { ChainGenerationContext, CurrentLocation, DyGenerationContext, EpisodicGenerationContext, ItemInstance, LogType, Node, PlayerState, Settings, Zone, ZoneGenerationContext } from '../contract';
 import { AiService, AudioService, ChainNarrativeService, DynamicNarrativeService, PersistenceService } from '../services';
 
 interface UseAiGenerationParams {

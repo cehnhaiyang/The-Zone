@@ -1,4 +1,4 @@
-import type { ApiPlatform } from '../meta';
+import type { ApiPlatform } from '../contract';
 
 /**
  * 与 Settings 中代理相关字段保持同构。

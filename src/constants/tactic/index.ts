@@ -8,8 +8,9 @@
  *   随装备自动持有，不参与公共池抽取。
  */
 
-import type { EquipState, Tactic, WeaponOwnTactic, WeaponType } from '../../meta';
-import { normalizeEquipState } from '../../meta';
+import { normalizeEquipState } from '../../consts';
+import type { EquipState, Tactic, WeaponOwnTactic, WeaponType } from '../../contract/meta';
+;
 import { publicAttackTactics } from './attack';
 import { publicDefenseTactics } from './defense';
 import { getWeaponOwnTactics, weaponOwnTactics } from './weapon';

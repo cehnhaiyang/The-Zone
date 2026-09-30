@@ -1,4 +1,4 @@
-import type { PlayerTemplate } from '../../meta';
+import type { PlayerTemplate } from '../../contract/meta';
 
 /**
  * 神秘学者 - 爆发型 (Burst)
@@ -6,7 +6,8 @@ import type { PlayerTemplate } from '../../meta';
  * 核心定位：超高真实法术爆发、极度脆弱、以生命与理智献祭超验因果力量
  * 玩法特色：
  *   - 跳过物理常驻护甲与防御序列的即时真实法术输出 (Instant Magic)
- *   - 意志（will）驱动的巨额法术伤害放大系数：True Damage = floor(WeaponDamage × (1 + floor(will / 10) × 0.5) × combatBonus × 0.75)
+ *   - 意志（will）驱动的巨额法术伤害放大系数：
+ *     $$\text{True Damage} = \lfloor \text{WeaponDamage} \times (1 + \lfloor will / 10 \rfloor \times 0.5) \times combatBonus \times 0.75 \rfloor$$
  *   - 深度共鸣高维异变遗物（利用 cthulhu 亲和性代偿血肉融合与认知侵蚀的反噬）
  * 风险收益：
  *   - 生理极限处于残废边缘（maxHp 55），容错率极低，抗击打能力微弱
@@ -22,7 +23,7 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
         attribute: {
             // [0 ~ 5] 残废区间：严重缺乏物理训练，长期沉浸于禁断典籍与真菌侵蚀，负重能力极低
             strength: 2,
-            // [10 ~ 20] 标准底线：神经传导与突触反应勉强及格，满足基础行动点 AP = floor(speed/5) = 2，并刚好达到差反机制启动门槛 (speed >= 10)
+            // [10 ~ 20] 标准底线：神经传导勉强及格，满足基础行动点 AP = floor(speed/5) = 2，并达到差反机制启动门槛 (speed >= 10)
             agility: 10,
             // [20 ~ 30] 顶尖学者：通晓古苏美尔秘文与非欧拓扑几何，大幅降低废墟搜查与推理的精力消耗
             wisdom: 28,
@@ -38,7 +39,7 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
             maxHp: 55,
             // 脆弱阈值：常年遭受深渊耳语轰击，距狂乱与神经崩溃仅一步之遥
             maxSanity: 80,
-            // 序列长度 L = floor(maxStamina / 10) = 6：行动序列短，战术爆发容错极紧凑
+            // 序列长度 $L = \lfloor 60 / 10 \rfloor = 6$：行动序列短，战术爆发容错极紧凑
             maxStamina: 60,
             // 精神疲惫：中枢神经系统承受高维震颤，精力亏空与疲劳积累速度偏快
             maxVigor: 70
@@ -150,24 +151,24 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
                 type: 'A',
                 id: 'occultist_void_bolt',
                 name: '虚空贯穿',
-                desc: '以右臂菌丝引导高维裂隙的反冲应力，直接击穿目标的因果轴心。因法术本就跳过物理护甲，此击转而摧毁目标的精神抗性并扰乱其神经传导。',
+                desc: '以右臂菌丝引导高维裂隙的反冲应力，直接击穿目标的因果轴心。因法术本就跳过物理护甲，此击转而引发神经震荡，重创目标的攻击出力与移动速度。',
                 apCost: 2,
                 requireWeapon: 'magic',
                 tacticEffect: [
-                    ['single_enemy', 'will', -6, 2],   // 瓦解目标意志，削弱其精神防御与高维抗性
-                    ['single_enemy', 'speed', -2, 2]  // 减缓目标反应，延后其行动顺序并压制其蓄反积累
+                    ['single_enemy', 'speed', -3, 2],
+                    ['single_enemy', 'damage', -5, 2]
                 ]
             },
             {
                 type: 'U',
                 id: 'occultist_blood_pact',
                 name: '鲜血契约',
-                desc: '以黑曜石短刃划破手腕，将活体温热鲜血献祭给右臂的寄生真菌，将肉体的剧烈痛苦转化为下一轮法术爆发的暴虐超验意志。',
+                desc: '以黑曜石短刃划破手腕，将活体温热鲜血献祭给右臂的寄生真菌，将肉体的剧烈痛苦直接转化为下一轮法术爆发的狂暴杀伤力与暴击倾向。',
                 apCost: 1,
                 tacticEffect: [
-                    ['self', 'hp', -8, 0],     // 立即献祭 8 点宝贵生命
-                    ['self', 'will', 8, 2],    // 意志暴涨 8 点，使法术倍率突破至更高档位
-                    ['self', 'damage', 4, 2]   // 提高武器基础判定伤害，全面放大爆发伤害池
+                    ['self', 'hp', -8, 0],       // 立即献祭 8 点宝贵生命
+                    ['self', 'damage', 8, 2],   // 攻击力大幅暴涨，全面放大爆发伤害池
+                    ['self', 'crit_chance', 0.15, 2] // 提升暴击概率
                 ]
             },
             {
@@ -190,7 +191,7 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
                 requireWeapon: 'magic',
                 tacticEffect: [
                     ['all_enemies', 'speed', -3, 2],    // 全体减速 3 点，逆转战局节奏
-                    ['all_enemies', 'evasion', -0.2, 2] // 全体额外免伤（闪避率）降低 20%，为全队集火肃清创造必中窗口
+                    ['all_enemies', 'evasion', -0.20, 2] // 全体额外免伤（闪避率）降低 20%，为全队集火创造必中窗口
                 ]
             }
         ]

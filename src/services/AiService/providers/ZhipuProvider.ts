@@ -5,7 +5,7 @@
  * 基于 BaseProvider 构建，复用统一的 Key 管理、Fetch、错误分类和日志。
  * 由于视频生成是异步任务，这里保留长时间轮询机制，不设置总超时。
  */
-import type { Settings } from '../../../meta';
+import type { Settings } from '../../../contract/meta';
 import type { TextGenParams } from './base';
 import {
     BaseProvider,

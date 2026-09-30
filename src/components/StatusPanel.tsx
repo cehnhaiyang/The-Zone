@@ -1,10 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import {
-  PlayerState, Entity, CompanionTemplate, CompanionDynamicState, AttributeType, ItemInstance, Tactic, Settings,
-  WeaponInstance, ArmorInstance, AccessoryInstance,
-  isWeaponInstance, isArmorInstance, isAccessoryInstance, isConsumableInstance, hasDurability,
-  normalizeEquipState,
-} from '../meta';
+import { hasDurability, isAccessoryInstance, isArmorInstance, isConsumableInstance, isWeaponInstance, normalizeEquipState } from '../consts';
+import { AccessoryInstance, ArmorInstance, AttributeType, CompanionDynamicState, CompanionTemplate, Entity, ItemInstance, PlayerState, Settings, Tactic, WeaponInstance } from '../contract';
 import { RARITY_MAP } from '../constants';
 import { AudioService } from '../services';
 
@@ -242,13 +238,13 @@ const UpgradeRow: React.FC<{
     attr: AttributeType; label: string; val: number;
     text: string; btn: string; bar: string;
   }> = [
-    { attr: 'strength', label: 'STR', val: attribute.strength, text: 'text-red-400', btn: 'border-red-900/50 hover:border-red-500 hover:shadow-[0_0_10px_rgba(239,68,68,0.3)]', bar: 'bg-red-500' },
-    { attr: 'agility', label: 'AGI', val: attribute.agility, text: 'text-emerald-400', btn: 'border-emerald-900/50 hover:border-emerald-500 hover:shadow-[0_0_10px_rgba(16,185,129,0.3)]', bar: 'bg-emerald-500' },
-    { attr: 'wisdom', label: 'WIS', val: attribute.wisdom, text: 'text-blue-400', btn: 'border-blue-900/50 hover:border-blue-500 hover:shadow-[0_0_10px_rgba(59,130,246,0.3)]', bar: 'bg-blue-500' },
-    { attr: 'awareness', label: 'PER', val: attribute.awareness, text: 'text-amber-400', btn: 'border-amber-900/50 hover:border-amber-500 hover:shadow-[0_0_10px_rgba(245,158,11,0.3)]', bar: 'bg-amber-500' },
-    { attr: 'will', label: 'SPI', val: attribute.will, text: 'text-purple-400', btn: 'border-purple-900/50 hover:border-purple-500 hover:shadow-[0_0_10px_rgba(168,85,247,0.3)]', bar: 'bg-purple-500' },
-    { attr: 'cthulhu', label: 'CTL', val: attribute.cthulhu, text: 'text-fuchsia-400', btn: 'border-fuchsia-900/50 hover:border-fuchsia-500 hover:shadow-[0_0_10px_rgba(217,70,239,0.3)]', bar: 'bg-fuchsia-500' },
-  ];
+      { attr: 'strength', label: 'STR', val: attribute.strength, text: 'text-red-400', btn: 'border-red-900/50 hover:border-red-500 hover:shadow-[0_0_10px_rgba(239,68,68,0.3)]', bar: 'bg-red-500' },
+      { attr: 'agility', label: 'AGI', val: attribute.agility, text: 'text-emerald-400', btn: 'border-emerald-900/50 hover:border-emerald-500 hover:shadow-[0_0_10px_rgba(16,185,129,0.3)]', bar: 'bg-emerald-500' },
+      { attr: 'wisdom', label: 'WIS', val: attribute.wisdom, text: 'text-blue-400', btn: 'border-blue-900/50 hover:border-blue-500 hover:shadow-[0_0_10px_rgba(59,130,246,0.3)]', bar: 'bg-blue-500' },
+      { attr: 'awareness', label: 'PER', val: attribute.awareness, text: 'text-amber-400', btn: 'border-amber-900/50 hover:border-amber-500 hover:shadow-[0_0_10px_rgba(245,158,11,0.3)]', bar: 'bg-amber-500' },
+      { attr: 'will', label: 'SPI', val: attribute.will, text: 'text-purple-400', btn: 'border-purple-900/50 hover:border-purple-500 hover:shadow-[0_0_10px_rgba(168,85,247,0.3)]', bar: 'bg-purple-500' },
+      { attr: 'cthulhu', label: 'CTL', val: attribute.cthulhu, text: 'text-fuchsia-400', btn: 'border-fuchsia-900/50 hover:border-fuchsia-500 hover:shadow-[0_0_10px_rgba(217,70,239,0.3)]', bar: 'bg-fuchsia-500' },
+    ];
 
   return (
     <div className="bg-[#121215]/80 border border-gray-800 p-4 rounded-sm hover:border-gray-600 transition-all duration-300 relative group overflow-hidden">

@@ -15,7 +15,7 @@
  *   OriginTemplate 契约不承载 difficulty 字段。
  */
 
-import type { OriginTemplate } from '../meta';
+import type { OriginTemplate } from '../contract';
 import { ZONE_HOSPITAL, ZONE_BUNKER, ZONE_ARCHIVE } from './sanctuary';
 import {
     PLAYER_INVESTIGATOR,

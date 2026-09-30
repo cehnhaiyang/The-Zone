@@ -15,12 +15,7 @@
 
 import React, { useMemo, useState } from 'react';
 
-import type {
-    HorrorAesthetic,
-    HorrorAtom,
-    HorrorDomain,
-    NarrativePhase,
-} from '../../meta';
+import type { HorrorAesthetic, HorrorAtom, HorrorDomain, NarrativePhase } from '../../contract/meta';
 import type { NarrativeMutationResult } from '../../hooks';
 import { AudioService } from '../../services';
 
@@ -717,142 +712,142 @@ const AestheticStudio: React.FC<AestheticStudioProps> = ({
                                 点击预设条目可将其载入表单作为模板，改 id 后另存为自建条目；预设本身只读。
                             </p>
 
-                        {tab === 'aesthetic' &&
-                            aesthetics.map((item) => {
-                                const isCustom = customAestheticIds.has(item.id);
-                                return (
-                                    <div
-                                        key={item.id}
-                                        className={`group p-3 border transition-colors cursor-pointer ${aestheticDraft.id === item.id && !isNewAesthetic ? 'border-emerald-500/70 bg-emerald-950/20' : 'border-slate-800/60 hover:border-slate-600'}`}
-                                        onClick={() => loadAesthetic(item, isCustom)}
-                                    >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className="text-xs text-slate-200 truncate">{item.name}</span>
-                                            {isCustom ? (
-                                                <button
-                                                    onClick={async (e) => {
-                                                        e.stopPropagation();
-                                                        if (!confirm(`确认删除自建美学「${item.name}」？`)) return;
-                                                        handleResult(await onRemoveAesthetic(item.id));
-                                                        if (aestheticDraft.id === item.id) startNewAesthetic();
-                                                    }}
-                                                    className="shrink-0 text-[10px] text-red-700 hover:text-red-400 font-mono opacity-0 group-hover:opacity-100 transition-opacity"
-                                                >
-                                                    删除
-                                                </button>
-                                            ) : (
-                                                <span className="shrink-0 text-[10px] text-slate-700 font-mono">预设</span>
-                                            )}
+                            {tab === 'aesthetic' &&
+                                aesthetics.map((item) => {
+                                    const isCustom = customAestheticIds.has(item.id);
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            className={`group p-3 border transition-colors cursor-pointer ${aestheticDraft.id === item.id && !isNewAesthetic ? 'border-emerald-500/70 bg-emerald-950/20' : 'border-slate-800/60 hover:border-slate-600'}`}
+                                            onClick={() => loadAesthetic(item, isCustom)}
+                                        >
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-xs text-slate-200 truncate">{item.name}</span>
+                                                {isCustom ? (
+                                                    <button
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            if (!confirm(`确认删除自建美学「${item.name}」？`)) return;
+                                                            handleResult(await onRemoveAesthetic(item.id));
+                                                            if (aestheticDraft.id === item.id) startNewAesthetic();
+                                                        }}
+                                                        className="shrink-0 text-[10px] text-red-700 hover:text-red-400 font-mono opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        删除
+                                                    </button>
+                                                ) : (
+                                                    <span className="shrink-0 text-[10px] text-slate-700 font-mono">预设</span>
+                                                )}
+                                            </div>
+                                            <div className="text-[10px] font-mono text-slate-600 mt-1 truncate">
+                                                {item.id} · {item.primaryDomain}
+                                            </div>
                                         </div>
-                                        <div className="text-[10px] font-mono text-slate-600 mt-1 truncate">
-                                            {item.id} · {item.primaryDomain}
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
 
-                        {tab === 'atom' &&
-                            atoms.map((item) => {
-                                const isCustom = customAtomIds.has(item.id);
-                                return (
-                                    <div
-                                        key={item.id}
-                                        className={`group p-3 border transition-colors cursor-pointer ${atomDraft.id === item.id && !isNewAtom ? 'border-emerald-500/70 bg-emerald-950/20' : 'border-slate-800/60 hover:border-slate-600'}`}
-                                        onClick={() => loadAtom(item, isCustom)}
-                                    >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className="text-xs text-slate-200 truncate">{item.name}</span>
-                                            {isCustom ? (
-                                                <button
-                                                    onClick={async (e) => {
-                                                        e.stopPropagation();
-                                                        if (!confirm(`确认删除自建恐怖元「${item.name}」？`)) return;
-                                                        handleResult(await onRemoveAtom(item.id));
-                                                        if (atomDraft.id === item.id) startNewAtom();
-                                                    }}
-                                                    className="shrink-0 text-[10px] text-red-700 hover:text-red-400 font-mono opacity-0 group-hover:opacity-100 transition-opacity"
-                                                >
-                                                    删除
-                                                </button>
-                                            ) : (
-                                                <span className="shrink-0 text-[10px] text-slate-700 font-mono">预设</span>
-                                            )}
+                            {tab === 'atom' &&
+                                atoms.map((item) => {
+                                    const isCustom = customAtomIds.has(item.id);
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            className={`group p-3 border transition-colors cursor-pointer ${atomDraft.id === item.id && !isNewAtom ? 'border-emerald-500/70 bg-emerald-950/20' : 'border-slate-800/60 hover:border-slate-600'}`}
+                                            onClick={() => loadAtom(item, isCustom)}
+                                        >
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-xs text-slate-200 truncate">{item.name}</span>
+                                                {isCustom ? (
+                                                    <button
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            if (!confirm(`确认删除自建恐怖元「${item.name}」？`)) return;
+                                                            handleResult(await onRemoveAtom(item.id));
+                                                            if (atomDraft.id === item.id) startNewAtom();
+                                                        }}
+                                                        className="shrink-0 text-[10px] text-red-700 hover:text-red-400 font-mono opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        删除
+                                                    </button>
+                                                ) : (
+                                                    <span className="shrink-0 text-[10px] text-slate-700 font-mono">预设</span>
+                                                )}
+                                            </div>
+                                            <div className="text-[10px] font-mono text-slate-600 mt-1 truncate">{item.id}</div>
                                         </div>
-                                        <div className="text-[10px] font-mono text-slate-600 mt-1 truncate">{item.id}</div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
 
-                        {tab === 'domain' &&
-                            domains.map((item) => {
-                                const isCustom = customDomainIds.has(item.id);
-                                return (
-                                    <div
-                                        key={item.id}
-                                        className={`group p-3 border transition-colors cursor-pointer ${domainDraft.id === item.id && !isNewDomain ? 'border-emerald-500/70 bg-emerald-950/20' : 'border-slate-800/60 hover:border-slate-600'}`}
-                                        onClick={() => loadDomain(item, isCustom)}
-                                    >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className="text-xs text-slate-200 truncate">{item.name}</span>
-                                            {isCustom ? (
-                                                <button
-                                                    onClick={async (e) => {
-                                                        e.stopPropagation();
-                                                        if (!confirm(`确认删除自建恐怖域「${item.name}」？`)) return;
-                                                        handleResult(await onRemoveDomain(item.id));
-                                                        if (domainDraft.id === item.id) startNewDomain();
-                                                    }}
-                                                    className="shrink-0 text-[10px] text-red-700 hover:text-red-400 font-mono opacity-0 group-hover:opacity-100 transition-opacity"
-                                                >
-                                                    删除
-                                                </button>
-                                            ) : (
-                                                <span className="shrink-0 text-[10px] text-slate-700 font-mono">预设</span>
-                                            )}
+                            {tab === 'domain' &&
+                                domains.map((item) => {
+                                    const isCustom = customDomainIds.has(item.id);
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            className={`group p-3 border transition-colors cursor-pointer ${domainDraft.id === item.id && !isNewDomain ? 'border-emerald-500/70 bg-emerald-950/20' : 'border-slate-800/60 hover:border-slate-600'}`}
+                                            onClick={() => loadDomain(item, isCustom)}
+                                        >
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-xs text-slate-200 truncate">{item.name}</span>
+                                                {isCustom ? (
+                                                    <button
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            if (!confirm(`确认删除自建恐怖域「${item.name}」？`)) return;
+                                                            handleResult(await onRemoveDomain(item.id));
+                                                            if (domainDraft.id === item.id) startNewDomain();
+                                                        }}
+                                                        className="shrink-0 text-[10px] text-red-700 hover:text-red-400 font-mono opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        删除
+                                                    </button>
+                                                ) : (
+                                                    <span className="shrink-0 text-[10px] text-slate-700 font-mono">预设</span>
+                                                )}
+                                            </div>
+                                            <div className="text-[10px] font-mono text-slate-600 mt-1 truncate">{item.id}</div>
                                         </div>
-                                        <div className="text-[10px] font-mono text-slate-600 mt-1 truncate">{item.id}</div>
-                                    </div>
-                                );
-                            })}
-                    </div>
+                                    );
+                                })}
+                        </div>
 
-                    {/* 表单栏 */}
-                    <div className="flex-1 overflow-y-auto p-8 scrollbar-thin scrollbar-thumb-emerald-900/50">
-                        {tab === 'aesthetic' && (
-                            <AestheticForm
-                                draft={aestheticDraft}
-                                isNew={isNewAesthetic}
-                                issues={issues}
-                                isSaving={isSaving}
-                                domains={domains}
-                                atoms={atoms}
-                                onChange={setAestheticDraft}
-                                onSubmit={async () => handleResult(await onUpsertAesthetic(aestheticDraft, isNewAesthetic))}
-                                onReset={startNewAesthetic}
-                            />
-                        )}
-                        {tab === 'atom' && (
-                            <AtomForm
-                                draft={atomDraft}
-                                isNew={isNewAtom}
-                                issues={issues}
-                                isSaving={isSaving}
-                                onChange={setAtomDraft}
-                                onSubmit={async () => handleResult(await onUpsertAtom(atomDraft, isNewAtom))}
-                                onReset={startNewAtom}
-                            />
-                        )}
-                        {tab === 'domain' && (
-                            <DomainForm
-                                draft={domainDraft}
-                                isNew={isNewDomain}
-                                issues={issues}
-                                isSaving={isSaving}
-                                onChange={setDomainDraft}
-                                onSubmit={async () => handleResult(await onUpsertDomain(domainDraft, isNewDomain))}
-                                onReset={startNewDomain}
-                            />
-                        )}
+                        {/* 表单栏 */}
+                        <div className="flex-1 overflow-y-auto p-8 scrollbar-thin scrollbar-thumb-emerald-900/50">
+                            {tab === 'aesthetic' && (
+                                <AestheticForm
+                                    draft={aestheticDraft}
+                                    isNew={isNewAesthetic}
+                                    issues={issues}
+                                    isSaving={isSaving}
+                                    domains={domains}
+                                    atoms={atoms}
+                                    onChange={setAestheticDraft}
+                                    onSubmit={async () => handleResult(await onUpsertAesthetic(aestheticDraft, isNewAesthetic))}
+                                    onReset={startNewAesthetic}
+                                />
+                            )}
+                            {tab === 'atom' && (
+                                <AtomForm
+                                    draft={atomDraft}
+                                    isNew={isNewAtom}
+                                    issues={issues}
+                                    isSaving={isSaving}
+                                    onChange={setAtomDraft}
+                                    onSubmit={async () => handleResult(await onUpsertAtom(atomDraft, isNewAtom))}
+                                    onReset={startNewAtom}
+                                />
+                            )}
+                            {tab === 'domain' && (
+                                <DomainForm
+                                    draft={domainDraft}
+                                    isNew={isNewDomain}
+                                    issues={issues}
+                                    isSaving={isSaving}
+                                    onChange={setDomainDraft}
+                                    onSubmit={async () => handleResult(await onUpsertDomain(domainDraft, isNewDomain))}
+                                    onReset={startNewDomain}
+                                />
+                            )}
                         </div>
                     </div>
                 </div>

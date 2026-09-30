@@ -1,10 +1,10 @@
-import type { CompanionTemplate } from '../../meta';
+import type { CompanionTemplate } from '../../contract/meta';
 
 /**
  * 守护者 - 防御型 (Defense)
  * 核心定位：超高生命、护甲免伤与全队掩护
  * 玩法特色：副手持重防暴盾吸收冲击，提供偏折力场并分担队友精神压力
- * 风险收益：极低敏捷与觉知，回转与追击受限，机载散热与精力维护压力巨大
+ * 风险收益：极低机动与觉知，回转与追击受限，机载散热与精力维护压力巨大
  */
 export const COMPANION_GUARDIAN: CompanionTemplate = {
     id: 'guardian',
@@ -15,7 +15,7 @@ export const COMPANION_GUARDIAN: CompanionTemplate = {
     initialState: {
         attribute: {
             strength: 26,     // 较强：液压动力骨骼，提供稳健的近战与高负重容量
-            agility: 7,       // 迟缓：重装躯体导致机动性极差，行动速度慢，规避动作迟滞
+            agility: 10,      // 迟缓稳固：军工伺服底盘提供最低战术基准，确保基础 AP = floor(10/5) = 2 并激活差反机制 (speed >= 10)
             wisdom: 14,       // 普通：军工战术逻辑单元尚存，足以处理基础战场分析
             awareness: 11,    // 偏低：光学传感器受损，搜查与先验感知能力薄弱
             will: 12,         // 军工程序稳定：恐惧回路被物理切除，逻辑单元强行锚定神经中枢
@@ -24,7 +24,7 @@ export const COMPANION_GUARDIAN: CompanionTemplate = {
         vital: {
             maxHp: 320,       // 极其优秀：重装义体与强化脏器提供坚不可摧的生存底子
             maxSanity: 110,   // 普通偏上：依赖守护者核心硬件算法锚定精神稳定性
-            maxStamina: 210,  // 优秀：军用级人工肌束具备超长持续抗压耐力
+            maxStamina: 210,  // 优秀：军用级人工肌束具备超长持续抗压耐力 ($L = \lfloor 210 / 10 \rfloor = 21$)
             maxVigor: 90      // 较弱：重负荷液压与散热系统持续挤占精力储备，容易过热疲劳
         },
         equipState: {
@@ -172,23 +172,23 @@ export const COMPANION_GUARDIAN: CompanionTemplate = {
                 type: 'A',
                 id: 'guardian_shield_bash',
                 name: '盾牌冲撞',
-                desc: '驱动臂甲液压全开，以盾牌重击单个目标，打乱其身形重心并瓦解其攻击节奏。',
+                desc: '驱动臂甲液压全开，以盾牌重击单个目标，震荡其身形重心并压低其攻击命中率与速度。',
                 apCost: 1,
                 requireWeapon: 'shield',
                 tacticEffect: [
                     ['single_enemy', 'speed', -3, 2],
-                    ['single_enemy', 'agility', -3, 2]
+                    ['single_enemy', 'aim', -15, 2]
                 ]
             },
             {
                 type: 'D',
                 id: 'guardian_cover_protocol',
                 name: '掩护协议',
-                desc: '将重盾斜插在友方身前构筑防御斜角，以自身机械身躯分担冲击，提供战术护盾。',
+                desc: '将重盾斜插在友方身前构筑防御斜角，以自身机械身躯分担冲击，为指定友方提供战术护盾并平复心神。',
                 apCost: 1,
                 tacticEffect: [
-                    ['single_teammate', 'shield', 25, 2],
-                    ['single_teammate', 'sanity', 8, 0]
+                    ['single_ally', 'shield', 25, 2],
+                    ['single_ally', 'sanity', 8, 0]
                 ]
             },
             {
@@ -206,11 +206,11 @@ export const COMPANION_GUARDIAN: CompanionTemplate = {
                 type: 'D',
                 id: 'guardian_bulwark_field',
                 name: '壁垒屏障',
-                desc: '过载核心动力源，向周遭展开短程静电偏折屏障，稳定全体随行人员的防御阵型。',
+                desc: '过载核心动力源，向周遭展开短程静电偏折屏障，为全队所有友方单位展开护盾并稳定精神。',
                 apCost: 2,
                 tacticEffect: [
-                    ['all_teammates', 'shield', 20, 2],
-                    ['all_teammates', 'sanity', 12, 0]
+                    ['all_allies', 'shield', 20, 2],
+                    ['all_allies', 'sanity', 12, 0]
                 ]
             }
         ],

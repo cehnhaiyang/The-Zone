@@ -1,61 +1,57 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
+import { CombatPosition, InteractionNpcEntity, applyEffectDeltas, buildZoneGenerationContext, clampDynamicVitals, getAppliedAccessoryDeltas, getBackpackGridSize, getNodeAmbushRate, initializeGameFromOrigin, initializeZoneRuntime, negateEffectDeltas, normalizeEquipmentWithOverflow, reclaimOverflowEquipments, safeAudioOperation } from '../consts';
 import {
+    AnyTactic,
+    AttackForecast,
+    BattleStartContext,
+    CounterAdvanceRequest,
+    CounterDecisionResult,
+    InsertActionWindow,
+    MoveDirection,
     GameState,
-    applyEffectDeltas,
-    clampDynamicVitals,
-    getAppliedAccessoryDeltas,
-    getBackpackGridSize,
-    negateEffectDeltas,
-    normalizeEquipmentWithOverflow,
-    reclaimOverflowEquipments,
-    initializeZoneRuntime,
-    buildZoneGenerationContext,
-    getNodeAmbushRate,
-    safeAudioOperation,
-    initializeGameFromOrigin,
-} from '../meta';
-import type {
-    PlayerState,
-    Log,
-    Zone,
-    Settings,
     AttributeType,
-    Sanctuary,
-    Entity,
+    BattleMap,
+    ChainNarrative,
+    ChoiceImpact,
+    CombatAlly,
+    CombatEnemy,
+    CombatIntent,
     CompanionDynamicState,
     CompanionTemplate,
-    InteractionNpcEntity,
-    StoryConfig,
-    BattleMap,
-    CombatEnemy,
-    EnemyTemplate,
-    ItemInstance,
-    Node,
-    ZoneGenerationContext,
-    Quest,
-    Puzzle,
-    NarrativePhase,
-    LogType,
-    PlotPoint,
+    Cover,
     CurrentTime,
+    DefenseResult,
     DyNarrative,
-    ZoneDate,
-    NarrativeMode,
-    NarrativePacing,
-    ChainNarrative,
+    EnemyTemplate,
+    Entity,
+    Facility,
     HorrorAesthetic,
     HorrorAtom,
     HorrorDomain,
-    ChoiceImpact,
-    CombatIntent,
-    Tactic,
-    CombatAlly,
-    Cover,
-    DefenseResult,
-    Facility,
+    ItemInstance,
+    Log,
+    LogType,
+    NarrativeMode,
+    NarrativePacing,
+    NarrativePhase,
+    Node,
+    PlayerState,
+    PlotPoint,
+    Puzzle,
+    Quest,
     Resident,
-} from '../meta';
+    Sanctuary,
+    Settings,
+    StoryConfig,
+    Tactic,
+    Zone,
+    ZoneDate,
+    ZoneGenerationContext,
+    CustomRestConfig,
+    FacilityUpgradePayment,
+    PuzzleInteractionController
+} from '../contract';
 import { INITIAL_SETTINGS, ORIGIN_TEMPLATES } from '../constants';
 import {
     AudioService,
@@ -65,57 +61,17 @@ import {
     ChainNarrativeService,
     DynamicNarrativeService,
 } from '../services';
-import type {
-    AnyTactic,
-    AttackForecast,
-    BattleStartContext,
-    CombatPosition,
-    CounterAdvanceRequest,
-    CounterDecisionResult,
-    InsertActionWindow,
-    MoveDirection,
-} from '../meta';
 import { useSocialization } from './useSocialization';
 import { useSanctuary } from './useSanctuary';
-import type { CustomRestConfig, FacilityUpgradePayment } from './useSanctuary';
 import { useGameState } from './useGameState';
-import type { NarrativeMutationResult } from './useGameState';
+import type { NarrativeMutationResult } from '../contract';
 import { usePersistence } from './usePersistence';
 import { useAssetLoad } from './useAssetLoad';
 import { useAiGeneration } from './useAiGeneration';
 import { useInteraction } from './useInteraction';
-import type { PuzzleInteractionController } from './useInteraction';
 import { useZoneTransition } from './useZoneTransition';
 import { useCombat } from './useCombat';
 
-// 战斗契约与战场空间工具的唯一真源在 meta；此处按「视图层只引用本模块」的约定转出。
-export type {
-    AnyTactic,
-    AttackForecast,
-    AttackForecastSource,
-    BattleStartContext,
-    CombatPosition,
-    CounterAdvanceRequest,
-    CounterDecisionResult,
-    InsertActionWindow,
-    MoveDirection,
-} from '../meta';
-export { getBattleDistance, getCoverAtCell, getSteppedCell, isCellWalkable } from '../meta';
-export type { PuzzleInteractionController } from './useInteraction';
-export type { NarrativeMutationResult } from './useGameState';
-export type { CustomRestConfig, FacilityUpgradePayment } from './useSanctuary';
-
-// =====================
-// 接口定义
-// =====================
-
-/**
- * 背包网格对外契约
- *
- * 自 useInteraction 的组合结果中提取；视图层只消费该契约，
- * 不参与任何网格落位计算。
- */
-export type InventoryGridApi = ReturnType<typeof useInteraction>['inventoryGrid'];
 interface UseGameParams { }
 
 interface UseGameReturn {
@@ -414,9 +370,7 @@ interface UseGameReturn {
     getTimeTuple: () => [ZoneDate, number];
 }
 
-// =====================
-// 主 Hook
-// =====================
+// Hook
 export const useGame = ({ }: UseGameParams = {}): UseGameReturn => {
     // ==========================================================================
     // 顶级全局状态容器

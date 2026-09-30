@@ -14,9 +14,9 @@ LogPanel.tsx - 游戏日志面板组件
 - 拖拽采用 ref 直写 DOM，零重渲染
 */
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { Icons } from './VisualPanel';
+import { Icons } from './Icons';
 import { AudioService } from '../services';
-import { Log, LogType, DotSoundType } from '../meta';
+import { DotSoundType, Log, LogType } from '../contract';
 
 interface LogPanelProps {
     logs: Log[];

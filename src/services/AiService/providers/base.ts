@@ -6,7 +6,7 @@
  * 所有具体 Provider 必须继承此类。
  */
 
-import type { Settings, ApiPlatform } from '../../../meta';
+import type { ApiPlatform, Settings } from '../../../contract/meta';
 import { KeyService } from '../../KeyService';
 import { MODEL_PROVIDER } from '../../../constants/config';
 

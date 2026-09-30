@@ -3,7 +3,7 @@
  * 神经终端风格 - 融合任务指令、伏笔异常与暗线协议的中央数据库
  */
 import React, { useState, useMemo } from 'react';
-import { PlayerState, PlotPoint, Quest } from '../meta';
+import { PlayerState, PlotPoint, Quest } from '../contract';
 
 interface ArchivesPanelProps {
   player: PlayerState;

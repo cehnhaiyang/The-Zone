@@ -5,7 +5,7 @@
  * 目标是低延迟、高并发、短输出（通常 < 100 tokens）。
  */
 
-import { Settings, DyGenerationContext } from '../../meta';
+import { DyGenerationContext, Settings } from '../../contract/meta';
 import { BaseProvider, AIResponse, GenericCacheManager } from './providers/base';
 import { callAi } from './providers';
 

@@ -25,7 +25,7 @@
  * @see ./atoms.ts
  */
 
-import type { HorrorAesthetic } from '../../meta'
+import type { HorrorAesthetic } from '../../contract/meta';
 
 const aesthetic = (
     id: string,

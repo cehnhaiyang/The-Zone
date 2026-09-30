@@ -986,7 +986,7 @@ body {
 }
 
 /* =============================================================================
-   OverlayPanel & Effects (全屏覆盖层与视觉特效)
+   Overlay & Effects (全屏覆盖层与视觉特效)
    ============================================================================= */
 
 /* 基础特效：扫描线 */
@@ -1323,7 +1323,7 @@ body {
 
 /* 滤镜/动效层必须位于裁切层之外：
    filter 与 clip-path 若同处一个元素，drop-shadow 会被裁掉。 */
-.rarity-card > .rarity-inner {
+.rarity-card>.rarity-inner {
   position: absolute;
   inset: 0;
   z-index: -1;
@@ -1332,7 +1332,7 @@ body {
   pointer-events: none;
 }
 
-.rarity-card > .rarity-inner > .rarity-skin {
+.rarity-card>.rarity-inner>.rarity-skin {
   position: absolute;
   inset: 0;
   overflow: hidden;
@@ -1345,7 +1345,7 @@ body {
 }
 
 /* 叠加纹样：扫描线 / 网格 / 光带 / 斑驳 */
-.rarity-card > .rarity-inner > .rarity-skin::before {
+.rarity-card>.rarity-inner>.rarity-skin::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -1357,7 +1357,7 @@ body {
 }
 
 /* 内缘高光：皮肤内侧 1px 亮边 */
-.rarity-card > .rarity-inner > .rarity-skin::after {
+.rarity-card>.rarity-inner>.rarity-skin::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -1365,12 +1365,12 @@ body {
   mix-blend-mode: screen;
 }
 
-.rarity-card:hover > .rarity-inner > .rarity-skin {
+.rarity-card:hover>.rarity-inner>.rarity-skin {
   border-color: var(--r-accent);
   box-shadow: 0 0 22px var(--r-halo), var(--r-shadow);
 }
 
-.rarity-card[data-equipped='true'] > .rarity-inner > .rarity-skin {
+.rarity-card[data-equipped='true']>.rarity-inner>.rarity-skin {
   border-color: #34d399;
   box-shadow: 0 0 22px rgba(16, 185, 129, 0.3), var(--r-shadow);
 }
@@ -1613,8 +1613,8 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
 
-  .rarity-card > .rarity-inner,
-  .rarity-card > .rarity-inner > .rarity-skin::before,
+  .rarity-card>.rarity-inner,
+  .rarity-card>.rarity-inner>.rarity-skin::before,
   .rarity-name {
     animation: none !important;
   }

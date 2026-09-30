@@ -1,4 +1,4 @@
-import type {
+import {
     AnyTactic,
     AccessoryInstance,
     ArmorInstance,
@@ -65,9 +65,7 @@ import type {
     ZoneDate,
     ZoneGenerationContext,
     _Nar,
-} from './interface';
-import { GameState } from './type';
-import type {
+    GameState,
     AccessoryEffectType,
     AttackResult,
     AttributeType,
@@ -79,8 +77,9 @@ import type {
     VitalType,
     VisualMode,
     WeaponType,
-} from './type';
-import { generateResidentName } from '../constants/residents';
+    NarrativeDraftIssue,
+} from './contract';
+import { generateResidentName } from './constants';
 
 //=============================================================================
 // 0. 全局常量与内部工具
@@ -2142,14 +2141,6 @@ export const initializeGameFromOrigin = (
 // 14. 背包网格
 //=============================================================================
 
-/**
- * 网格尺寸
- *
- * `[列, 行]`：物品占地与背包容量的统一单位。
- * 形状直接取契约 {@link BaseItemTemplate.size}，不再自行书写一份同构元组。
- */
-export type GridSize = BaseItemTemplate['size'];
-
 //-------------------------------------------------------------------------
 // 数据归档：物品占地与背包网格尺寸规则
 //-------------------------------------------------------------------------
@@ -2159,7 +2150,7 @@ export type GridSize = BaseItemTemplate['size'];
  *
  * 单位是 `[列, 行]`；物品数据未声明 `size` 时按此归档取值。
  */
-const ITEM_GRID_SIZE: Record<ItemInstance['type'], GridSize> = {
+const ITEM_GRID_SIZE: Record<ItemInstance['type'], BaseItemTemplate['size']> = {
     weapon: [2, 1],
     armor: [2, 2],
     accessory: [1, 1],
@@ -2174,7 +2165,7 @@ const ITEM_GRID_SIZE: Record<ItemInstance['type'], GridSize> = {
  *
  * 单位是 `[列, 行]`；数值按"长边水平"给出，长枪更宽、双手武器更厚。
  */
-const WEAPON_GRID_SIZE: Record<WeaponType, GridSize> = {
+const WEAPON_GRID_SIZE: Record<WeaponType, BaseItemTemplate['size']> = {
     wave: [2, 1],
     both_wave: [3, 2],
     prick: [2, 1],
@@ -2194,13 +2185,13 @@ const WEAPON_GRID_SIZE: Record<WeaponType, GridSize> = {
 };
 
 /** 背包网格基础尺寸：[列, 行] */
-const BACKPACK_GRID_BASE: GridSize = [6, 4];
+const BACKPACK_GRID_BASE: BaseItemTemplate['size'] = [6, 4];
 
 /** 背包网格下限：无论力量多低都不会小于该尺寸 */
-const BACKPACK_GRID_MIN: GridSize = [6, 4];
+const BACKPACK_GRID_MIN: BaseItemTemplate['size'] = [6, 4];
 
 /** 背包网格上限：无论力量多高都不会超过该尺寸 */
-const BACKPACK_GRID_MAX: GridSize = [12, 7];
+const BACKPACK_GRID_MAX: BaseItemTemplate['size'] = [12, 7];
 
 /** 力量成长系数：每满该点数追加一列 / 一行 */
 const BACKPACK_GRID_GROWTH_STRENGTH = { col: 10, row: 20 };
@@ -2214,7 +2205,7 @@ const clampInt = (value: number, min: number, max: number): number =>
     Math.min(max, Math.max(min, Math.floor(value)));
 
 /** 读取合法尺寸：必须是正整数对，否则返回 null */
-export const normalizeGridSize = (value: unknown): GridSize | null => {
+export const normalizeGridSize = (value: unknown): BaseItemTemplate['size'] | null => {
     if (!Array.isArray(value) || value.length < 2) return null;
 
     const cols = toFiniteNumber(value[0]);
@@ -2231,13 +2222,13 @@ export const normalizeGridSize = (value: unknown): GridSize | null => {
  * 元契约注释规定"物品默认将长边水平放置"，
  * 故 `[2, 4]` 的狙击枪默认占地为 `[4, 2]`。
  */
-const toHorizontalLayout = ([width, height]: GridSize): GridSize =>
+const toHorizontalLayout = ([width, height]: BaseItemTemplate['size']): BaseItemTemplate['size'] =>
     height > width ? [height, width] : [width, height];
 
 /** 按物品大类细分的占地取用表；武器再按形态细分一层 */
 const ITEM_SIZE_RESOLVER: Record<
     ItemInstance['type'],
-    (item: ItemInstance) => GridSize
+    (item: ItemInstance) => BaseItemTemplate['size']
 > = {
     weapon: (item) => {
         const weaponType = (item as { weaponType?: WeaponType }).weaponType;
@@ -2260,7 +2251,7 @@ const ITEM_SIZE_RESOLVER: Record<
  * 契约 `size` 优先；未声明或非法时回落到本节的归档缺省值。
  * 返回值恒为默认朝向（长边水平）。
  */
-export const getItemGridSize = (item: ItemInstance): GridSize => {
+export const getItemGridSize = (item: ItemInstance): BaseItemTemplate['size'] => {
     const declared = normalizeGridSize((item as { size?: unknown }).size);
     if (declared) return toHorizontalLayout(declared);
 
@@ -2272,7 +2263,7 @@ export const getItemGridSize = (item: ItemInstance): GridSize => {
 export const getItemGridFootprint = (
     item: ItemInstance,
     rotated: boolean
-): GridSize => {
+): BaseItemTemplate['size'] => {
     const [width, height] = getItemGridSize(item);
     return rotated ? [height, width] : [width, height];
 };
@@ -2286,7 +2277,7 @@ export const getItemGridFootprint = (
 export const getBackpackGridSize = (source: {
     strength?: unknown;
     storageSize?: unknown;
-}): GridSize => {
+}): BaseItemTemplate['size'] => {
     const declared = normalizeGridSize(source?.storageSize);
     if (declared) return declared;
 
@@ -3532,17 +3523,6 @@ export const getCritDefensePierce = (weaponType?: WeaponType): number =>
 //=============================================================================
 
 /**
- * 叙事库条目的契约校验失败项。
- *
- * 字段路径直接呈现给玩家（见 AestheticStudio 的 IssueList），
- * 故 `field` 使用契约里的字段名而非中文。
- */
-export interface NarrativeDraftIssue {
-    field: string;
-    message: string;
-}
-
-/**
  * 叙事库条目校验上下文。
  *
  * `takenIds` 必须取自「预设 + 自建」的合并视图：预设条目同样占用 id，
@@ -3722,18 +3702,18 @@ export const validateDomain = (
     draft: HorrorDomain,
     context: NarrativeDraftContext
 ): NarrativeDraftIssue[] => [
-    ...validateNarrativeId(draft.id, '恐怖域', context),
-    ...validateNarrativeFields(draft, '恐怖域'),
-];
+        ...validateNarrativeId(draft.id, '恐怖域', context),
+        ...validateNarrativeFields(draft, '恐怖域'),
+    ];
 
 /** 校验恐怖元草稿。 */
 export const validateAtom = (
     draft: HorrorAtom,
     context: NarrativeDraftContext
 ): NarrativeDraftIssue[] => [
-    ...validateNarrativeId(draft.id, '恐怖元', context),
-    ...validateNarrativeFields(draft, '恐怖元'),
-];
+        ...validateNarrativeId(draft.id, '恐怖元', context),
+        ...validateNarrativeFields(draft, '恐怖元'),
+    ];
 
 /**
  * 校验恐怖美学草稿。

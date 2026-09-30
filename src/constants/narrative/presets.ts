@@ -12,7 +12,7 @@
  * @see ../../meta/interface.ts
  */
 
-import type { NarMainAxis, NarMode, NarMotif, NarPacing } from '../../meta'
+import type { NarMainAxis, NarMode, NarMotif, NarPacing } from '../../contract/meta';
 
 export const MODES_DEF: NarMode[] = [
     {

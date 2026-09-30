@@ -1,4 +1,4 @@
-import type { ItemGrade } from '../meta'
+import type { ItemGrade } from '../contract';
 
 /**
  * 稀有度视觉变量（CSS 契约）

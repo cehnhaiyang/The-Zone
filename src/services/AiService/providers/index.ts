@@ -5,7 +5,7 @@
  * 外部只需传入提供商 ID 和所需能力，底层将自动路由到对应的适配器，完美解耦。
  */
 
-import { Settings } from '../../../meta';
+import { Settings } from '../../../contract/meta';
 
 import { BaseProvider, AIResponse } from './base';
 

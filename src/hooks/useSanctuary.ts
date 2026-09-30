@@ -1,37 +1,9 @@
 import { useCallback, useMemo } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import {
-    GameState,
-    NECESSARY_RESOURCE_CONSUMPTION_PER_DAY,
-    ZONE_TICKS_PER_HOUR,
-    addItemToInventory,
-    advanceZoneTime,
-    applySanctuaryResourceDeltas,
-    clamp,
-    clampDynamicVitals,
-    findItemInInventory,
-    findUniqueResource,
-    getSanctuaryResourceValue,
-    generateInstanceId,
-    removeItemFromInventory,
-    safeDeepClone,
-    safeNumber,
-    snapshotVital,
-} from '../meta';
-import type {
-    BaseDynamicState,
-    ChoiceImpact,
-    Facility,
-    FacilityTemplate,
-    ItemInstance,
-    LogType,
-    NecessaryResource,
-    NeuralLinkState,
-    PlayerState,
-    Resident,
-    Sanctuary,
-    VitalRecord,
-} from '../meta';
+import { NECESSARY_RESOURCE_CONSUMPTION_PER_DAY, ZONE_TICKS_PER_HOUR, addItemToInventory, advanceZoneTime, applySanctuaryResourceDeltas, clamp, clampDynamicVitals, findItemInInventory, findUniqueResource, generateInstanceId, getSanctuaryResourceValue, removeItemFromInventory, safeDeepClone, safeNumber, snapshotVital } from '../consts';
+import { GameState } from '../contract';
+import type { BaseDynamicState, ChoiceImpact, Facility, FacilityTemplate, ItemInstance, LogType, NecessaryResource, NeuralLinkState, PlayerState, Resident, Sanctuary, VitalRecord } from '../contract';
+import type { StackableItemInstance, TransferPlan, RestPlan, CustomRestConfig, FacilityUpgradePayment } from '../contract/hook';
 import { generateResidentName } from '../constants';
 import { AudioService } from '../services';
 
@@ -126,18 +98,6 @@ export const applyFacilityDailyProduction = (
     applySanctuaryChanges(next, changes);
     return next;
 };
-
-/**
- * 设施升级的支付代价。
- *
- * 契约允许任意一种资源充当升级货币，故代价需同时给出资源键与数量。
- */
-export interface FacilityUpgradePayment {
-    /** 资源键：`food` / `water` 或独特资源 id */
-    resourceId: string;
-    /** 支付数量 */
-    amount: number;
-}
 
 /**
  * 设施升级：按代价扣除对应资源、设施等级 +1。
@@ -322,7 +282,6 @@ export const applySanctuaryEventChoice = (
     };
 };
 
-
 const SANCTUARY_CONFIG = {
     COMPANION_RECOVERY_RATE: 0.8,
 } as const;
@@ -348,19 +307,6 @@ const REST_CONFIG = {
     },
 } as const;
 
-export interface CustomRestConfig {
-    hours: number;
-    hpRecovery: number;
-    sanityRecovery: number;
-    staminaRecovery: number;
-    vigorRecovery: number;
-    batteryRecovery: number;
-    /** 休息期间按人口消耗的庇护所资源，键为资源 id。 */
-    consumption: Record<string, number>;
-    neuralDamage: number;
-    efficiency: number;
-}
-
 interface UseSanctuaryParams {
     player: PlayerState;
     setPlayer: Dispatch<SetStateAction<PlayerState>>;
@@ -378,32 +324,6 @@ interface UseSanctuaryReturn {
     dailyProduction: Record<string, number>;
     residents: Resident[];
 }
-
-type StackableItemInstance = Extract<ItemInstance, { type: 'consumable' | 'material' }>;
-
-type PlanFailure = {
-    ok: false;
-    message: string;
-    info?: boolean;
-};
-
-type TransferPlan =
-    | PlanFailure
-    | {
-        ok: true;
-        next: PlayerState;
-        name: string;
-        amount: number;
-    };
-
-type RestPlan =
-    | PlanFailure
-    | {
-        ok: true;
-        next: PlayerState;
-        config: CustomRestConfig;
-        daysPassed: number;
-    };
 
 const parsePositiveInt = (value: unknown): number | null => {
     const parsed = safeNumber(value, Number.NaN);

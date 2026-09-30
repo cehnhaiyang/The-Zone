@@ -9,7 +9,7 @@
  * - 因此直接复用 BaseProvider 默认请求体、响应解析与 Key 轮转逻辑。
  */
 
-import type { Settings, ApiPlatform } from '../../../meta';
+import type { ApiPlatform, Settings } from '../../../contract/meta';
 import { BaseProvider } from './base';
 
 export class GroqProvider extends BaseProvider {

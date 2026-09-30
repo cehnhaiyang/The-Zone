@@ -1,8 +1,6 @@
 import { useCallback } from 'react';
-import {
-    Sanctuary, initializeZoneRuntime, GameState, PlayerState, Zone,
-    ZoneGenerationContext, LogType, Exit
-} from '../meta';
+import { initializeZoneRuntime } from '../consts';
+import { Exit, GameState, LogType, PlayerState, Sanctuary, Zone, ZoneGenerationContext } from '../contract';
 import { PersistenceService, AudioService } from '../services';
 
 interface UseZoneTransitionParams {

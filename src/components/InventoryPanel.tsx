@@ -14,40 +14,10 @@ import React, {
     useState,
 } from 'react';
 import { createPortal } from 'react-dom';
-import {
-    clamp,
-    getEntityDefenseOdds,
-    getEquippedInstances,
-    getPercent,
-    getWeaponAttackOdds,
-    hasDurability,
-    instantiateAttackSequence,
-    instantiateDefenseSequence,
-    isAccessoryInstance,
-    isArmorInstance,
-    isConsumableInstance,
-    isDataInstance,
-    isEquipmentInstance,
-    isWeaponInstance,
-} from '../meta';
-import type {
-    AttackLadderOdds,
-    AttackOddsData,
-    AttackResult,
-    ConsumableEffectType,
-    DefenseLadderOdds,
-    DefenseOddsData,
-    DefenseResult,
-    ItemInstance,
-    ItemGrade,
-    MaterialInstance,
-    PlayerState,
-    WeaponDamageType,
-    WeaponTemplate,
-    WeaponType,
-} from '../meta';
+import { AttackLadderOdds, AttackOddsData, DefenseLadderOdds, DefenseOddsData, clamp, getEntityDefenseOdds, getEquippedInstances, getPercent, getWeaponAttackOdds, hasDurability, instantiateAttackSequence, instantiateDefenseSequence, isAccessoryInstance, isArmorInstance, isConsumableInstance, isDataInstance, isEquipmentInstance, isWeaponInstance } from '../consts';
+;
+import type { AttackResult, ConsumableEffectType, DefenseResult, InventoryGridReturn, ItemGrade, ItemInstance, MaterialInstance, PlayerState, WeaponDamageType, WeaponTemplate, WeaponType } from '../contract';
 import { RARITY_MAP, RARITY_META } from '../constants';
-import type { InventoryGridApi } from '../hooks';
 
 // ============================================================================
 // 1. 视觉基调与档位表
@@ -1702,13 +1672,13 @@ const SequenceInspector: React.FC<SequenceInspectorProps> = ({ weapon, player })
 
 interface InventoryPanelProps {
     player: PlayerState;
-    grid: InventoryGridApi;
+    grid: InventoryGridReturn;
     onUseItem: (item: ItemInstance) => void | Promise<void>;
     onDiscardItem: (item: ItemInstance) => void;
     gameActive?: boolean;
 }
 
-type GridTile = InventoryGridApi['tiles'][number];
+type GridTile = InventoryGridReturn['tiles'][number];
 
 interface DragState {
     instanceId: string;

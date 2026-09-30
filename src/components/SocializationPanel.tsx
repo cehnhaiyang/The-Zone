@@ -1,33 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import type {
-    AffinityPhase,
-    CompanionTemplate,
-    InteractionNpcEntity,
-    NodeNpcTemplate,
-    PlayerState,
-    NPCTabMode,
-    ItemInstance,
-    TrustPhase,
-    Words,
-    PlayerWordsTag,
-    NpcWordsTag,
-    CombatStyle,
-    Quest,
-    QuestTemplate,
-    ItemTemplate,
-    Mood,
-    DynamicVitalType,
-    ZoneDate,
-    NeuralLinkState
-} from '../meta';
-import {
-    isItemTemplate,
-    isEquipmentInstance,
-    isWeaponInstance,
-    isConsumableInstance,
-    normalizeEquipState,
-    safeNumber
-} from '../meta';
+import { InteractionNpcEntity, isConsumableInstance, isEquipmentInstance, isItemTemplate, isWeaponInstance, normalizeEquipState, safeNumber } from '../consts';
+import type { AffinityPhase, CombatStyle, CompanionTemplate, DynamicVitalType, ItemInstance, ItemTemplate, Mood, NPCTabMode, NeuralLinkState, NodeNpcTemplate, NpcWordsTag, PlayerState, PlayerWordsTag, Quest, QuestTemplate, TrustPhase, Words, ZoneDate } from '../contract';
+;
 import { RARITY_MAP } from '../constants';
 import { AudioService, PersistenceService, SocializationService } from '../services';
 

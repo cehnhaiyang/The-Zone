@@ -6,7 +6,8 @@
  * LLM 不可用 / 解析失败时降级回引擎兜底（优先废料，其次食物；基准 20 + level × 15）。
  */
 
-import { PlayerState, Sanctuary, Settings, getSanctuaryResourceValue } from '../../meta';
+import { getSanctuaryResourceValue } from '../../consts';
+import { PlayerState, Sanctuary, Settings } from '../../contract/meta';
 import { BaseProvider, AIResponse } from './providers/base';
 import { callAi } from './providers';
 

@@ -5,7 +5,7 @@
  * （产出契约见 SanctuaryEvent，嵌入 SANCTUARY_EVENT_GENERATION_SCHEMA）。
  */
 
-import { Settings, SanctuaryEvent, SanctuaryEventGenerationContext } from '../../meta';
+import { SanctuaryEvent, SanctuaryEventGenerationContext, Settings } from '../../contract/meta';
 import { BaseProvider, AIResponse } from './providers/base';
 import { callAi } from './providers';
 

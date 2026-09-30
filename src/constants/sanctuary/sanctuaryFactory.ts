@@ -15,55 +15,7 @@
  * 6. 契约严格遵循：底层产物 100% 严丝合缝契合 meta/interface.ts 与 meta/type.ts。
  */
 
-import {
-    SanctuaryTemplate,
-    NodeTemplate,
-    Item,
-    Weapon,
-    Armor,
-    Accessory,
-    Storage,
-    Consumable,
-    Data,
-    Material,
-    ItemTemplate,
-    Interaction,
-    FacilityTemplate,
-    UniqueResource,
-    Exit,
-    Local,
-    ZoneTransfer,
-    SanctuaryReturn,
-    Puzzle,
-    EnemyTemplate,
-    CthulhuEnemyTemplate,
-    ImmovableEnemyTemplate,
-    CompanionTemplate,
-    NodeNpcTemplate,
-    EquipState,
-    WeaponInstance,
-    ArmorInstance,
-    AccessoryInstance,
-    StorageInstance,
-    Tactic,
-    QuestTemplate,
-    ItemGrade,
-    WeaponType,
-    WeaponDamageType,
-    AccessoryEffectType,
-    ConsumableEffectType,
-    SoundType,
-    GameRound,
-    CombatStyle,
-    AttributeType,
-    VitalType,
-    DynamicVitalType,
-    Target,
-    TacticEffectType,
-    IntentType,
-    NecessaryResource,
-    TacticType
-} from '../../meta'
+import { Accessory, AccessoryEffectType, AccessoryInstance, Armor, ArmorInstance, AttributeType, CombatStyle, CompanionTemplate, Consumable, ConsumableEffectType, CthulhuEnemyTemplate, Data, EnemyTemplate, EquipState, Exit, FacilityTemplate, GameRound, ImmovableEnemyTemplate, IntentType, Interaction, Item, ItemGrade, ItemTemplate, Local, Material, NecessaryResource, NodeNpcTemplate, NodeTemplate, Puzzle, QuestTemplate, SanctuaryReturn, SanctuaryTemplate, SoundType, Storage, StorageInstance, Tactic, TacticEffectType, TacticType, Target, UniqueResource, VitalType, Weapon, WeaponDamageType, WeaponInstance, WeaponType, ZoneTransfer } from '../../contract/meta';
 
 // ==========================
 // 1. 通用工具与底层清洗
@@ -838,7 +790,7 @@ export const createReplacement = (
     opts: {
         attributes?: Partial<Record<AttributeType, number>>
         vitals?: Partial<Record<VitalType, number>>
-        dynamicVitals?: Partial<Record<DynamicVitalType, number>>
+        dynamicVitals?: Partial<Record<VitalType, number>>
     } = {}
 ) => ({
     duty,

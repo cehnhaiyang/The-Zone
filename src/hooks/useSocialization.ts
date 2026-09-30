@@ -1,63 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import type {
-    PlayerState,
-    Node,
-    Zone,
-    Settings,
-    Quest,
-    ItemInstance,
-    InteractionNpcEntity,
-    InteractionDialogueContext,
-    NpcDynamicState,
-    Entity,
-    CompanionDynamicState,
-    CompanionTemplate,
-    Words,
-    PlayerWordsTag,
-    NpcWordsTag,
-    CurrentLocation,
-    Dialogue,
-    Mood,
-    ZoneDate,
-    LogType,
-    NodeNpcTemplate,
-    AttributeType,
-    VitalType,
-    DynamicVitalType,
-    QuestTemplate,
-    QuestStatus
-} from '../meta';
-import {
-    removeItemFromInventory,
-    addItemToInventory,
-    isConsumableInstance,
-    isEquipmentInstance,
-    isWeaponInstance,
-    isArmorInstance,
-    isAccessoryInstance,
-    normalizeEquipState,
-    equipItem,
-    unequipItem,
-    addUniqueItemToInventory,
-    stripEquipEffectSnapshot,
-    applyEffectDeltas,
-    negateEffectDeltas,
-    getAppliedAccessoryDeltas,
-    collectAccessoryEffects,
-    isAttributeType,
-    isVitalType,
-    buildCurrentLocation,
-    clamp,
-    createEmptyMemoryPyramid,
-    safeNumber,
-    generateInstanceId,
-    getRelationAxis,
-    getRelationScore,
-    getSanctuaryResourceValue,
-    safeDeepClone,
-    withRelationScore
-} from '../meta';
+import { InteractionDialogueContext, InteractionNpcEntity, addItemToInventory, addUniqueItemToInventory, applyEffectDeltas, buildCurrentLocation, clamp, collectAccessoryEffects, createEmptyMemoryPyramid, equipItem, generateInstanceId, getAppliedAccessoryDeltas, getRelationAxis, getRelationScore, getSanctuaryResourceValue, isAccessoryInstance, isArmorInstance, isAttributeType, isConsumableInstance, isEquipmentInstance, isVitalType, isWeaponInstance, negateEffectDeltas, normalizeEquipState, removeItemFromInventory, safeDeepClone, safeNumber, stripEquipEffectSnapshot, unequipItem, withRelationScore } from '../consts';
+import type { AttributeType, CompanionDynamicState, CompanionTemplate, CurrentLocation, Dialogue, DynamicVitalType, Entity, ItemInstance, LogType, Mood, Node, NodeNpcTemplate, NpcDynamicState, NpcWordsTag, PlayerState, PlayerWordsTag, Quest, QuestStatus, QuestTemplate, Settings, VitalType, Words, Zone, ZoneDate } from '../contract';
+;
 import {
     AudioService,
     AiService,

@@ -1,4 +1,4 @@
-import type { BattleMap, Cover } from '../../meta';
+import type { BattleMap, Cover } from '../../contract/meta';
 import { HOSPITAL_COVERS, HOSPITAL_MAPS } from './hospital';
 import { BUNKER_COVERS, BUNKER_MAPS } from './bunker';
 import { ARCHIVE_COVERS, ARCHIVE_MAPS } from './archive';

@@ -1,4 +1,4 @@
-import type { EnemyTemplate } from '../meta';
+import type { EnemyTemplate } from '../contract';
 
 /**
  * 基础敌人模板库

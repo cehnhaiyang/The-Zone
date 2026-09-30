@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense, lazy } from 'react';
-import { GameState, Settings, VisorPanelType, PlayerState, AttributeType, SanctuaryEvent, getEquippedInstances } from './meta';
+import { getEquippedInstances } from './/consts';
+import { AttributeType, GameState, PlayerState, SanctuaryEvent, Settings, VisorPanelType } from './contract/meta';
 import { useGame } from './hooks';
 import { AudioService, AiService } from './services';
 import { INITIAL_SETTINGS, MODEL_PROVIDER } from './constants';
@@ -14,8 +15,8 @@ const SANCTUARY_DAILY_EVENT_CHANCE = 0.35;
 const NeuralVisor = lazy(() => import('./components/NeuralinkDevice'));
 
 const CombatPanel = lazy(() => import('./components/CombatPanel'));
-const SettingsPanel = lazy(() => import('./components/SettingsPanel'));
-const OverlayPanel = lazy(() => import('./components/OverlayPanel'));
+const MenuPanel = lazy(() => import('./components/MeanuPanel'));
+const Overlay = lazy(() => import('./components/Overlay'));
 const PuzzlePanel = lazy(() => import('./components/PuzzlePanel'));
 const NarrativePanel = lazy(() => import('./components/NarrativePanel'));
 const SocializationPanel = lazy(() => import('./components/SocializationPanel'));
@@ -187,7 +188,6 @@ const App: React.FC = () => {
     } = useGame();
 
     // -------------------- 本地 UI 状态 --------------------
-    const [showSettings, setShowSettings] = useState(false);
     const [showSanctuaryUI, setShowSanctuaryUI] = useState(true);
     const [activeVisorPanel, setActiveVisorPanel] = useState<VisorPanelType>('visual');
     const [isLogFullscreen, setIsLogFullscreen] = useState(false);
@@ -321,12 +321,6 @@ const App: React.FC = () => {
         }));
     }, [setPlayer]);
 
-    /** 关闭设置面板 */
-    const handleCloseSettings = useCallback(() => setShowSettings(false), []);
-
-    /** 打开设置面板 */
-    const handleOpenSettings = useCallback(() => setShowSettings(true), []);
-
     /** 切换庇护所 UI */
     const handleToggleSanctuaryUI = useCallback(() => setShowSanctuaryUI((prev) => !prev), []);
 
@@ -385,8 +379,16 @@ const App: React.FC = () => {
     }, [settings]);
 
     // Apply brightness
+    //
+    // 注意：<body> 上的 filter 会把整个文档收进同一个渲染表面（并改变 fixed 后代的
+    // 包含块），使分区光栅化 / 逐层提升失效——文档内任何一处的动画或重渲染都可能
+    // 升级为整页重绘。该代价是**全局且常驻**的，与当前处于哪个界面无关。
+    // 因此亮度恰为 100% 时必须彻底摘掉滤镜（`brightness(100%)` 依然是非 none 值，
+    // 照样会建组），只有用户真正调暗/调亮时才承担这份开销。
     useEffect(() => {
-        document.body.style.filter = `brightness(${settings.screenBrightness}%)`;
+        document.body.style.filter = settings.screenBrightness === 100
+            ? ''
+            : `brightness(${settings.screenBrightness}%)`;
     }, [settings.screenBrightness]);
 
     /** 全局键盘事件处理 */
@@ -395,7 +397,8 @@ const App: React.FC = () => {
             // 忽略输入框内的按键
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-            // ESC 键处理（优先级：视觉全屏 > NPC对话 > 谜题 > 设置面板）
+            // ESC 键处理（优先级：视觉全屏 > NPC对话 > 谜题）。
+            // 设置页现内嵌于神经链接仪，其开合由装置自身接管，不再在此拦截。
             if (e.key === 'Escape') {
                 e.preventDefault();
                 if (isVisualFullscreen) {
@@ -404,14 +407,12 @@ const App: React.FC = () => {
                     closeNPCInteraction();
                 } else if (activePuzzleNodeId) {
                     setActivePuzzleNodeId(null);
-                } else {
-                    setShowSettings((prev) => !prev);
                 }
                 return;
             }
 
-            // Tab 键切换面板（仅在游戏中且设置面板未打开时）
-            if (e.key === 'Tab' && !showSettings && (gameState === GameState.PLAYING || gameState === GameState.SANCTUARY)) {
+            // Tab 键切换面板（仅在游戏中）
+            if (e.key === 'Tab' && (gameState === GameState.PLAYING || gameState === GameState.SANCTUARY)) {
                 e.preventDefault();
                 const currentIndex = PANEL_ORDER.indexOf(activeVisorPanel);
                 const nextIndex = (currentIndex + 1) % PANEL_ORDER.length;
@@ -422,7 +423,6 @@ const App: React.FC = () => {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [
-        showSettings,
         gameState,
         activeVisorPanel,
         activeInteractionNPC,
@@ -479,32 +479,12 @@ const App: React.FC = () => {
     }, [setSettings]);
 
     // -------------------- 渲染：特殊状态 --------------------
-    // 主菜单
+    // 主菜单（独立整页组件，不经覆盖层）
     if (gameState === GameState.MAIN_MENU) {
         return (
-            <>
-                {showSettings && (
-                    <Suspense fallback={null}>
-                        <SettingsPanel
-                            settings={settings}
-                            onUpdate={setSettings}
-                            onClose={handleCloseSettings}
-                            isFullscreen={true}
-                            onSaveGame={handleSaveGame}
-                            onLoadGame={handleLoadGame}
-                            onListSaves={handleListSaves}
-                            onDeleteSave={handleDeleteSave}
-                        />
-                    </Suspense>
-                )}
-                <Suspense fallback={null}>
-                    <OverlayPanel
-                        type="menu"
-                        onOpenSettings={handleOpenSettings}
-                        onInitGame={initGame}
-                    />
-                </Suspense>
-            </>
+            <Suspense fallback={null}>
+                <MenuPanel onInitGame={initGame} />
+            </Suspense>
         );
     }
 
@@ -512,7 +492,7 @@ const App: React.FC = () => {
     if (gameState === GameState.GAME_OVER) {
         return (
             <Suspense fallback={null}>
-                <OverlayPanel type="gameover" deathReason={(player as any).deathReason} onReset={handleReturnToMenu} />
+                <Overlay type="gameover" deathReason={(player as any).deathReason} onReset={handleReturnToMenu} />
             </Suspense>
         );
     }
@@ -522,7 +502,7 @@ const App: React.FC = () => {
             {/* 加载中状态 (作为最高层遮罩，遮挡正在后台渲染的主界面) */}
             {gameState === GameState.LOADING && (
                 <Suspense fallback={null}>
-                    <OverlayPanel
+                    <Overlay
                         type="zone_gen"
                         status={loadingStatus}
                         modelName={settings.zoneModel.model}
@@ -534,19 +514,7 @@ const App: React.FC = () => {
             {/* 主界面（在加载中时保持半透明显示日志，不遮挡操作但允许看到生成进度） */}
             <div className={`absolute inset-0 flex flex-col transition-opacity duration-500 ease-in-out ${gameState === GameState.LOADING ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
                 <Suspense fallback={null}>
-                    {/* 设置面板 */}
-                    {showSettings && (
-                        <SettingsPanel
-                            settings={settings}
-                            onUpdate={setSettings}
-                            onClose={handleCloseSettings}
-                            isFullscreen={true}
-                            onSaveGame={handleSaveGame}
-                            onLoadGame={handleLoadGame}
-                            onListSaves={handleListSaves}
-                            onDeleteSave={handleDeleteSave}
-                        />
-                    )}
+                    {/* 设置面板已内嵌至神经链接仪（NeuralVisor → NeuralinkDevice） */}
 
                     {/* 叙事面板流程 */}
                     {showNarrative && (
@@ -600,7 +568,7 @@ const App: React.FC = () => {
                     )}
 
                     {/* 过场动画 */}
-                    {showCutscene && currentNode && <OverlayPanel type="cutscene" node={currentNode} nodeId={currentNodeId} onCutsceneComplete={handleCutsceneComplete} />}
+                    {showCutscene && currentNode && <Overlay type="cutscene" node={currentNode} nodeId={currentNodeId} onCutsceneComplete={handleCutsceneComplete} />}
 
                     {/* NPC 对话面板 */}
                     {activeInteractionNPC && (
@@ -734,7 +702,12 @@ const App: React.FC = () => {
                             const npc = player.companions.find(c => c.static.id === id);
                             if (npc) handleInteractWithCompanion(npc);
                         }}
-                        onOpenSettings={handleOpenSettings}
+                        // 设置页出参：设置变更与存档操作均由装置内的设置页面直接消费
+                        onUpdateSettings={setSettings}
+                        onSaveGame={handleSaveGame}
+                        onLoadGame={handleLoadGame}
+                        onListSaves={handleListSaves}
+                        onDeleteSave={handleDeleteSave}
                         isSanctuary={gameState === GameState.SANCTUARY}
                         onToggleSanctuaryUI={handleToggleSanctuaryUI}
                         isCombat={gameState === GameState.COMBAT}

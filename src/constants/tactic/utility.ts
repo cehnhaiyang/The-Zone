@@ -11,10 +11,10 @@
  * - 绝不直接提供厚实护盾 (shield) 或高额常驻装甲防御 (defense)
  * - 绝不直接作为高伤害攻击技能投射大额直接伤害 (damage)
  *
- * @version 2.3.0
+ * @version 2.4.0
  */
 
-import type { Tactic } from '../../meta'
+import type { Tactic } from '../../contract/meta';
 
 /**
  * 辅助战术工厂构造器
@@ -46,7 +46,7 @@ export const publicUtilityTactics: Tactic[] = [
         '短暂停歇肌肉活动，平复心跳与微抖，提升下一次攻击判定的射击精度。',
         1,
         [
-            ['self', 'aim', 20, 0],
+            ['self', 'aim', 22, 0],
             ['self', 'vigor', -1, 0],
         ],
     ),
@@ -56,8 +56,8 @@ export const publicUtilityTactics: Tactic[] = [
         '利用战术目镜将敌方的掩体死角与运动轴线同步至神经链路，剥夺其回避能力。',
         1,
         [
-            ['single_enemy', 'evasion', -18, 1],
-            ['self', 'aim', 10, 1],
+            ['single_enemy', 'evasion', -20, 1],
+            ['self', 'aim', 12, 1],
         ],
     ),
     util(
@@ -66,8 +66,8 @@ export const publicUtilityTactics: Tactic[] = [
         '捏碎微型氨水嗅盐胶囊吸入刺激性气体，强行唤醒迟钝神经并换取短时精力与体力。',
         1,
         [
-            ['self', 'vigor', 4, 0],
-            ['self', 'stamina', 6, 0],
+            ['self', 'vigor', 5, 0],
+            ['self', 'stamina', 7, 0],
             ['self', 'hp', -1, 0],
         ],
     ),
@@ -77,7 +77,7 @@ export const publicUtilityTactics: Tactic[] = [
         '微调神经链接仪滤波频宽，以微弱的神经阻尼平抑轻度理智噪点。',
         1,
         [
-            ['self', 'sanity', 4, 0],
+            ['self', 'sanity', 5, 0],
             ['self', 'speed', -1, 1],
         ],
     ),
@@ -87,8 +87,8 @@ export const publicUtilityTactics: Tactic[] = [
         '快速垫步调整身体站姿与支撑点，消除上一轮动作残留的肌肉僵硬与滞涩。',
         1,
         [
-            ['self', 'speed', 2, 1],
-            ['self', 'stamina', 5, 0],
+            ['self', 'speed', 3, 1],
+            ['self', 'stamina', 6, 0],
         ],
     ),
     util(
@@ -97,7 +97,7 @@ export const publicUtilityTactics: Tactic[] = [
         '洞悉目标外壳剥落或护甲铰链松动处，为其施加破甲易伤标记。',
         1,
         [
-            ['single_enemy', 'defense', -14, 1],
+            ['single_enemy', 'defense', -15, 1],
         ],
     ),
     util(
@@ -106,7 +106,7 @@ export const publicUtilityTactics: Tactic[] = [
         '迅速撕开便携凝血止血敷料按压活动性出血创口，以体力消耗换取生命体征稳定。',
         1,
         [
-            ['self', 'hp', 5, 0],
+            ['self', 'hp', 6, 0],
             ['self', 'stamina', -4, 0],
         ],
     ),
@@ -133,7 +133,7 @@ export const publicUtilityTactics: Tactic[] = [
         2,
         [
             ['self', 'speed', 3, 1],
-            ['self', 'aim', 15, 1],
+            ['self', 'aim', 16, 1],
             ['self', 'crit_chance', 0.15, 1],
         ],
     ),
@@ -144,7 +144,7 @@ export const publicUtilityTactics: Tactic[] = [
         2,
         [
             ['all_allies', 'damage', 3, 1],
-            ['all_allies', 'aim', 14, 1],
+            ['all_allies', 'aim', 15, 1],
         ],
     ),
     util(
@@ -153,7 +153,7 @@ export const publicUtilityTactics: Tactic[] = [
         '将自身神经链接仪的计算算力广播分流至全体友军，全面提升小队的战术反应与机动协调。',
         2,
         [
-            ['all_allies', 'aim', 16, 1],
+            ['all_allies', 'aim', 18, 1],
             ['all_allies', 'speed', 2, 1],
             ['self', 'vigor', -3, 0],
         ],
@@ -164,8 +164,8 @@ export const publicUtilityTactics: Tactic[] = [
         '利用火力交替死角指挥战斗梯队同步换气调息，极大加速全员战术体力回复。',
         2,
         [
-            ['all_teammates', 'stamina', 14, 0],
-            ['self', 'stamina', 8, 0],
+            ['all_teammates', 'stamina', 16, 0],
+            ['self', 'stamina', 10, 0],
         ],
     ),
     util(
@@ -174,7 +174,7 @@ export const publicUtilityTactics: Tactic[] = [
         '静脉注射高纯度神经稳定剂并强制闪回安全记忆，强力平复理智裂痕，但肉体短时迟钝。',
         2,
         [
-            ['self', 'sanity', 10, 0],
+            ['self', 'sanity', 12, 0],
             ['self', 'speed', -2, 1],
             ['self', 'stamina', -4, 0],
         ],
@@ -185,9 +185,9 @@ export const publicUtilityTactics: Tactic[] = [
         '射出一发高热磷光信标附着于目标表层，强制剥夺目标的阴影掩蔽与规避余量。',
         2,
         [
-            ['single_enemy', 'evasion', -25, 1],
-            ['single_enemy', 'defense', -16, 1],
-            ['all_allies', 'aim', 15, 1],
+            ['single_enemy', 'evasion', -28, 1],
+            ['single_enemy', 'defense', -18, 1],
+            ['all_allies', 'aim', 16, 1],
         ],
     ),
 
@@ -202,7 +202,7 @@ export const publicUtilityTactics: Tactic[] = [
         [
             ['all_allies', 'ap', 1, 0],
             ['all_allies', 'speed', 3, 1],
-            ['all_allies', 'aim', 12, 1],
+            ['all_allies', 'aim', 14, 1],
             ['self', 'vigor', -4, 0],
         ],
     ),
@@ -224,8 +224,8 @@ export const publicUtilityTactics: Tactic[] = [
         '以激光测距仪与高维频段彻底锚定敌方关键首脑，向其倾泻毁灭性破甲与弱点指引。',
         3,
         [
-            ['single_enemy', 'defense', -30, 1],
-            ['single_enemy', 'evasion', -30, 1],
+            ['single_enemy', 'defense', -32, 1],
+            ['single_enemy', 'evasion', -32, 1],
             ['all_allies', 'crit_chance', 0.25, 1],
             ['all_allies', 'crit_bonus', 8, 1],
         ],
@@ -236,7 +236,7 @@ export const publicUtilityTactics: Tactic[] = [
         '展开全套战地外科器械，优先抢救所有负伤同伴的致命出血，自身承受极度神经亏空。',
         3,
         [
-            ['all_teammates', 'hp', 7, 0],
+            ['all_teammates', 'hp', 8, 0],
             ['self', 'vigor', -5, 0],
             ['self', 'stamina', -6, 0],
         ],
@@ -247,8 +247,8 @@ export const publicUtilityTactics: Tactic[] = [
         '广播阿斯克勒庇俄斯未受污染的原生平复音轨，抚平全队理智裂痕并重燃生存体力。',
         3,
         [
-            ['all_allies', 'sanity', 8, 0],
-            ['all_allies', 'stamina', 8, 0],
+            ['all_allies', 'sanity', 9, 0],
+            ['all_allies', 'stamina', 9, 0],
             ['self', 'sanity', -3, 0],
         ],
     ),
@@ -258,8 +258,8 @@ export const publicUtilityTactics: Tactic[] = [
         '播放深渊基金会应急收容战歌，强制平复全员受损理智并重筑不可动摇的杀戮战意。',
         3,
         [
-            ['all_allies', 'sanity', 8, 0],
-            ['all_allies', 'stamina', 12, 0],
+            ['all_allies', 'sanity', 9, 0],
+            ['all_allies', 'stamina', 14, 0],
             ['all_allies', 'damage', 3, 1],
             ['self', 'vigor', -3, 0],
         ],
@@ -290,7 +290,7 @@ export const publicUtilityTactics: Tactic[] = [
             ['all_enemies', 'ap', -2, 1],
             ['all_enemies', 'speed', -5, 1],
             ['all_enemies', 'defense', -35, 1],
-            ['all_enemies', 'evasion', -30, 1],
+            ['all_enemies', 'evasion', -32, 1],
             ['self', 'stamina', -15, 0],
         ],
     ),
@@ -315,8 +315,8 @@ export const publicUtilityTactics: Tactic[] = [
         '透过高倍率热成像狙击镜跨越战场扫描弱点，向同伴同步射击死角并击碎敌方装甲信心。',
         2,
         [
-            ['single_enemy', 'defense', -25, 1],
-            ['single_enemy', 'evasion', -25, 1],
+            ['single_enemy', 'defense', -28, 1],
+            ['single_enemy', 'evasion', -28, 1],
             ['all_allies', 'crit_chance', 0.20, 1],
         ],
         'sniper_rifle',
@@ -332,7 +332,7 @@ export const publicUtilityTactics: Tactic[] = [
         1,
         [
             ['self', 'speed', 3, 1],
-            ['self', 'aim', 15, 1],
+            ['self', 'aim', 16, 1],
         ],
         'wave',
     ),
@@ -342,7 +342,7 @@ export const publicUtilityTactics: Tactic[] = [
         '左手自然下垂维持平衡，右手反手运刀，极致放大单手空置带来的敏捷命中与暴击加成。',
         2,
         [
-            ['self', 'aim', 25, 1],
+            ['self', 'aim', 26, 1],
             ['self', 'crit_chance', 0.20, 1],
             ['self', 'speed', 2, 1],
         ],
@@ -359,7 +359,7 @@ export const publicUtilityTactics: Tactic[] = [
         1,
         [
             ['self', 'speed', 3, 1],
-            ['self', 'aim', 18, 1],
+            ['self', 'aim', 20, 1],
             ['self', 'stamina', -4, 0],
         ],
         'both_wave',
@@ -371,7 +371,7 @@ export const publicUtilityTactics: Tactic[] = [
         2,
         [
             ['self', 'a_sequence', 1, 0],
-            ['self', 'aim', 20, 1],
+            ['self', 'aim', 22, 1],
             ['self', 'crit_bonus', 6, 1],
         ],
         'both_wave',
@@ -387,8 +387,8 @@ export const publicUtilityTactics: Tactic[] = [
         1,
         [
             ['self', 'crit_chance', 0.25, 1],
-            ['self', 'aim', 18, 1],
-            ['self', 'speed', 1, 1],
+            ['self', 'aim', 20, 1],
+            ['self', 'speed', 2, 1],
         ],
         'prick',
     ),
@@ -398,7 +398,7 @@ export const publicUtilityTactics: Tactic[] = [
         '调取清理人生体解剖数据库，以极快短刺探清敌方神经节密集区，彻底剥除其防御抗性。',
         2,
         [
-            ['single_enemy', 'defense', -25, 1],
+            ['single_enemy', 'defense', -28, 1],
             ['self', 'crit_bonus', 10, 1],
             ['self', 'a_sequence', 1, 0],
         ],
@@ -415,8 +415,8 @@ export const publicUtilityTactics: Tactic[] = [
         2,
         [
             ['single_enemy', 'speed', -4, 1],
-            ['single_enemy', 'evasion', -20, 1],
-            ['self', 'aim', 20, 1],
+            ['single_enemy', 'evasion', -22, 1],
+            ['self', 'aim', 22, 1],
         ],
         'both_prick',
     ),
@@ -427,8 +427,8 @@ export const publicUtilityTactics: Tactic[] = [
         2,
         [
             ['self', 'a_sequence', 1, 0],
-            ['single_enemy', 'defense', -25, 1],
-            ['self', 'aim', 15, 1],
+            ['single_enemy', 'defense', -28, 1],
+            ['self', 'aim', 18, 1],
         ],
         'both_prick',
     ),
@@ -443,7 +443,7 @@ export const publicUtilityTactics: Tactic[] = [
         1,
         [
             ['self', 'speed', 3, 1],
-            ['self', 'aim', 12, 1],
+            ['self', 'aim', 14, 1],
         ],
         'shield',
     ),
@@ -453,9 +453,9 @@ export const publicUtilityTactics: Tactic[] = [
         '以盾牌外缘斜向撞开敌方防线切角，为紧跟其后的友军撕开致命射击窗口。',
         2,
         [
-            ['single_enemy', 'evasion', -25, 1],
-            ['single_enemy', 'defense', -18, 1],
-            ['single_ally', 'aim', 20, 1],
+            ['single_enemy', 'evasion', -28, 1],
+            ['single_enemy', 'defense', -20, 1],
+            ['single_ally', 'aim', 22, 1],
         ],
         'shield',
     ),
@@ -469,8 +469,8 @@ export const publicUtilityTactics: Tactic[] = [
         '将双手塔盾驻锄深插入地表化作射击支点，向全队提供稳定的依托射击指引。',
         2,
         [
-            ['all_allies', 'aim', 18, 1],
-            ['all_enemies', 'evasion', -15, 1],
+            ['all_allies', 'aim', 20, 1],
+            ['all_enemies', 'evasion', -18, 1],
             ['self', 'speed', -2, 1],
         ],
         'both_shield',
@@ -497,7 +497,7 @@ export const publicUtilityTactics: Tactic[] = [
         '右手虚悬于快拔枪套之上，保持肌肉松弛，完美触发手枪未移动首击免 AP 优势。',
         1,
         [
-            ['self', 'aim', 25, 0],
+            ['self', 'aim', 26, 0],
             ['self', 'speed', 2, 1],
         ],
         'pistol',
@@ -508,8 +508,8 @@ export const publicUtilityTactics: Tactic[] = [
         '开启手枪下挂不可见红外激光瞄具，将目标要害投射至小队共享目镜，大幅压制其闪避。',
         2,
         [
-            ['single_enemy', 'evasion', -28, 1],
-            ['all_allies', 'aim', 18, 1],
+            ['single_enemy', 'evasion', -30, 1],
+            ['all_allies', 'aim', 20, 1],
             ['self', 'crit_chance', 0.15, 1],
         ],
         'pistol',
@@ -525,7 +525,7 @@ export const publicUtilityTactics: Tactic[] = [
         1,
         [
             ['self', 'ap', 1, 0],
-            ['self', 'aim', 12, 1],
+            ['self', 'aim', 14, 1],
             ['self', 'stamina', -6, 0],
         ],
         'smg',
@@ -536,7 +536,7 @@ export const publicUtilityTactics: Tactic[] = [
         '双手扫射打出交错弹道切片，迫使区域内敌群缩头隐蔽，为友方创造安全位移机会。',
         2,
         [
-            ['all_enemies', 'aim', -20, 1],
+            ['all_enemies', 'aim', -22, 1],
             ['all_enemies', 'speed', -2, 1],
             ['all_allies', 'speed', 3, 1],
         ],
@@ -552,8 +552,8 @@ export const publicUtilityTactics: Tactic[] = [
         '以行云流水的正规军械操典完成弹匣单手快换，校准下一发入膛穿甲弹药并恢复操作节奏。',
         1,
         [
-            ['self', 'aim', 18, 1],
-            ['self', 'stamina', 5, 0],
+            ['self', 'aim', 20, 1],
+            ['self', 'stamina', 6, 0],
         ],
         'assault_rifle',
     ),
@@ -563,8 +563,8 @@ export const publicUtilityTactics: Tactic[] = [
         '击发特种曳光弹点亮敌方掩体主受力点，撕裂目标护甲并引导小队火力无差别覆盖。',
         2,
         [
-            ['single_enemy', 'defense', -25, 1],
-            ['all_allies', 'aim', 16, 1],
+            ['single_enemy', 'defense', -28, 1],
+            ['all_allies', 'aim', 18, 1],
             ['all_allies', 'damage', 2, 1],
         ],
         'assault_rifle',
@@ -581,7 +581,7 @@ export const publicUtilityTactics: Tactic[] = [
         [
             ['self', 'speed', 3, 1],
             ['self', 'crit_chance', 0.25, 1],
-            ['single_enemy', 'evasion', -20, 1],
+            ['single_enemy', 'evasion', -22, 1],
         ],
         'shotgun',
     ),
@@ -591,7 +591,7 @@ export const publicUtilityTactics: Tactic[] = [
         '空击特种强闪光高压燃气弹，狂暴的冲击波震碎周边敌人的瞄准与平衡神经。',
         2,
         [
-            ['all_enemies', 'aim', -25, 1],
+            ['all_enemies', 'aim', -28, 1],
             ['all_enemies', 'speed', -3, 1],
         ],
         'shotgun',
@@ -607,7 +607,7 @@ export const publicUtilityTactics: Tactic[] = [
         1,
         [
             ['self', 'speed', 3, 1],
-            ['single_enemy', 'evasion', -20, 1],
+            ['single_enemy', 'evasion', -22, 1],
         ],
         'sawed_off',
     ),
@@ -617,8 +617,8 @@ export const publicUtilityTactics: Tactic[] = [
         '利用单手短管近身喷射未充分燃烧的火药微粒与灼热气体，制造严重的致盲失准。',
         2,
         [
-            ['single_enemy', 'aim', -30, 1],
-            ['single_enemy', 'defense', -15, 1],
+            ['single_enemy', 'aim', -32, 1],
+            ['single_enemy', 'defense', -16, 1],
         ],
         'sawed_off',
     ),
@@ -633,7 +633,7 @@ export const publicUtilityTactics: Tactic[] = [
         1,
         [
             ['self', 'crit_bonus', 12, 1],
-            ['self', 'crit_chance', 0.15, 1],
+            ['self', 'crit_chance', 0.18, 1],
             ['self', 'stamina', -4, 0],
         ],
         'crossbow',
@@ -644,8 +644,8 @@ export const publicUtilityTactics: Tactic[] = [
         '将带有放射性同位素标记的细栓射入目标肢体，彻底废除其潜行掩蔽。',
         2,
         [
-            ['single_enemy', 'evasion', -32, 1],
-            ['all_allies', 'aim', 20, 1],
+            ['single_enemy', 'evasion', -35, 1],
+            ['all_allies', 'aim', 22, 1],
         ],
         'crossbow',
     ),
@@ -659,7 +659,7 @@ export const publicUtilityTactics: Tactic[] = [
         '双手将复合长弓拉至满月，通过深呼吸滤除风偏干扰，极大提升下一次远射精度与暴击。',
         1,
         [
-            ['self', 'aim', 28, 0],
+            ['self', 'aim', 30, 0],
             ['self', 'crit_chance', 0.20, 0],
         ],
         'bow',
@@ -670,8 +670,8 @@ export const publicUtilityTactics: Tactic[] = [
         '射出一支在半空产生高频尖啸的破甲骨箭，标记敌阵薄弱部位并引领全队箭火。',
         2,
         [
-            ['all_allies', 'aim', 20, 1],
-            ['all_enemies', 'evasion', -20, 1],
+            ['all_allies', 'aim', 22, 1],
+            ['all_enemies', 'evasion', -22, 1],
         ],
         'bow',
     ),
@@ -686,8 +686,8 @@ export const publicUtilityTactics: Tactic[] = [
         2,
         [
             ['all_allies', 'speed', 2, 1],
-            ['all_enemies', 'aim', -25, 1],
-            ['all_enemies', 'evasion', -15, 1],
+            ['all_enemies', 'aim', -28, 1],
+            ['all_enemies', 'evasion', -16, 1],
         ],
         'throw',
     ),
@@ -697,8 +697,8 @@ export const publicUtilityTactics: Tactic[] = [
         '掷出大范围高流明冷光燃烧棒，驱散战场阴霾与虚空薄雾，彻底曝光隐匿之敌。',
         2,
         [
-            ['all_enemies', 'evasion', -30, 1],
-            ['all_allies', 'aim', 20, 1],
+            ['all_enemies', 'evasion', -32, 1],
+            ['all_allies', 'aim', 22, 1],
         ],
         'throw',
     ),
@@ -712,7 +712,7 @@ export const publicUtilityTactics: Tactic[] = [
         '引导高维以太灵流贯穿神经链接仪，以微量理智为代价换取精力与攻击判定质量升档。',
         1,
         [
-            ['self', 'vigor', 5, 0],
+            ['self', 'vigor', 6, 0],
             ['self', 'a_sequence', 1, 0],
             ['self', 'sanity', -1, 0],
         ],
@@ -725,7 +725,7 @@ export const publicUtilityTactics: Tactic[] = [
         2,
         [
             ['self', 'speed', 5, 1],
-            ['self', 'aim', 15, 1],
+            ['self', 'aim', 16, 1],
             ['self', 'sanity', -2, 0],
         ],
         'magic',
@@ -737,8 +737,8 @@ export const publicUtilityTactics: Tactic[] = [
         3,
         [
             ['single_ally', 'ap', 2, 0],
-            ['single_ally', 'stamina', 18, 0],
-            ['single_ally', 'hp', 4, 0],
+            ['single_ally', 'stamina', 20, 0],
+            ['single_ally', 'hp', 5, 0],
             ['self', 'sanity', -5, 0],
         ],
         'magic',

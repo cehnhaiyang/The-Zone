@@ -20,12 +20,7 @@
  * 均不由 LLM 区域模板直接生成，而应由引擎在模板加工阶段处理。
  */
 
-import type {
-    Settings,
-    ZoneGenerationContext,
-    ChainGenerationContext,
-    EpisodicGenerationContext,
-} from '../../meta';
+import type { ChainGenerationContext, EpisodicGenerationContext, Settings, ZoneGenerationContext } from '../../contract/meta';
 import { BaseProvider, type AIResponse } from './providers/base';
 import { callAi } from './providers';
 import {

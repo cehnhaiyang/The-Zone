@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { Zone, LogType, AssetType } from '../meta';
+import { AssetType, LogType, Zone } from '../contract';
 import { AudioService, PersistenceService } from '../services';
 
 // --- 局部常量与辅助函数 ---
@@ -18,18 +18,12 @@ const extractFileIndex = (filename: string): number => {
  */
 export type AssetCategory = 'scene' | 'enemy' | 'npc' | 'player';
 
-/**
- * 入参契约
- */
 interface UseAssetLoadParams {
     currentZone: Zone;
     addLog: (text: string, type: LogType) => void;
     onUpdateAsset?: (mediaType: 'image' | 'video', type: AssetCategory, objId: string, url: string) => void;
 }
 
-/**
- * 出参契约
- */
 interface UseAssetLoadReturn {
     autoLoadAssets: (category: AssetCategory, objId: string) => Promise<{ imageUrl: string | null; videoUrl: string | null }>;
     handleRandomSwitch: (mediaType: AssetType, category: AssetCategory, objId?: string, currentUrl?: string) => Promise<string | null>;

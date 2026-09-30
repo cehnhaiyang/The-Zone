@@ -7,7 +7,7 @@
  *   - 视频: Ltxv_13B_0_9_8_Distilled_FP8 / Ltx2_19B_Dist_FP8 / Ltx2_3_22B_Dist_INT8
  */
 
-import { Settings } from '../../../meta';
+import { Settings } from '../../../contract/meta';
 import { KeyService } from '../../KeyService';
 import { BaseProvider, AIServiceError } from './base';
 

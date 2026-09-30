@@ -1,188 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Dispatch, KeyboardEvent as ReactKeyboardEvent, SetStateAction } from 'react';
-import type {
-    AccessoryInstance,
-    ArmorInstance,
-    BaseDynamicState,
-    ConsumableInstance,
-    DataInstance,
-    EnemyTemplate,
-    EquipState,
-    InteractionNpcEntity,
-    ItemInstance,
-    NeuralLinkState,
-    Node,
-    PlayerState,
-    Puzzle,
-    Settings,
-    WeaponInstance,
-    Zone,
-} from '../meta';
-import type {
-    AttributeType,
-    ConsumableEffectType,
-    InteractionType,
-    LogType,
-    VitalType,
-} from '../meta';
-import {
-    addItemToInventory,
-    addUniqueItemToInventory,
-    applyAttributeUpdates,
-    applyEffectDeltas,
-    applyEffectDeltasWithSnapshot,
-    applyVitalUpdates,
-    buildCurrentLocation,
-    calculateEncounterChance,
-    calculatePerceptionScore,
-    calculateSearchCosts,
-    checkExitLock,
-    clamp,
-    clampDynamicVitals,
-    collectAccessoryEffects,
-    createItemInstance,
-    createNodeNpcEntity,
-    equipItem,
-    getAppliedAccessoryDeltas,
-    getEffectValueByType,
-    getNodeAmbushRate,
-    getNodeSpecificEnemies,
-    getNodeThreatLevel,
-    hasItemInInventory,
-    isAccessoryInstance,
-    isArmorInstance,
-    isAttributeType,
-    isConsumableInstance,
-    isDataInstance,
-    isEquipmentInstance,
-    isVitalType,
-    normalizeEquipState,
-    isWeaponInstance,
-    negateEffectDeltas,
-    normalizeEquipmentWithOverflow,
-    normalizeUnlockIds,
-    processItemDiscovery,
-    processStateChange,
-    reclaimOverflowEquipments,
-    removeItemFromInventory,
-    removeInteractionFromNode,
-    safeNumber,
-    stripEquipEffectSnapshot,
-    unequipItem,
-    writeEquipEffectSnapshot,
-} from '../meta';
-import type { EffectDeltas, GridSize } from '../meta';
-import { getBackpackGridSize, getItemGridFootprint, getItemGridSize } from '../meta';
+import { useCallback, useEffect, useMemo, useRef, useState, Dispatch, KeyboardEvent, SetStateAction } from 'react';
+import { EffectDeltas, InteractionNpcEntity, addItemToInventory, addUniqueItemToInventory, applyAttributeUpdates, applyEffectDeltas, applyEffectDeltasWithSnapshot, applyVitalUpdates, buildCurrentLocation, calculateEncounterChance, calculatePerceptionScore, calculateSearchCosts, checkExitLock, clamp, clampDynamicVitals, collectAccessoryEffects, createItemInstance, createNodeNpcEntity, equipItem, getAppliedAccessoryDeltas, getBackpackGridSize, getEffectValueByType, getItemGridFootprint, getItemGridSize, getNodeAmbushRate, getNodeSpecificEnemies, getNodeThreatLevel, hasItemInInventory, isAccessoryInstance, isArmorInstance, isAttributeType, isConsumableInstance, isDataInstance, isEquipmentInstance, isVitalType, isWeaponInstance, negateEffectDeltas, normalizeEquipState, normalizeEquipmentWithOverflow, normalizeUnlockIds, processItemDiscovery, processStateChange, reclaimOverflowEquipments, removeInteractionFromNode, removeItemFromInventory, safeNumber, stripEquipEffectSnapshot, unequipItem, writeEquipEffectSnapshot } from '../consts';
+import type { BattleStartContext, AccessoryInstance, ArmorInstance, BaseDynamicState, BaseItemTemplate, ConsumableInstance, DataInstance, EnemyTemplate, EquipState, ItemInstance, Node, PlayerState, Puzzle, Settings, WeaponInstance, Zone, AttributeType, InteractionType, LogType, ConsumableEffectApplication, EncounterCondition, EquipmentSlotType, GridBoard, GridLayoutResult, GridPlacement, GridPlacementMap, InventoryGridReturn, InventoryGridTile, PuzzleInteractionController, PuzzleRuntime } from '../contract';
 import { AiService, AudioService, PersistenceService } from '../services';
-import type { BattleStartContext } from '../meta';
-
-type PuzzleStatus = 'idle' | 'success' | 'error';
-type PuzzleStatusMsg = 'AWAITING_INPUT' | 'ACCESS_GRANTED' | 'ACCESS_DENIED' | 'TIME_EXPIRED';
-type EquipmentSlotType = 'weapon' | 'armor' | 'accessory';
-/** 遭遇裁定的触发渠道：进入节点（仅伏击节点）与搜查。 */
-type EncounterCondition = 'on_enter' | 'on_search';
-
-interface ConsumableEffectApplication {
-    attributeUpdates: Partial<Record<AttributeType, number>>;
-    vitalUpdates: Partial<Record<VitalType, number>>;
-    neuralLinkUpdates: Partial<Pick<NeuralLinkState, 'battery' | 'integrity'>>;
-    hpDelta: number;
-    sanityDelta: number;
-    staminaDelta: number;
-    vigorDelta: number;
-    effectsApplied: Array<{
-        type: ConsumableEffectType;
-        value: number;
-        duration?: number;
-    }>;
-}
-
-const applyConsumableEffects = (
-    item: ConsumableInstance,
-    player: PlayerState
-): ConsumableEffectApplication => {
-    const result: ConsumableEffectApplication = {
-        attributeUpdates: {},
-        vitalUpdates: {},
-        neuralLinkUpdates: {},
-        hpDelta: 0,
-        sanityDelta: 0,
-        staminaDelta: 0,
-        vigorDelta: 0,
-        effectsApplied: [],
-    };
-
-    if (!item.effects?.length) return result;
-
-    for (const effect of item.effects) {
-        const [effectType, rawValue, duration] = effect;
-        const value = Math.floor(safeNumber(rawValue));
-
-        result.effectsApplied.push({
-            type: effectType,
-            value,
-            duration,
-        });
-
-        switch (effectType) {
-            case 'hp':
-                result.hpDelta += value;
-                break;
-
-            case 'sanity':
-                result.sanityDelta += value;
-                break;
-
-            case 'stamina':
-                result.staminaDelta += value;
-                break;
-
-            case 'vigor':
-                result.vigorDelta += value;
-                break;
-
-            case 'battery': {
-                const currentBattery =
-                    result.neuralLinkUpdates.battery ?? safeNumber(player.neuralLink.battery);
-
-                result.neuralLinkUpdates.battery = clamp(
-                    currentBattery + value,
-                    0,
-                    safeNumber(player.neuralLink.maxBattery)
-                );
-                break;
-            }
-
-            case 'integrity': {
-                const currentIntegrity =
-                    result.neuralLinkUpdates.integrity ?? safeNumber(player.neuralLink.integrity);
-
-                result.neuralLinkUpdates.integrity = clamp(
-                    currentIntegrity + value,
-                    0,
-                    safeNumber(player.neuralLink.maxIntegrity)
-                );
-                break;
-            }
-
-            default: {
-                const effectKey = effectType as string;
-
-                if (isAttributeType(effectKey)) {
-                    result.attributeUpdates[effectKey] =
-                        safeNumber(result.attributeUpdates[effectKey] ?? 0) + value;
-                } else if (isVitalType(effectKey)) {
-                    result.vitalUpdates[effectKey] =
-                        safeNumber(result.vitalUpdates[effectKey] ?? 0) + value;
-                } else {
-                    console.warn(`[状态流转] 丢弃未知的消耗品效果指令: ${effectKey}`);
-                }
-            }
-        }
-    }
-
-    return result;
-};
 
 interface UseInteractionParams {
     currentZone: Zone;
@@ -230,518 +49,7 @@ interface UseInteractionReturn {
     loadingAudioId: string | null;
 }
 
-export interface PuzzleInteractionController {
-    input: string;
-    status: PuzzleStatus;
-    statusMsg: PuzzleStatusMsg;
-    attempts: number;
-    maxAttempts: number;
-    isShaking: boolean;
-    hintsUsed: number;
-    timeLeft: number;
-    showLore: boolean;
-    selectedOptions: number[];
-    patternInput: string[];
-    type: Puzzle['body']['type'] | null;
-    currentHints: string[];
-    handleInputChange: (val: string) => void;
-    handleOptionSelect: (index: number) => void;
-    handlePatternClick: (index: number) => void;
-    handleSubmit: () => void;
-    handleKeyDown: (e: ReactKeyboardEvent) => void;
-    handleUseHint: () => void;
-}
-
-interface PuzzleRuntime {
-    input: string;
-    status: PuzzleStatus;
-    statusMsg: PuzzleStatusMsg;
-    attempts: number;
-    isShaking: boolean;
-    hintsUsed: number;
-    timeLeft: number;
-    showLore: boolean;
-    selectedOptions: number[];
-    patternInput: string[];
-}
-
 const DEFAULT_MAX_PUZZLE_ATTEMPTS = 3;
-
-const normalizeAnswer = (value: unknown): string => String(value ?? '').trim().toLowerCase();
-
-const makeFallbackNode = (name: string, desc: string): Node =>
-    ({ name, desc, visualPrompt: desc, searchCount: 0, isVisited: false }) as Node;
-
-const createPuzzleRuntime = (puzzle: Puzzle | null, clozeCells: string[]): PuzzleRuntime => ({
-    input: '',
-    status: 'idle',
-    statusMsg: 'AWAITING_INPUT',
-    attempts: 0,
-    isShaking: false,
-    hintsUsed: 0,
-    timeLeft: puzzle?.restrictions?.timeLimit ?? 0,
-    showLore: false,
-    selectedOptions: [],
-    patternInput: puzzle?.body.type === 'cloze' ? clozeCells.map(String) : [],
-});
-
-/**
- * 装备槽位序列（主手 → 副手 / 护甲槽 / 饰品槽）。
- *
- * 槽位契约允许 weapons 为对象、armors / accessories 为单件或数组，
- * 这里统一走 normalizeEquipState，保证序号与 equipItem / unequipItem 的槽位语义一致。
- */
-const getEquipmentSlots = (
-    equipment: EquipState,
-    slotType: EquipmentSlotType
-): Array<WeaponInstance | ArmorInstance | AccessoryInstance | null> => {
-    const normalized = normalizeEquipState(equipment);
-    if (slotType === 'weapon') return [normalized.weapons.main, normalized.weapons.side];
-    if (slotType === 'armor') return normalized.armors;
-    return normalized.accessories;
-};
-
-//-------------------------------------------------------------------------
-// 背包网格（生化危机式格子仓储）
-//-------------------------------------------------------------------------
-
-/**
- * 网格落位
- *
- * 直接取自元契约 {@link BaseItemInstance.gridPlacement} 的内联结构，
- * 不另行定义第二套模型。
- */
-type GridPlacement = NonNullable<ItemInstance['gridPlacement']>;
-
-/** 落位表：instanceId → 落位 */
-type GridPlacementMap = Record<string, GridPlacement>;
-
-/** 单个待渲染的网格单元 */
-interface InventoryGridTile {
-    item: ItemInstance;
-    /** 锚点列坐标 */
-    x: number;
-    /** 锚点行坐标 */
-    y: number;
-    /** 实际占位宽度（含旋转态） */
-    width: number;
-    /** 实际占位高度（含旋转态） */
-    height: number;
-    rotated: boolean;
-}
-
-/** 占位板：以扁平数组记录每一格被哪个实例占用 */
-interface GridBoard {
-    cols: number;
-    rows: number;
-    cells: Array<string | null>;
-}
-
-const createGridBoard = ([cols, rows]: GridSize): GridBoard => ({
-    cols,
-    rows,
-    cells: new Array<string | null>(cols * rows).fill(null),
-});
-
-const canOccupyGrid = (
-    board: GridBoard,
-    [width, height]: GridSize,
-    x: number,
-    y: number
-): boolean => {
-    if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
-    if (x < 0 || y < 0) return false;
-    if (x + width > board.cols || y + height > board.rows) return false;
-
-    for (let row = y; row < y + height; row += 1) {
-        for (let col = x; col < x + width; col += 1) {
-            if (board.cells[row * board.cols + col] !== null) return false;
-        }
-    }
-
-    return true;
-};
-
-const occupyGrid = (
-    board: GridBoard,
-    [width, height]: GridSize,
-    x: number,
-    y: number,
-    owner: string
-): void => {
-    for (let row = y; row < y + height; row += 1) {
-        for (let col = x; col < x + width; col += 1) {
-            board.cells[row * board.cols + col] = owner;
-        }
-    }
-};
-
-/** 落位构造：非旋转态不写 rotated 字段，保持存档干净 */
-const toGridPlacement = (x: number, y: number, rotated: boolean): GridPlacement =>
-    rotated ? { x, y, rotated: true } : { x, y };
-
-/** 从左到右、从上到下找首个可容纳位；先试默认朝向，再试旋转态 */
-const findFirstGridFit = (
-    board: GridBoard,
-    footprint: GridSize
-): GridPlacement | null => {
-    const [width, height] = footprint;
-    const rotatedFootprint: GridSize = [height, width];
-    const canRotate = width !== height;
-
-    for (let y = 0; y < board.rows; y += 1) {
-        for (let x = 0; x < board.cols; x += 1) {
-            if (canOccupyGrid(board, footprint, x, y)) return { x, y };
-            if (canRotate && canOccupyGrid(board, rotatedFootprint, x, y)) {
-                return { x, y, rotated: true };
-            }
-        }
-    }
-
-    return null;
-};
-
-const putOnGridBoard = (
-    board: GridBoard,
-    item: ItemInstance,
-    placement: GridPlacement
-): boolean => {
-    const footprint = getItemGridFootprint(item, placement.rotated === true);
-    if (!canOccupyGrid(board, footprint, placement.x, placement.y)) return false;
-
-    occupyGrid(board, footprint, placement.x, placement.y, item.instanceId);
-    return true;
-};
-
-/** 按落位表重建占位板，可排除某个实例以试算它的新位置 */
-const buildGridBoard = (
-    inventory: ItemInstance[],
-    placements: GridPlacementMap,
-    size: GridSize,
-    excludeInstanceId?: string
-): GridBoard => {
-    const board = createGridBoard(size);
-
-    inventory.forEach((item) => {
-        if (item.instanceId === excludeInstanceId) return;
-
-        const placement = placements[item.instanceId];
-        if (!placement) return;
-
-        putOnGridBoard(board, item, placement);
-    });
-
-    return board;
-};
-
-interface GridLayoutResult {
-    placements: GridPlacementMap;
-    overflow: ItemInstance[];
-    usedCells: number;
-    totalCells: number;
-}
-
-/**
- * 求解背包布局
- *
- * 两轮扫描：先原地保留已持久化且仍然合法的落位（保证玩家的手动摆放稳定），
- * 再按背包顺序为其余物品补首个可容纳位；两轮都放不下的进溢出区。
- */
-const resolveGridPlacements = (
-    inventory: ItemInstance[],
-    size: GridSize
-): GridLayoutResult => {
-    const board = createGridBoard(size);
-    const placements: GridPlacementMap = {};
-    const overflow: ItemInstance[] = [];
-    const pending: ItemInstance[] = [];
-
-    inventory.forEach((item) => {
-        const stored = item.gridPlacement;
-
-        if (stored && !placements[item.instanceId] && putOnGridBoard(board, item, stored)) {
-            placements[item.instanceId] = toGridPlacement(
-                stored.x,
-                stored.y,
-                stored.rotated === true
-            );
-            return;
-        }
-
-        pending.push(item);
-    });
-
-    pending.forEach((item) => {
-        const fit = findFirstGridFit(board, getItemGridSize(item));
-
-        if (fit && putOnGridBoard(board, item, fit)) {
-            placements[item.instanceId] = fit;
-            return;
-        }
-
-        overflow.push(item);
-    });
-
-    const usedCells = board.cells.reduce<number>(
-        (count, owner) => (owner === null ? count : count + 1),
-        0
-    );
-
-    return { placements, overflow, usedCells, totalCells: size[0] * size[1] };
-};
-
-/** 把落位写回物品实例；无变化的实例原样返回，避免无谓的对象重建 */
-const applyGridPlacements = (
-    inventory: ItemInstance[],
-    placements: GridPlacementMap
-): ItemInstance[] => {
-    let changed = false;
-
-    const next = inventory.map((item) => {
-        const placement = placements[item.instanceId];
-        const current = item.gridPlacement;
-
-        if (!placement) {
-            if (!current) return item;
-
-            changed = true;
-            const { gridPlacement: _dropped, ...rest } = item;
-            return rest as ItemInstance;
-        }
-
-        const same =
-            current !== undefined &&
-            current.x === placement.x &&
-            current.y === placement.y &&
-            (current.rotated === true) === (placement.rotated === true);
-
-        if (same) return item;
-
-        changed = true;
-        return {
-            ...item,
-            gridPlacement: toGridPlacement(
-                placement.x,
-                placement.y,
-                placement.rotated === true
-            ),
-        };
-    });
-
-    return changed ? next : inventory;
-};
-
-/** 试算拖拽：返回新的落位表，不可放置时返回 null */
-const tryMoveGrid = (
-    inventory: ItemInstance[],
-    placements: GridPlacementMap,
-    size: GridSize,
-    instanceId: string,
-    x: number,
-    y: number
-): GridPlacementMap | null => {
-    const item = inventory.find((entry) => entry.instanceId === instanceId);
-    if (!item) return null;
-
-    const rotated = placements[instanceId]?.rotated === true;
-    const board = buildGridBoard(inventory, placements, size, instanceId);
-
-    if (!canOccupyGrid(board, getItemGridFootprint(item, rotated), x, y)) return null;
-
-    return { ...placements, [instanceId]: toGridPlacement(x, y, rotated) };
-};
-
-/** 试算旋转：原位放不下时按就近顺序微调锚点，全落空则返回 null */
-const tryRotateGrid = (
-    inventory: ItemInstance[],
-    placements: GridPlacementMap,
-    size: GridSize,
-    instanceId: string
-): GridPlacementMap | null => {
-    const item = inventory.find((entry) => entry.instanceId === instanceId);
-    const current = placements[instanceId];
-    if (!item || !current) return null;
-
-    const nextRotated = current.rotated !== true;
-    const board = buildGridBoard(inventory, placements, size, instanceId);
-    const footprint = getItemGridFootprint(item, nextRotated);
-
-    const anchors: Array<[number, number]> = [
-        [current.x, current.y],
-        [current.x - 1, current.y],
-        [current.x, current.y - 1],
-        [current.x - 1, current.y - 1],
-        [current.x + 1, current.y],
-        [current.x, current.y + 1],
-    ];
-
-    for (const [x, y] of anchors) {
-        if (!canOccupyGrid(board, footprint, x, y)) continue;
-        return { ...placements, [instanceId]: toGridPlacement(x, y, nextRotated) };
-    }
-
-    return null;
-};
-
-/** 自动整理：占地降序的贪心装箱，让长武器与大件先占住完整空间 */
-const arrangeGridPlacements = (
-    inventory: ItemInstance[],
-    size: GridSize
-): GridPlacementMap => {
-    const board = createGridBoard(size);
-    const placements: GridPlacementMap = {};
-
-    const ordered = inventory
-        .map((item, index) => ({ item, index, footprint: getItemGridSize(item) }))
-        .sort((a, b) => {
-            const areaDiff =
-                b.footprint[0] * b.footprint[1] - a.footprint[0] * a.footprint[1];
-            if (areaDiff !== 0) return areaDiff;
-
-            const longDiff = Math.max(...b.footprint) - Math.max(...a.footprint);
-            if (longDiff !== 0) return longDiff;
-
-            return a.index - b.index;
-        });
-
-    ordered.forEach(({ item }) => {
-        const fit = findFirstGridFit(board, getItemGridSize(item));
-        if (!fit || !putOnGridBoard(board, item, fit)) return;
-
-        placements[item.instanceId] = fit;
-    });
-
-    return placements;
-};
-
-/**
- * 判定物品能否被当前背包容纳
- *
- * 可堆叠物品（消耗品 / 材料）命中同源堆叠时不占新空间，直接视为可容纳；
- * 其余情况按当前布局试放一次。供仓库取出等交付类操作预检。
- */
-const canFitGridItem = (
-    inventory: ItemInstance[],
-    placements: GridPlacementMap,
-    size: GridSize,
-    item: ItemInstance
-): boolean => {
-    const stackable = item.type === 'consumable' || item.type === 'material';
-    const merged =
-        stackable &&
-        inventory.some((entry) => entry.id === item.id && entry.type === item.type);
-
-    if (merged) return true;
-
-    return findFirstGridFit(buildGridBoard(inventory, placements, size), getItemGridSize(item)) !== null;
-};
-
-/** 背包网格对外契约（由 useInteraction 出参透出，视图层只消费） */
-interface InventoryGridReturn {
-    /** 背包网格尺寸（列 × 行），随力量成长 */
-    size: GridSize;
-    /** 待渲染的网格单元 */
-    tiles: InventoryGridTile[];
-    /** 网格容纳不下的物品 */
-    overflow: ItemInstance[];
-    /** 已占用格数 */
-    usedCells: number;
-    /** 网格总格数 */
-    totalCells: number;
-    /** 拖拽落位；不可放置时返回 false，视图据此弹回 */
-    moveItem: (instanceId: string, x: number, y: number) => boolean;
-    /** 落位预检：仅试算不写入，供拖拽过程中的合法性高亮使用 */
-    canPlace: (instanceId: string, x: number, y: number) => boolean;
-    /** 收纳预检：该物品能否放进当前背包网格，供仓库取出等交付操作使用 */
-    canFit: (item: ItemInstance) => boolean;
-    /** 旋转物品；放不下时返回 false */
-    rotateItem: (instanceId: string) => boolean;
-    /** 自动整理 */
-    autoArrange: () => void;
-}
-
-const patchZoneNode = (zone: Zone, nodeId: string, updater: (node: Node) => Node): Zone => {
-    const node = zone.nodes[nodeId];
-    if (!node) return zone;
-    return { ...zone, nodes: { ...zone.nodes, [nodeId]: updater(node) } };
-};
-
-const unlockZoneNode = (zone: Zone, nodeId: string): Zone =>
-    patchZoneNode(zone, nodeId, (node) => {
-        const next: Node = { ...node };
-        delete next.lock;
-        return next;
-    });
-
-const lockZoneNode = (zone: Zone, nodeId: string, reason: string): Zone =>
-    patchZoneNode(zone, nodeId, (node) => ({ ...node, lock: reason }));
-
-async function loadNodeMediaResources(
-    zoneId: string,
-    nodeId: string
-): Promise<{ videoUrl?: string; imageUrl?: string }> {
-    if (!PersistenceService.isReady) return {};
-    const result: { videoUrl?: string; imageUrl?: string } = {};
-    try {
-        const videos = await PersistenceService.listVideos(zoneId, nodeId);
-        const videoFiles = videos.filter((fileName) => /^\d+\.mp4$/i.test(fileName));
-        if (videoFiles.length > 0) {
-            const maxIdx = videoFiles.reduce((max, fileName) => {
-                const matched = fileName.match(/^(\d+)\.mp4$/i);
-                const idx = matched ? parseInt(matched[1], 10) : 0;
-                return Math.max(max, idx);
-            }, 0);
-            const path = await PersistenceService.getVideoPath(zoneId, nodeId, String(maxIdx));
-            if (path) result.videoUrl = path;
-        }
-        const images = await PersistenceService.listImages(zoneId, nodeId);
-        if (images.length > 0) {
-            const latestImage = [...images].sort().pop();
-            if (latestImage) {
-                const baseName = latestImage.replace(/\.[^/.]+$/, '');
-                const data = await PersistenceService.loadImage(zoneId, nodeId, baseName);
-                if (data) result.imageUrl = data;
-            }
-        }
-    } catch (error) {
-        console.warn(`节点媒体加载故障 [${zoneId}/${nodeId}]:`, error);
-    }
-    return result;
-}
-
-async function handleAudioItem(
-    item: DataInstance,
-    zone: Zone,
-    settings: Settings,
-    addLog: (text: string, type: LogType) => void,
-    nodeId: string
-): Promise<DataInstance> {
-    if (item.audioUrl) {
-        addLog(`播放音频实体轨: ${item.name}`, 'command');
-        AudioService.playPCM(item.audioUrl);
-        return item;
-    }
-    if (!item.audioScript) {
-        addLog(`数据损坏: ${item.name} 无法解析。`, 'warning');
-        return item;
-    }
-    addLog(`解析音频轨道: ${item.name}...`, 'command');
-    addLog('启动神经解码流...', 'ai-gen');
-    try {
-        const url = await AiService.generateSpeech(settings, item.audioScript, {
-            zoneId: zone.id,
-            nodeId,
-        });
-        if (url) {
-            AudioService.playPCM(url);
-            return { ...item, audioUrl: url };
-        }
-    } catch (error) {
-        console.error('音频重建协议失败:', error);
-    }
-    addLog('音频重建异常终止。', 'warning');
-    return item;
-}
 
 export const useInteraction = ({
     currentZone,
@@ -760,6 +68,515 @@ export const useInteraction = ({
     settings,
     updateCompanion,
 }: UseInteractionParams): UseInteractionReturn => {
+    // ==========================================================================
+    // 内部工具函数（原置于钩子体外，因仅供本钩子使用而内联）
+    // ==========================================================================
+
+    /** 逐条解析消耗品效果，归并成属性 / 生命体征 / 神经链接三类增量。 */
+    const applyConsumableEffects = (
+        item: ConsumableInstance,
+        player: PlayerState
+    ): ConsumableEffectApplication => {
+        const result: ConsumableEffectApplication = {
+            attributeUpdates: {},
+            vitalUpdates: {},
+            neuralLinkUpdates: {},
+            hpDelta: 0,
+            sanityDelta: 0,
+            staminaDelta: 0,
+            vigorDelta: 0,
+            effectsApplied: [],
+        };
+
+        if (!item.effects?.length) return result;
+
+        for (const effect of item.effects) {
+            const [effectType, rawValue, duration] = effect;
+            const value = Math.floor(safeNumber(rawValue));
+
+            result.effectsApplied.push({
+                type: effectType,
+                value,
+                duration,
+            });
+
+            switch (effectType) {
+                case 'hp':
+                    result.hpDelta += value;
+                    break;
+
+                case 'sanity':
+                    result.sanityDelta += value;
+                    break;
+
+                case 'stamina':
+                    result.staminaDelta += value;
+                    break;
+
+                case 'vigor':
+                    result.vigorDelta += value;
+                    break;
+
+                case 'battery': {
+                    const currentBattery =
+                        result.neuralLinkUpdates.battery ?? safeNumber(player.neuralLink.battery);
+
+                    result.neuralLinkUpdates.battery = clamp(
+                        currentBattery + value,
+                        0,
+                        safeNumber(player.neuralLink.maxBattery)
+                    );
+                    break;
+                }
+
+                case 'integrity': {
+                    const currentIntegrity =
+                        result.neuralLinkUpdates.integrity ?? safeNumber(player.neuralLink.integrity);
+
+                    result.neuralLinkUpdates.integrity = clamp(
+                        currentIntegrity + value,
+                        0,
+                        safeNumber(player.neuralLink.maxIntegrity)
+                    );
+                    break;
+                }
+
+                default: {
+                    const effectKey = effectType as string;
+
+                    if (isAttributeType(effectKey)) {
+                        result.attributeUpdates[effectKey] =
+                            safeNumber(result.attributeUpdates[effectKey] ?? 0) + value;
+                    } else if (isVitalType(effectKey)) {
+                        result.vitalUpdates[effectKey] =
+                            safeNumber(result.vitalUpdates[effectKey] ?? 0) + value;
+                    } else {
+                        console.warn(`[状态流转] 丢弃未知的消耗品效果指令: ${effectKey}`);
+                    }
+                }
+            }
+        }
+
+        return result;
+    };
+
+    const normalizeAnswer = (value: unknown): string => String(value ?? '').trim().toLowerCase();
+
+    const makeFallbackNode = (name: string, desc: string): Node =>
+        ({ name, desc, visualPrompt: desc, searchCount: 0, isVisited: false }) as Node;
+
+    const createPuzzleRuntime = (puzzle: Puzzle | null, clozeCells: string[]): PuzzleRuntime => ({
+        input: '',
+        status: 'idle',
+        statusMsg: 'AWAITING_INPUT',
+        attempts: 0,
+        isShaking: false,
+        hintsUsed: 0,
+        timeLeft: puzzle?.restrictions?.timeLimit ?? 0,
+        showLore: false,
+        selectedOptions: [],
+        patternInput: puzzle?.body.type === 'cloze' ? clozeCells.map(String) : [],
+    });
+
+    /**
+     * 装备槽位序列（主手 → 副手 / 护甲槽 / 饰品槽）。
+     *
+     * 槽位契约允许 weapons 为对象、armors / accessories 为单件或数组，
+     * 这里统一走 normalizeEquipState，保证序号与 equipItem / unequipItem 的槽位语义一致。
+     */
+    const getEquipmentSlots = (
+        equipment: EquipState,
+        slotType: EquipmentSlotType
+    ): Array<WeaponInstance | ArmorInstance | AccessoryInstance | null> => {
+        const normalized = normalizeEquipState(equipment);
+        if (slotType === 'weapon') return [normalized.weapons.main, normalized.weapons.side];
+        if (slotType === 'armor') return normalized.armors;
+        return normalized.accessories;
+    };
+
+    // --------------------------------------------------------------------------
+    // 背包网格（生化危机式格子仓储）内部工具
+    // --------------------------------------------------------------------------
+
+    const createGridBoard = ([cols, rows]: BaseItemTemplate['size']): GridBoard => ({
+        cols,
+        rows,
+        cells: new Array<string | null>(cols * rows).fill(null),
+    });
+
+    const canOccupyGrid = (
+        board: GridBoard,
+        [width, height]: BaseItemTemplate['size'],
+        x: number,
+        y: number
+    ): boolean => {
+        if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
+        if (x < 0 || y < 0) return false;
+        if (x + width > board.cols || y + height > board.rows) return false;
+
+        for (let row = y; row < y + height; row += 1) {
+            for (let col = x; col < x + width; col += 1) {
+                if (board.cells[row * board.cols + col] !== null) return false;
+            }
+        }
+
+        return true;
+    };
+
+    const occupyGrid = (
+        board: GridBoard,
+        [width, height]: BaseItemTemplate['size'],
+        x: number,
+        y: number,
+        owner: string
+    ): void => {
+        for (let row = y; row < y + height; row += 1) {
+            for (let col = x; col < x + width; col += 1) {
+                board.cells[row * board.cols + col] = owner;
+            }
+        }
+    };
+
+    /** 落位构造：非旋转态不写 rotated 字段，保持存档干净。 */
+    const toGridPlacement = (x: number, y: number, rotated: boolean): GridPlacement =>
+        rotated ? { x, y, rotated: true } : { x, y };
+
+    /** 从左到右、从上到下找首个可容纳位；先试默认朝向，再试旋转态。 */
+    const findFirstGridFit = (
+        board: GridBoard,
+        footprint: BaseItemTemplate['size']
+    ): GridPlacement | null => {
+        const [width, height] = footprint;
+        const rotatedFootprint: BaseItemTemplate['size'] = [height, width];
+        const canRotate = width !== height;
+
+        for (let y = 0; y < board.rows; y += 1) {
+            for (let x = 0; x < board.cols; x += 1) {
+                if (canOccupyGrid(board, footprint, x, y)) return { x, y };
+                if (canRotate && canOccupyGrid(board, rotatedFootprint, x, y)) {
+                    return { x, y, rotated: true };
+                }
+            }
+        }
+
+        return null;
+    };
+
+    const putOnGridBoard = (
+        board: GridBoard,
+        item: ItemInstance,
+        placement: GridPlacement
+    ): boolean => {
+        const footprint = getItemGridFootprint(item, placement.rotated === true);
+        if (!canOccupyGrid(board, footprint, placement.x, placement.y)) return false;
+
+        occupyGrid(board, footprint, placement.x, placement.y, item.instanceId);
+        return true;
+    };
+
+    /** 按落位表重建占位板，可排除某个实例以试算它的新位置。 */
+    const buildGridBoard = (
+        inventory: ItemInstance[],
+        placements: GridPlacementMap,
+        size: BaseItemTemplate['size'],
+        excludeInstanceId?: string
+    ): GridBoard => {
+        const board = createGridBoard(size);
+
+        inventory.forEach((item) => {
+            if (item.instanceId === excludeInstanceId) return;
+
+            const placement = placements[item.instanceId];
+            if (!placement) return;
+
+            putOnGridBoard(board, item, placement);
+        });
+
+        return board;
+    };
+
+    /**
+     * 求解背包布局
+     *
+     * 两轮扫描：先原地保留已持久化且仍然合法的落位（保证玩家的手动摆放稳定），
+     * 再按背包顺序为其余物品补首个可容纳位；两轮都放不下的进溢出区。
+     */
+    const resolveGridPlacements = (
+        inventory: ItemInstance[],
+        size: BaseItemTemplate['size']
+    ): GridLayoutResult => {
+        const board = createGridBoard(size);
+        const placements: GridPlacementMap = {};
+        const overflow: ItemInstance[] = [];
+        const pending: ItemInstance[] = [];
+
+        inventory.forEach((item) => {
+            const stored = item.gridPlacement;
+
+            if (stored && !placements[item.instanceId] && putOnGridBoard(board, item, stored)) {
+                placements[item.instanceId] = toGridPlacement(
+                    stored.x,
+                    stored.y,
+                    stored.rotated === true
+                );
+                return;
+            }
+
+            pending.push(item);
+        });
+
+        pending.forEach((item) => {
+            const fit = findFirstGridFit(board, getItemGridSize(item));
+
+            if (fit && putOnGridBoard(board, item, fit)) {
+                placements[item.instanceId] = fit;
+                return;
+            }
+
+            overflow.push(item);
+        });
+
+        const usedCells = board.cells.reduce<number>(
+            (count, owner) => (owner === null ? count : count + 1),
+            0
+        );
+
+        return { placements, overflow, usedCells, totalCells: size[0] * size[1] };
+    };
+
+    /** 把落位写回物品实例；无变化的实例原样返回，避免无谓的对象重建。 */
+    const applyGridPlacements = (
+        inventory: ItemInstance[],
+        placements: GridPlacementMap
+    ): ItemInstance[] => {
+        let changed = false;
+
+        const next = inventory.map((item) => {
+            const placement = placements[item.instanceId];
+            const current = item.gridPlacement;
+
+            if (!placement) {
+                if (!current) return item;
+
+                changed = true;
+                const { gridPlacement: _dropped, ...rest } = item;
+                return rest as ItemInstance;
+            }
+
+            const same =
+                current !== undefined &&
+                current.x === placement.x &&
+                current.y === placement.y &&
+                (current.rotated === true) === (placement.rotated === true);
+
+            if (same) return item;
+
+            changed = true;
+            return {
+                ...item,
+                gridPlacement: toGridPlacement(
+                    placement.x,
+                    placement.y,
+                    placement.rotated === true
+                ),
+            };
+        });
+
+        return changed ? next : inventory;
+    };
+
+    /** 试算拖拽：返回新的落位表，不可放置时返回 null。 */
+    const tryMoveGrid = (
+        inventory: ItemInstance[],
+        placements: GridPlacementMap,
+        size: BaseItemTemplate['size'],
+        instanceId: string,
+        x: number,
+        y: number
+    ): GridPlacementMap | null => {
+        const item = inventory.find((entry) => entry.instanceId === instanceId);
+        if (!item) return null;
+
+        const rotated = placements[instanceId]?.rotated === true;
+        const board = buildGridBoard(inventory, placements, size, instanceId);
+
+        if (!canOccupyGrid(board, getItemGridFootprint(item, rotated), x, y)) return null;
+
+        return { ...placements, [instanceId]: toGridPlacement(x, y, rotated) };
+    };
+
+    /** 试算旋转：原位放不下时按就近顺序微调锚点，全落空则返回 null。 */
+    const tryRotateGrid = (
+        inventory: ItemInstance[],
+        placements: GridPlacementMap,
+        size: BaseItemTemplate['size'],
+        instanceId: string
+    ): GridPlacementMap | null => {
+        const item = inventory.find((entry) => entry.instanceId === instanceId);
+        const current = placements[instanceId];
+        if (!item || !current) return null;
+
+        const nextRotated = current.rotated !== true;
+        const board = buildGridBoard(inventory, placements, size, instanceId);
+        const footprint = getItemGridFootprint(item, nextRotated);
+
+        const anchors: Array<[number, number]> = [
+            [current.x, current.y],
+            [current.x - 1, current.y],
+            [current.x, current.y - 1],
+            [current.x - 1, current.y - 1],
+            [current.x + 1, current.y],
+            [current.x, current.y + 1],
+        ];
+
+        for (const [x, y] of anchors) {
+            if (!canOccupyGrid(board, footprint, x, y)) continue;
+            return { ...placements, [instanceId]: toGridPlacement(x, y, nextRotated) };
+        }
+
+        return null;
+    };
+
+    /** 自动整理：占地降序的贪心装箱，让长武器与大件先占住完整空间。 */
+    const arrangeGridPlacements = (
+        inventory: ItemInstance[],
+        size: BaseItemTemplate['size']
+    ): GridPlacementMap => {
+        const board = createGridBoard(size);
+        const placements: GridPlacementMap = {};
+
+        const ordered = inventory
+            .map((item, index) => ({ item, index, footprint: getItemGridSize(item) }))
+            .sort((a, b) => {
+                const areaDiff =
+                    b.footprint[0] * b.footprint[1] - a.footprint[0] * a.footprint[1];
+                if (areaDiff !== 0) return areaDiff;
+
+                const longDiff = Math.max(...b.footprint) - Math.max(...a.footprint);
+                if (longDiff !== 0) return longDiff;
+
+                return a.index - b.index;
+            });
+
+        ordered.forEach(({ item }) => {
+            const fit = findFirstGridFit(board, getItemGridSize(item));
+            if (!fit || !putOnGridBoard(board, item, fit)) return;
+
+            placements[item.instanceId] = fit;
+        });
+
+        return placements;
+    };
+
+    /**
+     * 判定物品能否被当前背包容纳
+     *
+     * 可堆叠物品（消耗品 / 材料）命中同源堆叠时不占新空间，直接视为可容纳；
+     * 其余情况按当前布局试放一次。供仓库取出等交付类操作预检。
+     */
+    const canFitGridItem = (
+        inventory: ItemInstance[],
+        placements: GridPlacementMap,
+        size: BaseItemTemplate['size'],
+        item: ItemInstance
+    ): boolean => {
+        const stackable = item.type === 'consumable' || item.type === 'material';
+        const merged =
+            stackable &&
+            inventory.some((entry) => entry.id === item.id && entry.type === item.type);
+
+        if (merged) return true;
+
+        return findFirstGridFit(buildGridBoard(inventory, placements, size), getItemGridSize(item)) !== null;
+    };
+
+    // --------------------------------------------------------------------------
+    // 节点补丁与节点媒体 / 音频
+    // --------------------------------------------------------------------------
+
+    const patchZoneNode = (zone: Zone, nodeId: string, updater: (node: Node) => Node): Zone => {
+        const node = zone.nodes[nodeId];
+        if (!node) return zone;
+        return { ...zone, nodes: { ...zone.nodes, [nodeId]: updater(node) } };
+    };
+
+    const unlockZoneNode = (zone: Zone, nodeId: string): Zone =>
+        patchZoneNode(zone, nodeId, (node) => {
+            const next: Node = { ...node };
+            delete next.lock;
+            return next;
+        });
+
+    const lockZoneNode = (zone: Zone, nodeId: string, reason: string): Zone =>
+        patchZoneNode(zone, nodeId, (node) => ({ ...node, lock: reason }));
+
+    const loadNodeMediaResources = async (
+        zoneId: string,
+        nodeId: string
+    ): Promise<{ videoUrl?: string; imageUrl?: string }> => {
+        if (!PersistenceService.isReady) return {};
+        const result: { videoUrl?: string; imageUrl?: string } = {};
+        try {
+            const videos = await PersistenceService.listVideos(zoneId, nodeId);
+            const videoFiles = videos.filter((fileName) => /^\d+\.mp4$/i.test(fileName));
+            if (videoFiles.length > 0) {
+                const maxIdx = videoFiles.reduce((max, fileName) => {
+                    const matched = fileName.match(/^(\d+)\.mp4$/i);
+                    const idx = matched ? parseInt(matched[1], 10) : 0;
+                    return Math.max(max, idx);
+                }, 0);
+                const path = await PersistenceService.getVideoPath(zoneId, nodeId, String(maxIdx));
+                if (path) result.videoUrl = path;
+            }
+            const images = await PersistenceService.listImages(zoneId, nodeId);
+            if (images.length > 0) {
+                const latestImage = [...images].sort().pop();
+                if (latestImage) {
+                    const baseName = latestImage.replace(/\.[^/.]+$/, '');
+                    const data = await PersistenceService.loadImage(zoneId, nodeId, baseName);
+                    if (data) result.imageUrl = data;
+                }
+            }
+        } catch (error) {
+            console.warn(`节点媒体加载故障 [${zoneId}/${nodeId}]:`, error);
+        }
+        return result;
+    };
+
+    const handleAudioItem = async (
+        item: DataInstance,
+        zone: Zone,
+        settings: Settings,
+        addLog: (text: string, type: LogType) => void,
+        nodeId: string
+    ): Promise<DataInstance> => {
+        if (item.audioUrl) {
+            addLog(`播放音频实体轨: ${item.name}`, 'command');
+            AudioService.playPCM(item.audioUrl);
+            return item;
+        }
+        if (!item.audioScript) {
+            addLog(`数据损坏: ${item.name} 无法解析。`, 'warning');
+            return item;
+        }
+        addLog(`解析音频轨道: ${item.name}...`, 'command');
+        addLog('启动神经解码流...', 'ai-gen');
+        try {
+            const url = await AiService.generateSpeech(settings, item.audioScript, {
+                zoneId: zone.id,
+                nodeId,
+            });
+            if (url) {
+                AudioService.playPCM(url);
+                return { ...item, audioUrl: url };
+            }
+        } catch (error) {
+            console.error('音频重建协议失败:', error);
+        }
+        addLog('音频重建异常终止。', 'warning');
+        return item;
+    };
+
     const [activePuzzleNodeId, setActivePuzzleNodeId] = useState<string | null>(null);
     const [activePuzzleInteractionIndex, setActivePuzzleInteractionIndex] = useState<number | null>(null);
     const [puzzleStats, setPuzzleStats] = useState({ solved: 0, failed: 0, hints: 0 });
@@ -1686,7 +1503,7 @@ export const useInteraction = ({
     }, [activePuzzleNodeId, puzzleRuntime.status, addLog, clearPuzzleTimers]);
 
     const handlePuzzleKeyDown = useCallback(
-        (e: ReactKeyboardEvent) => {
+        (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 closePuzzle();
                 return;

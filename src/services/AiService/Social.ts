@@ -10,30 +10,10 @@
  * - 所有枚举、字段、任务结构都必须符合 type.ts / interface.copy.ts。
  */
 
-import type {
-    Settings,
-    QuestTemplate,
-    InteractionDialogueContext,
-    InteractionNpcEntity,
-    Dialogue,
-    PlayerTemplate,
-    PlayerDynamicState,
-    Mood,
-    Entity,
-    Words,
-    PlayerWordsTag,
-    NpcWordsTag,
-    Location,
-    ItemTemplate,
-    AccessoryEffectType,
-    ConsumableEffectType,
-    CombatStyle,
-    MemorySummaries,
-    WeaponType,
-    WeaponDamageType
-} from '../../meta';
-import { getRelationScore, normalizeEquipState } from '../../meta';
-import type { CompanionTemplate, NodeNpcTemplate } from '../../meta';
+import { InteractionDialogueContext, InteractionNpcEntity, getRelationScore, normalizeEquipState } from '../../consts';
+import type { AccessoryEffectType, CombatStyle, ConsumableEffectType, Dialogue, Entity, ItemTemplate, Location, MemorySummaries, Mood, NpcWordsTag, PlayerDynamicState, PlayerTemplate, PlayerWordsTag, QuestTemplate, Settings, WeaponDamageType, WeaponType, Words } from '../../contract/meta';
+;
+import type { CompanionTemplate, NodeNpcTemplate } from '../../contract/meta';
 import { SocializationService } from '../SocializationService';
 import { getSeverity, HP_STATE, SANITY_STATE } from '../../constants';
 import { callAi } from './providers';
@@ -528,7 +508,8 @@ const normalizeItemSize = (
     return type ? ITEM_DEFAULT_SIZE[type] : [1, 1];
 };
 
-const normalizeAccessoryEffects = (raw: unknown): Array<[AccessoryEffectType, number]> => {    if (!Array.isArray(raw)) return [];
+const normalizeAccessoryEffects = (raw: unknown): Array<[AccessoryEffectType, number]> => {
+    if (!Array.isArray(raw)) return [];
 
     return raw.reduce<Array<[AccessoryEffectType, number]>>((acc, entry) => {
         let type: string | undefined;

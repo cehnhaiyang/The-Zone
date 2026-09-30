@@ -1,4 +1,4 @@
-import type { BattleMap, Cover } from '../../meta';
+import type { BattleMap, Cover } from '../../contract/meta';
 /**
  * 烛火书斋 · 全域战场地图集
  * 覆盖所有 isDangerous 节点

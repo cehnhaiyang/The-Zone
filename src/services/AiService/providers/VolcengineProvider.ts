@@ -8,7 +8,7 @@
  * - deepseek-v4-flash-ga-260731 命中思考模型清单，自动注入 thinking 参数。
  */
 
-import type { Settings, ApiPlatform } from '../../../meta';
+import type { ApiPlatform, Settings } from '../../../contract/meta';
 import { BaseProvider } from './base';
 import type { TextGenParams } from './base';
 import { injectThinkParams } from './think';

@@ -1,10 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-    DotSoundType,
-    ModelCategory,
-    Settings,
-    ShortSoundType, safeDeepClone
-} from '../meta';
+import { safeDeepClone } from '../consts';
+import { DotSoundType, ModelCategory, Settings, ShortSoundType } from '../contract';
 import { MODEL_PROVIDER, MODEL_REGISTRY } from '../constants/config';
 import { AudioService, KeyService, PersistenceService } from '../services';
 import type { PlatformHealthSnapshot } from '../services/KeyService';
@@ -217,6 +213,13 @@ interface SettingsPanelProps {
     onUpdate: (newSettings: Settings) => void;
     onClose: () => void;
     isFullscreen?: boolean;
+    /**
+     * 嵌入式渲染。
+     *
+     * 为 true 时不再自建 fixed 全屏遮罩与背景特效，改由宿主容器约束尺寸
+     * （神经链接仪将其作为装置内可切换页面挂载）。
+     */
+    embedded?: boolean;
     onSaveGame?: (saveName?: string) => Promise<string | null>;
     onLoadGame?: (fileName: string) => Promise<boolean>;
     onListSaves?: () => Promise<Array<{ name: string; size: number; modified: string }>>;
@@ -230,7 +233,7 @@ type MixParams = ReturnType<typeof AudioService.getMixParams>;
 interface SliderDef { label: string; k: string; min: number; max: number; step: number; }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
-    settings, onUpdate, onClose, isFullscreen = false,
+    settings, onUpdate, onClose, isFullscreen = false, embedded = false,
     onSaveGame, onLoadGame, onListSaves, onDeleteSave,
 }) => {
     const fileSystemReady = PersistenceService.isReady;
@@ -821,13 +824,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     );
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-950/80 backdrop-blur-xl">
-            {/* 环境光晕特效 */}
-            <div className="absolute inset-0 pointer-events-none z-0 opacity-20 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
-            <div className="absolute inset-0 pointer-events-none z-0 radial-gradient-vignette opacity-80" />
+        <div className={embedded
+            ? 'relative w-full h-full flex items-center justify-center'
+            : 'fixed inset-0 z-[100] flex items-center justify-center bg-zinc-950/80 backdrop-blur-xl'}>
+            {/* 环境光晕特效（嵌入式由宿主提供背景，故不再重复铺设） */}
+            {!embedded && (
+                <>
+                    <div className="absolute inset-0 pointer-events-none z-0 opacity-20 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
+                    <div className="absolute inset-0 pointer-events-none z-0 radial-gradient-vignette opacity-80" />
+                </>
+            )}
 
             {/* 面板主体 */}
-            <div className={`relative flex flex-col bg-zinc-950/90 border border-zinc-800 shadow-[0_0_80px_rgba(16,185,129,0.05)] overflow-hidden ${isFullscreen ? 'w-full h-full' : 'w-full max-w-6xl h-[88vh] m-4 rounded-sm'}`}>
+            <div className={`relative flex flex-col bg-zinc-950/90 border border-zinc-800 shadow-[0_0_80px_rgba(16,185,129,0.05)] overflow-hidden ${embedded || isFullscreen ? 'w-full h-full' : 'w-full max-w-6xl h-[88vh] m-4 rounded-sm'}`}>
                 <CornerAccents />
 
                 {/* 顶部消息提示 (Toast) */}

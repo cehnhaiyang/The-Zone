@@ -18,7 +18,7 @@
  * @see ../interface.ts
  */
 
-import type { ThemeType } from '../../meta'
+import type { ThemeType } from '../../contract/meta';
 import type { NoiseColor } from './tools'
 import {
     SCALES,

@@ -13,38 +13,9 @@
  * - 阶段判定只由本文件的两张阶段表驱动，UI、Hook 与 Prompt 一律消费同一份结果。
  * - 尽量返回不可变结果，便于 React 状态更新。
  */
-import type {
-    Affinity,
-    AffinityPhase,
-    Dialogue,
-    InteractionNpcDynamic,
-    InteractionNpcEntity,
-    ItemGrade,
-    MemoryPyramid,
-    MemorySummaries,
-    MemorySummaries_α,
-    MemorySummaries_β,
-    MemorySummaries_γ,
-    MemorySummaries_δ,
-    NodeNpcDynamicState,
-    NpcDynamicState,
-    RelationAxis,
-    _Relationship,
-    Settings,
-    Trust,
-    TrustPhase,
-    Words,
-    PlayerWordsTag,
-    NpcWordsTag,
-    ZoneDate,
-    _Array
-} from '../meta';
-import {
-    getRelationAxis,
-    getRelationScore,
-    safeNumber,
-    withRelationScore
-} from '../meta';
+import { InteractionNpcDynamic, InteractionNpcEntity, RelationAxis, getRelationAxis, getRelationScore, safeNumber, withRelationScore } from '../consts';
+import type { Affinity, AffinityPhase, Dialogue, ItemGrade, MemoryPyramid, MemorySummaries, MemorySummaries_α, MemorySummaries_β, MemorySummaries_γ, MemorySummaries_δ, NodeNpcDynamicState, NpcDynamicState, NpcWordsTag, PlayerWordsTag, Settings, Trust, TrustPhase, Words, ZoneDate, _Array, _Relationship } from '../contract';
+;
 
 interface MemorySummaryDraft {
     summary: string;

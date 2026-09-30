@@ -1,4 +1,4 @@
-import type { PlayerTemplate } from '../../meta';
+import type { PlayerTemplate } from '../../contract/meta';
 
 /**
  * 老兵 - 进攻型 (Attack)
@@ -14,8 +14,8 @@ export const PLAYER_VETERAN: PlayerTemplate = {
     visualPrompt: 'A battle-hardened male special forces sergeant in his late 40s with a buzz cut and cold haunted eyes, deep burn and claw scars across his face and left arm, wearing patched-up dirty military fatigues reinforced with scrap metal chest plates, bandolier of tactical gear, holding a lethal trench fighting knife with brass knuckles in his right hand, left hand free, ruined barbed-wire military outpost backdrop, dim flare lighting, grim survival horror aesthetic.',
     initialState: {
         attribute: {
-            strength: 26,     // 较强：千锤百炼的近战技巧与强壮筋骨，稳定造成致残重击，背包空间充裕
-            agility: 16,      // 稳健：扎实的战术步伐与格斗本能，基础 AP 达标 (16/5=3)，支撑冲锋与规避
+            strength: 26,     // 较强：千锤百炼的近战技巧与强壮筋骨，提供近战伤害加成，背包空间充裕
+            agility: 16,      // 稳健：扎实的战术步伐与格斗本能，基础 AP 达标 ($\lfloor 16 / 5 \rfloor = 3$)，支撑冲锋与规避
             wisdom: 10,       // 普通：不擅长复杂理论或高深谋略，信赖最直观的杀敌经验
             awareness: 22,    // 较强：战场雷达般的危机嗅觉，能在电光火石间捕捉死角
             will: 10,         // 成年人坚韧：饱受 PTSD 折磨但拥有铁血军人的凡人神经内核
@@ -24,7 +24,7 @@ export const PLAYER_VETERAN: PlayerTemplate = {
         vital: {
             maxHp: 230,       // 优秀：长期高强度特战淬炼出的强韧体魄
             maxSanity: 90,    // 偏低：深陷严重 PTSD 与幸存者负罪感，精神临界点极脆弱
-            maxStamina: 210,  // 优秀：令人惊叹的耐力基数，支撑长因果序列与多次战术重铸
+            maxStamina: 210,  // 优秀：令人惊叹的耐力基数，支撑长因果序列 ($L = \lfloor 210 / 10 \rfloor = 21$) 与多次战术重铸
             maxVigor: 190     // 优秀：铁血老兵的军人底子，在恶劣环境中依然精力充沛
         },
         inventory: [
@@ -134,23 +134,23 @@ export const PLAYER_VETERAN: PlayerTemplate = {
                 type: 'A',
                 id: 'veteran_suppressive_strike',
                 name: '压制突刺',
-                desc: '利用全身冲力将刺刀狠狠贯入目标关节枢纽，破坏其机动轴心，大幅削弱其速度与敏捷。',
+                desc: '利用全身冲力将刺刀狠狠贯入目标关节枢纽，破坏其机动轴心，大幅削弱其速度与闪避能力。',
                 apCost: 2,
                 requireWeapon: 'prick',
                 tacticEffect: [
                     ['single_enemy', 'speed', -4, 2],
-                    ['single_enemy', 'agility', -4, 2]
+                    ['single_enemy', 'evasion', -0.20, 2]
                 ]
             },
             {
                 type: 'D',
                 id: 'veteran_combat_hardened',
                 name: '战壕硬化',
-                desc: '收紧核心肌群，调动多年在尸山血海中锤炼出的近战肌肉记忆，拔高力量并硬化受击面。',
+                desc: '收紧核心肌群，调动多年在尸山血海中锤炼出的近战肌肉记忆，提升近战杀伤压迫并硬化受击面。',
                 apCost: 1,
                 tacticEffect: [
-                    ['self', 'strength', 4, 2],
-                    ['self', 'defense', 0.08, 2]
+                    ['self', 'defense', 0.10, 2],
+                    ['self', 'damage', 4, 2]
                 ]
             },
             {

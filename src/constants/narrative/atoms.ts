@@ -20,7 +20,7 @@
  * @see ../../meta/type.ts
  */
 
-import type { HorrorAtom } from '../../meta'
+import type { HorrorAtom } from '../../contract/meta';
 
 /**
  * 恐怖元构造辅助函数

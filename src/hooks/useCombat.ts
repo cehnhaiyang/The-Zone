@@ -13,39 +13,25 @@
  * - 战场坐标、位移方向、蓄反请求、立即行动窗口、武器特性状态、开战上下文与战前预测的
  *   类型契约，见 `meta/interface.ts`。
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
-import { GameState } from '../meta';
-import type {
-    AllyResultSequence,
-    AnyTactic,
-    AttackDamageScale,
-    AttackForecast,
-    AttackForecastOdds,
-    AttackForecastSource,
+import { useCallback, useEffect, useRef, useState, Dispatch, SetStateAction } from 'react';
+import {
+    GameState,
     AttackResult,
-    AttackSlot,
     BattleMap,
-    BattleStartContext,
     CombatAlly,
     CombatDynamicState,
     CombatEnemy,
     CombatIntent,
-    CombatPosition,
     CombatStatus,
     CompanionDynamicState,
     CompanionTemplate,
-    CounterAdvanceRequest,
-    CounterDecisionResult,
     CounterType,
     Cover,
     DefenseResult,
     DotSoundType,
     EnemyTemplate,
     Entity,
-    EnvironmentModifier,
     EquipState,
-    InsertActionWindow,
     IntentType,
     ItemInstance,
     ItemTemplate,
@@ -56,11 +42,23 @@ import type {
     Target,
     WeaponInstance,
     WeaponType,
-} from '../meta';
+    AnyTactic,
+    AttackForecast,
+    AttackForecastOdds,
+    AttackForecastSource,
+    BattleStartContext,
+    CounterAdvanceRequest,
+    CounterDecisionResult,
+    InsertActionWindow,
+} from '../contract';
 import {
     ATTACK_RESULT_LADDER,
     ATTACK_SLOTS,
+    AllyResultSequence,
+    AttackDamageScale,
+    AttackSlot,
     COMBAT_CONFIG,
+    CombatPosition,
     MAX_PARTIAL_REDUCTION,
     RESULT_MODIFIER_TYPES,
     addAccumulateCounter,
@@ -103,7 +101,6 @@ import {
     getPrimaryWeapon,
     getSequenceLength,
     getSequenceShift,
-    getShieldWeapon,
     getSniperDowngradeChance,
     getSplashDamage,
     getSteppedCell,
@@ -114,7 +111,6 @@ import {
     isCoverDestructible,
     isDashWeapon,
     isDisplacementEffect,
-    isDynamicVitalType,
     isSequenceEffect,
     isVitalEffectType,
     isVitalType,
@@ -142,7 +138,7 @@ import {
     spendWeaponUse,
     storeStatusItem,
     tickRoundStatuses,
-} from '../meta';
+} from '../consts';
 import {
     DEFAULT_BATTLE_MAP,
     ENEMY_TEMPLATES,
@@ -151,6 +147,22 @@ import {
     getEquippedWeaponOwnTactics,
 } from '../constants';
 import { AudioService } from '../services';
+
+/** 战斗演出单步延时（毫秒）。 */
+const ANIM_DELAY = 150;
+
+/** 战斗日志保留条数上限。 */
+const COMBAT_LOG_LIMIT = 200;
+
+const delay = (ms: number = ANIM_DELAY) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+const playSfx = (sfx: DotSoundType) => {
+    try {
+        AudioService.playSfx(sfx);
+    } catch {
+        // noop
+    }
+};
 
 interface UseCombatParams {
     playerState: PlayerState;
@@ -260,30 +272,6 @@ interface UseCombatReturn {
     endInsertAction: () => void;
 }
 
-//==============================================================================
-// 表现层胶水（演出节奏与音效，不进入元工具）
-//==============================================================================
-
-/** 战斗演出单步延时（毫秒）。 */
-const ANIM_DELAY = 150;
-
-/** 战斗日志保留条数上限。 */
-const COMBAT_LOG_LIMIT = 200;
-
-const delay = (ms: number = ANIM_DELAY) =>
-    new Promise<void>((resolve) => setTimeout(resolve, ms));
-
-const playSfx = (sfx: DotSoundType) => {
-    try {
-        AudioService.playSfx(sfx);
-    } catch {
-        // noop
-    }
-};
-
-//==============================================================================
-// Hook
-//==============================================================================
 export const useCombat = ({
     playerState,
     companions,
@@ -318,7 +306,6 @@ export const useCombat = ({
     >({});
     /** 「立即行动」窗口：预支结算后，我方单位立即行动的行动点池（敌方窗口不在此展示）。 */
     const [insertAction, setInsertAction] = useState<InsertActionWindow | null>(null);
-
 
     //--------------------------------------------------------------------------
     // Refs
@@ -3025,7 +3012,7 @@ export const useCombat = ({
                         const idx = ATTACK_RESULT_LADDER.indexOf(applied.attackResult[0]);
                         const kind =
                             ATTACK_RESULT_LADDER[
-                                Math.min(idx + 1, ATTACK_RESULT_LADDER.length - 1)
+                            Math.min(idx + 1, ATTACK_RESULT_LADDER.length - 1)
                             ];
                         applied = { ...applied, attackResult: [kind, attackValueAt(kind, scale)] };
                     }
@@ -3094,8 +3081,8 @@ export const useCombat = ({
             const raw = absorbDamageByCover(
                 blockingCover,
                 (Math.max(0, attackResult[1]) + dashBonus + mods.damage + bonusCrit) *
-                    damageMultiplier *
-                    critMultiplier
+                damageMultiplier *
+                critMultiplier
             );
 
             const label =

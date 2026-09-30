@@ -8,12 +8,12 @@
  *
  * 严格边界：
  * - 绝不提供生存护盾 (shield) 或常驻防御 (defense)
- * - 绝不提供生命或体征的自我恢复
+ * - 绝不提供生命或体征的自我恢复 (严格禁止自我回血/回体/回理智)
  *
- * @version 2.3.0
+ * @version 2.4.0
  */
 
-import type { Tactic } from '../../meta'
+import type { Tactic } from '../../contract/meta';
 
 /**
  * 攻击战术工厂构造器
@@ -45,7 +45,7 @@ export const publicAttackTactics: Tactic[] = [
         '以极短的肌肉收缩发动试探性直拳，抢占出手节奏并校正攻击线。',
         1,
         [
-            ['self', 'aim', 12, 0],
+            ['self', 'aim', 14, 0],
             ['self', 'damage', 2, 0],
         ],
     ),
@@ -55,8 +55,8 @@ export const publicAttackTactics: Tactic[] = [
         '以小幅假动作诱导目标误判格挡重心，制造转瞬即逝的防御死角。',
         1,
         [
-            ['single_enemy', 'evasion', -15, 1],
-            ['self', 'aim', 10, 0],
+            ['single_enemy', 'evasion', -16, 1],
+            ['self', 'aim', 12, 0],
             ['self', 'damage', 1, 0],
         ],
     ),
@@ -77,7 +77,7 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 4, 0],
-            ['single_enemy', 'aim', -18, 1],
+            ['single_enemy', 'aim', -20, 1],
         ],
     ),
     atk(
@@ -87,7 +87,7 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 4, 0],
-            ['single_enemy', 'defense', -15, 1],
+            ['single_enemy', 'defense', -16, 1],
         ],
     ),
     atk(
@@ -97,7 +97,7 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 4, 0],
-            ['single_enemy', 'defense', -10, 1],
+            ['single_enemy', 'defense', -12, 1],
             ['single_ally', 'damage', 2, 1],
         ],
     ),
@@ -107,9 +107,9 @@ export const publicAttackTactics: Tactic[] = [
         '大幅度后引发力，牺牲命中精度换取极具压迫感的高额重创。',
         3,
         [
-            ['self', 'damage', 9, 0],
-            ['self', 'aim', -12, 0],
-            ['self', 'crit_bonus', 6, 0],
+            ['self', 'damage', 10, 0],
+            ['self', 'aim', -14, 0],
+            ['self', 'crit_bonus', 7, 0],
         ],
     ),
     atk(
@@ -119,7 +119,7 @@ export const publicAttackTactics: Tactic[] = [
         3,
         [
             ['self', 'damage', 6, 0],
-            ['single_enemy', 'stamina', -20, 0],
+            ['single_enemy', 'stamina', -22, 0],
             ['single_enemy', 'speed', -3, 1],
         ],
     ),
@@ -129,7 +129,7 @@ export const publicAttackTactics: Tactic[] = [
         '针对已陷入失衡或重创的敌方要害发动终结式打击，强制拉升攻击判定阶次。',
         4,
         [
-            ['self', 'damage', 15, 0],
+            ['self', 'damage', 16, 0],
             ['self', 'a_sequence', 1, 1],
             ['self', 'crit_chance', 0.25, 0],
         ],
@@ -144,7 +144,7 @@ export const publicAttackTactics: Tactic[] = [
         '利用单手挥动武器的轻便弧线迅速划过目标外围，逼迫其退守。',
         1,
         [
-            ['self', 'aim', 15, 0],
+            ['self', 'aim', 16, 0],
             ['self', 'damage', 2, 0],
         ],
         'wave',
@@ -156,7 +156,7 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 5, 0],
-            ['single_enemy', 'defense', -12, 1],
+            ['single_enemy', 'defense', -14, 1],
         ],
         'wave',
     ),
@@ -168,7 +168,7 @@ export const publicAttackTactics: Tactic[] = [
         [
             ['self', 'damage', 4, 0],
             ['single_enemy', 'speed', -4, 1],
-            ['single_enemy', 'evasion', -20, 1],
+            ['single_enemy', 'evasion', -22, 1],
         ],
         'wave',
     ),
@@ -195,7 +195,7 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 6, 0],
-            ['self', 'aim', 20, 0],
+            ['self', 'aim', 22, 0],
         ],
         'both_wave',
     ),
@@ -207,7 +207,7 @@ export const publicAttackTactics: Tactic[] = [
         [
             ['self', 'damage', 7, 0],
             ['all_enemies', 'speed', -2, 1],
-            ['all_enemies', 'aim', -12, 1],
+            ['all_enemies', 'aim', -14, 1],
         ],
         'both_wave',
     ),
@@ -218,7 +218,7 @@ export const publicAttackTactics: Tactic[] = [
         3,
         [
             ['self', 'damage', 10, 0],
-            ['single_enemy', 'defense', -25, 1],
+            ['single_enemy', 'defense', -28, 1],
         ],
         'both_wave',
     ),
@@ -228,9 +228,9 @@ export const publicAttackTactics: Tactic[] = [
         '凝聚全身筋骨爆发毁灭一击，由于动量过载短时抑制自身回避机能。',
         4,
         [
-            ['self', 'damage', 17, 0],
+            ['self', 'damage', 18, 0],
             ['self', 'aim', 25, 0],
-            ['single_enemy', 'stamina', -30, 0],
+            ['single_enemy', 'stamina', -32, 0],
             ['self', 'evasion', -15, 0],
         ],
         'both_wave',
@@ -259,7 +259,7 @@ export const publicAttackTactics: Tactic[] = [
         [
             ['self', 'damage', 5, 0],
             ['self', 'crit_chance', 0.20, 0],
-            ['single_enemy', 'defense', -16, 1],
+            ['single_enemy', 'defense', -18, 1],
         ],
         'prick',
     ),
@@ -270,8 +270,8 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 5, 0],
-            ['single_enemy', 'evasion', -25, 1],
-            ['single_enemy', 'speed', -2, 1],
+            ['single_enemy', 'evasion', -26, 1],
+            ['single_enemy', 'speed', -3, 1],
         ],
         'prick',
     ),
@@ -299,7 +299,7 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 5, 0],
-            ['self', 'aim', 15, 0],
+            ['self', 'aim', 16, 0],
             ['single_enemy', 'speed', -3, 1],
         ],
         'both_prick',
@@ -312,7 +312,7 @@ export const publicAttackTactics: Tactic[] = [
         [
             ['self', 'damage', 8, 0],
             ['self', 'crit_chance', 0.25, 0],
-            ['single_enemy', 'defense', -22, 1],
+            ['single_enemy', 'defense', -24, 1],
         ],
         'both_prick',
     ),
@@ -324,7 +324,7 @@ export const publicAttackTactics: Tactic[] = [
         [
             ['self', 'damage', 10, 0],
             ['self', 'crit_bonus', 8, 0],
-            ['single_enemy', 'evasion', -22, 1],
+            ['single_enemy', 'evasion', -24, 1],
         ],
         'both_prick',
     ),
@@ -334,10 +334,10 @@ export const publicAttackTactics: Tactic[] = [
         '爆发式连续多段突刺封锁敌方所有躲闪轴，造成毁灭性空腔贯穿。',
         4,
         [
-            ['self', 'damage', 15, 0],
+            ['self', 'damage', 16, 0],
             ['self', 'crit_chance', 0.30, 0],
             ['self', 'a_sequence', 1, 1],
-            ['single_enemy', 'stamina', -25, 0],
+            ['single_enemy', 'stamina', -28, 0],
         ],
         'both_prick',
     ),
@@ -352,7 +352,7 @@ export const publicAttackTactics: Tactic[] = [
         1,
         [
             ['self', 'damage', 2, 0],
-            ['single_enemy', 'aim', -15, 1],
+            ['single_enemy', 'aim', -16, 1],
         ],
         'shield',
     ),
@@ -364,7 +364,7 @@ export const publicAttackTactics: Tactic[] = [
         [
             ['self', 'damage', 5, 0],
             ['single_enemy', 'speed', -3, 1],
-            ['single_enemy', 'defense', -10, 1],
+            ['single_enemy', 'defense', -12, 1],
         ],
         'shield',
     ),
@@ -376,7 +376,7 @@ export const publicAttackTactics: Tactic[] = [
         [
             ['self', 'damage', 4, 0],
             ['single_enemy', 'evasion', -30, 1],
-            ['single_enemy', 'defense', -12, 1],
+            ['single_enemy', 'defense', -14, 1],
         ],
         'shield',
     ),
@@ -388,7 +388,7 @@ export const publicAttackTactics: Tactic[] = [
         [
             ['self', 'damage', 7, 0],
             ['single_enemy', 'ap', -1, 1],
-            ['single_enemy', 'stamina', -15, 0],
+            ['single_enemy', 'stamina', -18, 0],
         ],
         'shield',
     ),
@@ -414,8 +414,8 @@ export const publicAttackTactics: Tactic[] = [
         3,
         [
             ['self', 'damage', 8, 0],
-            ['single_enemy', 'defense', -22, 1],
-            ['single_enemy', 'stamina', -22, 0],
+            ['single_enemy', 'defense', -24, 1],
+            ['single_enemy', 'stamina', -24, 0],
         ],
         'both_shield',
     ),
@@ -425,10 +425,10 @@ export const publicAttackTactics: Tactic[] = [
         '如移动城墙般无情碾压前方轨道，将阻挡的一切肉身化作血泥与肉糜。',
         4,
         [
-            ['self', 'damage', 12, 0],
+            ['self', 'damage', 13, 0],
             ['single_enemy', 'ap', -2, 1],
             ['single_enemy', 'speed', -4, 1],
-            ['single_enemy', 'defense', -25, 1],
+            ['single_enemy', 'defense', -28, 1],
         ],
         'both_shield',
     ),
@@ -454,8 +454,8 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 5, 0],
-            ['self', 'aim', 12, 0],
-            ['single_enemy', 'aim', -15, 1],
+            ['self', 'aim', 14, 0],
+            ['single_enemy', 'aim', -16, 1],
         ],
         'pistol',
     ),
@@ -478,9 +478,9 @@ export const publicAttackTactics: Tactic[] = [
         3,
         [
             ['self', 'damage', 8, 0],
-            ['self', 'aim', 25, 0],
+            ['self', 'aim', 26, 0],
             ['self', 'crit_chance', 0.20, 0],
-            ['single_enemy', 'defense', -18, 1],
+            ['single_enemy', 'defense', -20, 1],
         ],
         'pistol',
     ),
@@ -494,7 +494,7 @@ export const publicAttackTactics: Tactic[] = [
         '扣下扳机打出小基数点射，利用微后坐力快速修正弹着点。',
         1,
         [
-            ['self', 'aim', 12, 0],
+            ['self', 'aim', 14, 0],
             ['self', 'damage', 3, 0],
         ],
         'smg',
@@ -506,8 +506,8 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 5, 0],
-            ['single_enemy', 'aim', -20, 1],
-            ['single_enemy', 'evasion', -16, 1],
+            ['single_enemy', 'aim', -22, 1],
+            ['single_enemy', 'evasion', -18, 1],
         ],
         'smg',
     ),
@@ -518,8 +518,8 @@ export const publicAttackTactics: Tactic[] = [
         3,
         [
             ['self', 'damage', 8, 0],
-            ['single_enemy', 'defense', -22, 1],
-            ['all_enemies', 'evasion', -12, 1],
+            ['single_enemy', 'defense', -24, 1],
+            ['all_enemies', 'evasion', -14, 1],
         ],
         'smg',
     ),
@@ -529,8 +529,8 @@ export const publicAttackTactics: Tactic[] = [
         '清理人破门室内肃清战术，凭借高射速在单个行动轮内彻底瓦解敌群行动力。',
         4,
         [
-            ['self', 'damage', 13, 0],
-            ['all_enemies', 'aim', -20, 1],
+            ['self', 'damage', 14, 0],
+            ['all_enemies', 'aim', -22, 1],
             ['all_enemies', 'speed', -3, 1],
             ['self', 'a_sequence', 1, 1],
         ],
@@ -547,7 +547,7 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 6, 0],
-            ['self', 'aim', 16, 0],
+            ['self', 'aim', 18, 0],
         ],
         'assault_rifle',
     ),
@@ -559,7 +559,7 @@ export const publicAttackTactics: Tactic[] = [
         [
             ['self', 'damage', 6, 0],
             ['all_enemies', 'speed', -3, 1],
-            ['all_enemies', 'aim', -18, 1],
+            ['all_enemies', 'aim', -20, 1],
         ],
         'assault_rifle',
     ),
@@ -570,7 +570,7 @@ export const publicAttackTactics: Tactic[] = [
         3,
         [
             ['self', 'damage', 9, 0],
-            ['single_enemy', 'defense', -25, 1],
+            ['single_enemy', 'defense', -26, 1],
             ['self', 'crit_chance', 0.15, 0],
         ],
         'assault_rifle',
@@ -581,10 +581,10 @@ export const publicAttackTactics: Tactic[] = [
         '将突击步枪威力推至极限，在战壕纵深制造致死火力陷阱，粉碎一切生机。',
         4,
         [
-            ['self', 'damage', 15, 0],
-            ['self', 'aim', 20, 0],
-            ['all_enemies', 'defense', -16, 1],
-            ['single_enemy', 'stamina', -20, 0],
+            ['self', 'damage', 16, 0],
+            ['self', 'aim', 22, 0],
+            ['all_enemies', 'defense', -18, 1],
+            ['single_enemy', 'stamina', -22, 0],
         ],
         'assault_rifle',
     ),
@@ -599,7 +599,7 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 6, 0],
-            ['single_enemy', 'defense', -20, 1],
+            ['single_enemy', 'defense', -22, 1],
         ],
         'shotgun',
     ),
@@ -610,7 +610,7 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 4, 0],
-            ['all_enemies', 'evasion', -18, 1],
+            ['all_enemies', 'evasion', -20, 1],
         ],
         'shotgun',
     ),
@@ -633,10 +633,10 @@ export const publicAttackTactics: Tactic[] = [
         '抵住目标胸腔扣动扳机，高压火药燃气与钢珠瞬间将碳基组织轰为齑粉。',
         4,
         [
-            ['self', 'damage', 16, 0],
+            ['self', 'damage', 17, 0],
             ['self', 'crit_chance', 0.40, 0],
             ['self', 'crit_bonus', 12, 0],
-            ['single_enemy', 'defense', -30, 1],
+            ['single_enemy', 'defense', -32, 1],
         ],
         'shotgun',
     ),
@@ -651,7 +651,7 @@ export const publicAttackTactics: Tactic[] = [
         1,
         [
             ['self', 'damage', 3, 0],
-            ['single_enemy', 'aim', -15, 1],
+            ['single_enemy', 'aim', -16, 1],
         ],
         'sawed_off',
     ),
@@ -662,7 +662,7 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 6, 0],
-            ['single_enemy', 'defense', -16, 1],
+            ['single_enemy', 'defense', -18, 1],
             ['single_enemy', 'speed', -2, 1],
         ],
         'sawed_off',
@@ -690,7 +690,7 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 7, 0],
-            ['self', 'aim', 25, 0],
+            ['self', 'aim', 26, 0],
         ],
         'sniper_rifle',
     ),
@@ -702,7 +702,7 @@ export const publicAttackTactics: Tactic[] = [
         [
             ['self', 'damage', 10, 0],
             ['self', 'crit_chance', 0.25, 0],
-            ['single_enemy', 'defense', -30, 1],
+            ['single_enemy', 'defense', -32, 1],
         ],
         'sniper_rifle',
     ),
@@ -712,7 +712,7 @@ export const publicAttackTactics: Tactic[] = [
         '在极限交战距离计算非欧引力偏转，射出无情终结一弹，直接提升判定层级。',
         4,
         [
-            ['self', 'damage', 18, 0],
+            ['self', 'damage', 19, 0],
             ['self', 'aim', 35, 0],
             ['self', 'crit_chance', 0.35, 0],
             ['self', 'crit_bonus', 15, 0],
@@ -731,8 +731,8 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 5, 0],
-            ['self', 'aim', 20, 0],
-            ['single_enemy', 'defense', -12, 1],
+            ['self', 'aim', 22, 0],
+            ['single_enemy', 'defense', -14, 1],
         ],
         'crossbow',
     ),
@@ -744,7 +744,7 @@ export const publicAttackTactics: Tactic[] = [
         [
             ['self', 'damage', 4, 0],
             ['single_enemy', 'speed', -4, 1],
-            ['single_enemy', 'stamina', -15, 0],
+            ['single_enemy', 'stamina', -16, 0],
         ],
         'crossbow',
     ),
@@ -756,7 +756,7 @@ export const publicAttackTactics: Tactic[] = [
         [
             ['self', 'damage', 9, 0],
             ['self', 'crit_chance', 0.30, 0],
-            ['single_enemy', 'defense', -26, 1],
+            ['single_enemy', 'defense', -28, 1],
         ],
         'crossbow',
     ),
@@ -770,7 +770,7 @@ export const publicAttackTactics: Tactic[] = [
         '手指滑过箭袋瞬间满弓射出，以高频箭雨骚扰敌方规避走位。',
         1,
         [
-            ['self', 'aim', 15, 0],
+            ['self', 'aim', 16, 0],
             ['self', 'damage', 2, 0],
         ],
         'bow',
@@ -782,7 +782,7 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 5, 0],
-            ['single_enemy', 'evasion', -20, 1],
+            ['single_enemy', 'evasion', -22, 1],
         ],
         'bow',
     ),
@@ -793,7 +793,7 @@ export const publicAttackTactics: Tactic[] = [
         3,
         [
             ['self', 'damage', 6, 0],
-            ['all_enemies', 'aim', -20, 1],
+            ['all_enemies', 'aim', -22, 1],
             ['all_enemies', 'speed', -2, 1],
         ],
         'bow',
@@ -807,7 +807,7 @@ export const publicAttackTactics: Tactic[] = [
             ['self', 'damage', 9, 0],
             ['self', 'crit_chance', 0.25, 0],
             ['self', 'crit_bonus', 8, 0],
-            ['single_enemy', 'defense', -20, 1],
+            ['single_enemy', 'defense', -22, 1],
         ],
         'bow',
     ),
@@ -822,8 +822,8 @@ export const publicAttackTactics: Tactic[] = [
         1,
         [
             ['self', 'damage', 1, 0],
-            ['single_enemy', 'aim', -20, 1],
-            ['single_enemy', 'evasion', -15, 1],
+            ['single_enemy', 'aim', -22, 1],
+            ['single_enemy', 'evasion', -16, 1],
         ],
         'throw',
     ),
@@ -845,9 +845,9 @@ export const publicAttackTactics: Tactic[] = [
         3,
         [
             ['self', 'damage', 6, 0],
-            ['all_enemies', 'aim', -25, 1],
+            ['all_enemies', 'aim', -26, 1],
             ['all_enemies', 'speed', -3, 1],
-            ['all_enemies', 'sanity', -5, 0],
+            ['all_enemies', 'sanity', -6, 0],
         ],
         'throw',
     ),
@@ -862,7 +862,7 @@ export const publicAttackTactics: Tactic[] = [
         2,
         [
             ['self', 'damage', 4, 0],
-            ['single_enemy', 'sanity', -4, 0],
+            ['single_enemy', 'sanity', -5, 0],
         ],
         'magic',
     ),
@@ -873,7 +873,7 @@ export const publicAttackTactics: Tactic[] = [
         3,
         [
             ['self', 'damage', 7, 0],
-            ['single_enemy', 'sanity', -9, 0],
+            ['single_enemy', 'sanity', -10, 0],
             ['single_enemy', 'ap', -1, 1],
         ],
         'magic',
@@ -881,12 +881,13 @@ export const publicAttackTactics: Tactic[] = [
     atk(
         'magic_void_siphon',
         '虚空生体虹吸',
-        '在敌我之间建立非欧能量渡桥，以概念攻击直接剥离目标的体力与活力。',
+        '在敌我之间建立非欧能量渡桥，以概念攻击剥离目标的行动体力与神经清醒度。',
         3,
         [
             ['self', 'damage', 7, 0],
-            ['single_enemy', 'stamina', -20, 0],
-            ['self', 'stamina', 15, 0],
+            ['single_enemy', 'stamina', -25, 0],
+            ['single_enemy', 'vigor', -6, 0],
+            ['single_enemy', 'speed', -3, 1],
         ],
         'magic',
     ),
@@ -896,9 +897,9 @@ export const publicAttackTactics: Tactic[] = [
         '撕碎现实薄膜召唤深渊引力奇点，造成不可名状的广域概念毁灭与真理坍塌。',
         4,
         [
-            ['self', 'damage', 14, 0],
-            ['all_enemies', 'defense', -25, 1],
-            ['all_enemies', 'sanity', -16, 0],
+            ['self', 'damage', 15, 0],
+            ['all_enemies', 'defense', -28, 1],
+            ['all_enemies', 'sanity', -18, 0],
             ['self', 'a_sequence', 1, 1],
         ],
         'magic',

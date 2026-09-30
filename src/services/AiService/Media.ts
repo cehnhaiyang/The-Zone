@@ -5,7 +5,7 @@
  * 生成完毕后进行单向落盘，加载逻辑交由外部引擎层全权接管。
  */
 
-import { Settings } from '../../meta';
+import { Settings } from '../../contract/meta';
 import { PersistenceService } from '../PersistenceService';
 import { BaseProvider, AIServiceError } from './providers/base';
 import { callAi } from './providers';

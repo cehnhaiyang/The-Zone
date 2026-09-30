@@ -1,4 +1,4 @@
-import type { SanctuaryTemplate } from '../../meta'
+import type { SanctuaryTemplate } from '../../contract/meta';
 import {
     sanctuary,
     node,

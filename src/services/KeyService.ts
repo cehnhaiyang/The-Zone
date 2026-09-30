@@ -9,7 +9,7 @@
  * - 状态可观测：可查询每个 Key 的健康状态与调用统计
  */
 
-import type { ApiPlatform, Settings } from '../meta';
+import type { ApiPlatform, Settings } from '../contract';
 
 /** 单个 Key 的运行时状态 */
 interface KeyState {

@@ -16,7 +16,7 @@
  * @see ../../meta/type.ts
  */
 
-import type { HorrorDomain } from '../../meta'
+import type { HorrorDomain } from '../../contract/meta';
 
 const domain = (
     id: string,

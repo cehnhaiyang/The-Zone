@@ -1,4 +1,4 @@
-import type { PlayerTemplate } from '../../meta';
+import type { PlayerTemplate } from '../../contract/meta';
 
 /**
  * 调查员 - 游走型 (Skirmish)
@@ -15,7 +15,7 @@ export const PLAYER_INVESTIGATOR: PlayerTemplate = {
     initialState: {
         attribute: {
             strength: 6,      // 较弱：长期从事文职与暗中调查，肌肉力量有限，储物空间中等
-            agility: 23,      // 较强：反应迅疾，基础 AP 充沛 (23/5=4)，擅长在掩体间滑步穿梭
+            agility: 23,      // 较强：反应迅疾，基础 AP 充沛 ($\lfloor 23 / 5 \rfloor = 4$)，擅长在掩体间滑步穿梭
             wisdom: 24,       // 较强：严密的财务审计与逻辑推演本能，大幅降低节点搜查机能损耗
             awareness: 30,    // 极强：触碰精英门槛 (30) 的直觉嗅觉，大幅提升搜查精度与因果判定暴击率
             will: 12,         // 冷静理性：高度严密的逻辑自洽思维与认知滤网阻隔，意志稳定在成年人之上
@@ -24,7 +24,7 @@ export const PLAYER_INVESTIGATOR: PlayerTemplate = {
         vital: {
             maxHp: 90,        // 较弱：未受生化强化的凡人肉身，经不起强力正面撕扯
             maxSanity: 150,   // 优秀：强大的理性思维与清理人面甲降维过滤协同抵抗精神污染
-            maxStamina: 100,  // 普通人：标准体能，依赖节奏规划规避过度疲劳
+            maxStamina: 100,  // 普通人：标准体能，生成判定序列长度 $L = \lfloor 100 / 10 \rfloor = 10$
             maxVigor: 120     // 良好：神经紧绷带来的高专注度，支撑高强度细致搜寻
         },
         inventory: [
@@ -105,7 +105,7 @@ export const PLAYER_INVESTIGATOR: PlayerTemplate = {
                     maxUses: 120,
                     currentUses: 120
                 },
-                side: null // 刻意留空：完美激活手枪单手持握命中增益与首次攻击免 AP
+                side: null // 留空：激活手枪单手持握命中增益与首次攻击免 AP 特性
             },
             armors: [
                 {
@@ -142,10 +142,11 @@ export const PLAYER_INVESTIGATOR: PlayerTemplate = {
                 type: 'U',
                 id: 'investigator_analyze',
                 name: '情报推演',
-                desc: '通过目镜标定目标运动轨迹与受损节点，提升感知并利用掩体预判走位。',
+                desc: '通过目镜标定目标运动轨迹与受损节点，大幅提升自身瞄准与暴击倾向，并借助预判提升闪避。',
                 apCost: 1,
                 tacticEffect: [
-                    ['self', 'awareness', 4, 2],
+                    ['self', 'aim', 15, 2],
+                    ['self', 'crit_chance', 0.10, 2],
                     ['self', 'evasion', 0.10, 2]
                 ]
             },
@@ -153,31 +154,31 @@ export const PLAYER_INVESTIGATOR: PlayerTemplate = {
                 type: 'A',
                 id: 'investigator_suppressive_shot',
                 name: '速射牵制',
-                desc: '利用手枪短促开火压迫敌人身位，迫使其寻找遮蔽，压低其机动性与速度。',
+                desc: '利用手枪短促开火压迫敌人身位，迫使其寻找遮蔽，压低其行动速度与射击瞄准度。',
                 apCost: 1,
                 requireWeapon: 'pistol',
                 tacticEffect: [
                     ['single_enemy', 'speed', -3, 2],
-                    ['single_enemy', 'agility', -3, 2]
+                    ['single_enemy', 'aim', -15, 2]
                 ]
             },
             {
                 type: 'A',
                 id: 'investigator_expose_weakness',
                 name: '破绽标记',
-                desc: '精确射击撕裂防护死角，剥落护甲并破坏敌方的感知平衡。',
+                desc: '精确射击撕裂防护死角，剥落护甲常驻免伤并瓦解敌方的身法闪避。',
                 apCost: 2,
                 requireWeapon: 'pistol',
                 tacticEffect: [
                     ['single_enemy', 'defense', -0.15, 2],
-                    ['single_enemy', 'awareness', -4, 2]
+                    ['single_enemy', 'evasion', -0.15, 2]
                 ]
             },
             {
                 type: 'D',
                 id: 'investigator_tactical_retreat',
                 name: '战术滑步',
-                desc: '借助射击反冲与盲区迅速拉开交火间距，调匀呼吸并重置身位。',
+                desc: '借助射击反冲与死角盲区迅速拉开交火间距，调匀呼吸并重置身位。',
                 apCost: 1,
                 tacticEffect: [
                     ['self', 'evasion', 0.20, 1],

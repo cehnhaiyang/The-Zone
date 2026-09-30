@@ -12,10 +12,10 @@
  * - 绝不提供生命治疗 (hp)、理智抚平 (sanity) 或体力精力自愈 (stamina/vigor 回复)
  * - 绝不直接提升自身攻击力 (damage) 或进行直接伤害结算
  *
- * @version 2.3.0
+ * @version 2.4.0
  */
 
-import type { Tactic } from '../../meta'
+import type { Tactic } from '../../contract/meta';
 
 /**
  * 防御战术工厂构造器
@@ -44,11 +44,11 @@ export const publicDefenseTactics: Tactic[] = [
     def(
         'axis_evasion',
         '轴线错位',
-        '微幅调整身体重心与站立轴线，错开来袭弹道与斩击轨迹，提升单次闪避机率。',
+        '微幅调整身体重心与站立轴线，错开来袭弹道与斩击轨迹，提升单次闪避机率与短距机动。',
         1,
         [
-            ['self', 'evasion', 15, 1],
-            ['self', 'speed', 1, 1],
+            ['self', 'evasion', 18, 1],
+            ['self', 'speed', 2, 1],
         ],
     ),
     def(
@@ -58,7 +58,7 @@ export const publicDefenseTactics: Tactic[] = [
         1,
         [
             ['self', 'd_sequence', 1, 0],
-            ['self', 'defense', 10, 1],
+            ['self', 'defense', 12, 1],
         ],
     ),
     def(
@@ -67,8 +67,8 @@ export const publicDefenseTactics: Tactic[] = [
         '微调护甲与肢体迎敌倾角，引导物理穿透动能发生滑移，平衡提升防御与回避。',
         1,
         [
-            ['self', 'defense', 12, 1],
-            ['self', 'evasion', 8, 1],
+            ['self', 'defense', 14, 1],
+            ['self', 'evasion', 10, 1],
         ],
     ),
     def(
@@ -77,7 +77,7 @@ export const publicDefenseTactics: Tactic[] = [
         '短促超载便携式力场发生器，在胸腹关键区域生成一层吸收冲击的瞬态护盾。',
         1,
         [
-            ['self', 'shield', 8, 1],
+            ['self', 'shield', 10, 1],
             ['self', 'vigor', -2, 0],
         ],
     ),
@@ -87,8 +87,8 @@ export const publicDefenseTactics: Tactic[] = [
         '双臂抱头压低全身投影面，在失去反击瞄准视线的代价下最大程度护住致命脏器。',
         1,
         [
-            ['self', 'defense', 16, 1],
-            ['self', 'aim', -12, 1],
+            ['self', 'defense', 18, 1],
+            ['self', 'aim', -15, 1],
         ],
     ),
 
@@ -101,8 +101,8 @@ export const publicDefenseTactics: Tactic[] = [
         '压低身段深嵌于工事掩体之后，借掩体物质结构全面降低受创面。',
         2,
         [
-            ['self', 'defense', 25, 1],
-            ['self', 'evasion', 20, 1],
+            ['self', 'defense', 28, 1],
+            ['self', 'evasion', 22, 1],
             ['self', 'speed', -2, 1],
         ],
     ),
@@ -112,7 +112,7 @@ export const publicDefenseTactics: Tactic[] = [
         '强行锁闭外骨骼液压阻尼与肌肉群，以肉身化为固定碉堡，极大提升抗击打常驻减伤。',
         2,
         [
-            ['self', 'defense', 35, 1],
+            ['self', 'defense', 38, 1],
             ['self', 'evasion', -15, 1],
             ['self', 'speed', -3, 1],
         ],
@@ -123,7 +123,7 @@ export const publicDefenseTactics: Tactic[] = [
         '顺应冲击波与火力散布方向急速滚翻，彻底瓦解锁定并提升防御判定。',
         2,
         [
-            ['self', 'evasion', 30, 1],
+            ['self', 'evasion', 32, 1],
             ['self', 'd_sequence', 1, 1],
             ['self', 'stamina', -6, 0],
         ],
@@ -134,8 +134,8 @@ export const publicDefenseTactics: Tactic[] = [
         '跨步横移切入战友受击轨道，用自身的护甲与胸膛强行分担冲击，为战友撑起屏障。',
         2,
         [
-            ['single_ally', 'shield', 16, 1],
-            ['single_ally', 'defense', 15, 1],
+            ['single_ally', 'shield', 18, 1],
+            ['single_ally', 'defense', 18, 1],
             ['self', 'stamina', -4, 0],
         ],
     ),
@@ -145,9 +145,9 @@ export const publicDefenseTactics: Tactic[] = [
         '以密集的射击死角掩护单一同伴撤出致命交火线，助其重组防线。',
         2,
         [
-            ['single_ally', 'evasion', 25, 1],
-            ['single_ally', 'defense', 15, 1],
-            ['self', 'defense', 10, 1],
+            ['single_ally', 'evasion', 28, 1],
+            ['single_ally', 'defense', 16, 1],
+            ['self', 'defense', 12, 1],
         ],
     ),
     def(
@@ -156,7 +156,7 @@ export const publicDefenseTactics: Tactic[] = [
         '将自身力场发生器的聚束偏导通道定向投射至濒危友方，为其构筑紧急吸收护盾。',
         2,
         [
-            ['single_ally', 'shield', 18, 1],
+            ['single_ally', 'shield', 22, 1],
             ['self', 'vigor', -3, 0],
         ],
     ),
@@ -168,7 +168,7 @@ export const publicDefenseTactics: Tactic[] = [
         [
             ['single_enemy', 'aim', -25, 1],
             ['single_enemy', 'speed', -3, 1],
-            ['self', 'defense', 10, 1],
+            ['self', 'defense', 12, 1],
         ],
     ),
     def(
@@ -177,8 +177,8 @@ export const publicDefenseTactics: Tactic[] = [
         '就地引爆气溶胶发烟筒，浓厚的阻滞烟雾吞没战场通道，全面恶化敌方瞄准线。',
         2,
         [
-            ['all_enemies', 'aim', -20, 1],
-            ['self', 'evasion', 20, 1],
+            ['all_enemies', 'aim', -22, 1],
+            ['self', 'evasion', 22, 1],
         ],
     ),
 
@@ -191,8 +191,8 @@ export const publicDefenseTactics: Tactic[] = [
         '以绝不后退的意志夯死掩体掩角，将防御力、护盾与规避判定推向凡人极限。',
         3,
         [
-            ['self', 'defense', 45, 1],
-            ['self', 'shield', 25, 1],
+            ['self', 'defense', 48, 1],
+            ['self', 'shield', 26, 1],
             ['self', 'd_sequence', 1, 1],
             ['self', 'speed', -4, 1],
         ],
@@ -203,8 +203,8 @@ export const publicDefenseTactics: Tactic[] = [
         '指挥调度所有战斗友方背靠背结成防御斜面，以重叠交错的防护抵御正面风暴。',
         3,
         [
-            ['all_allies', 'defense', 25, 1],
-            ['all_allies', 'shield', 15, 1],
+            ['all_allies', 'defense', 26, 1],
+            ['all_allies', 'shield', 16, 1],
         ],
     ),
     def(
@@ -213,8 +213,8 @@ export const publicDefenseTactics: Tactic[] = [
         '将便携能量核心超载至熔毁临界点，为整个作战小队披覆一层厚重的动能吸收护盾。',
         3,
         [
-            ['all_allies', 'shield', 20, 1],
-            ['all_allies', 'defense', 15, 1],
+            ['all_allies', 'shield', 22, 1],
+            ['all_allies', 'defense', 18, 1],
             ['self', 'vigor', -5, 0],
         ],
     ),
@@ -225,8 +225,8 @@ export const publicDefenseTactics: Tactic[] = [
         3,
         [
             ['all_enemies', 'speed', -4, 1],
-            ['all_enemies', 'aim', -25, 1],
-            ['all_allies', 'evasion', 15, 1],
+            ['all_enemies', 'aim', -26, 1],
+            ['all_allies', 'evasion', 16, 1],
         ],
     ),
 
@@ -239,8 +239,8 @@ export const publicDefenseTactics: Tactic[] = [
         '释放方舟原铸最高权限防护协议，构筑绝对不可侵犯的物理与概念力场防御网。',
         4,
         [
-            ['all_allies', 'shield', 35, 1],
-            ['all_allies', 'defense', 40, 1],
+            ['all_allies', 'shield', 38, 1],
+            ['all_allies', 'defense', 42, 1],
             ['all_allies', 'd_sequence', 1, 1],
             ['self', 'vigor', -6, 0],
         ],
@@ -251,9 +251,9 @@ export const publicDefenseTactics: Tactic[] = [
         '以深渊黑晶裂片扭曲周围微观维度的因果线，将必中打击强行偏折并散解致死动能。',
         4,
         [
-            ['self', 'shield', 40, 1],
+            ['self', 'shield', 45, 1],
             ['self', 'd_sequence', 2, 0],
-            ['all_allies', 'defense', 20, 1],
+            ['all_allies', 'defense', 22, 1],
             ['self', 'sanity', -6, 0],
         ],
     ),
@@ -267,8 +267,8 @@ export const publicDefenseTactics: Tactic[] = [
         '抬起单手防暴合金盾完全遮蔽面门与胸腹，硬抗来袭冲击，使防御部分闪避免伤直达峰值。',
         1,
         [
-            ['self', 'defense', 20, 1],
-            ['self', 'shield', 8, 1],
+            ['self', 'defense', 22, 1],
+            ['self', 'shield', 10, 1],
         ],
         'shield',
     ),
@@ -279,8 +279,8 @@ export const publicDefenseTactics: Tactic[] = [
         2,
         [
             ['self', 'd_sequence', 1, 0],
-            ['self', 'defense', 25, 1],
-            ['self', 'shield', 10, 1],
+            ['self', 'defense', 28, 1],
+            ['self', 'shield', 12, 1],
         ],
         'shield',
     ),
@@ -290,8 +290,8 @@ export const publicDefenseTactics: Tactic[] = [
         '横盾斜跨挡于受创友方身前，用坚厚盾体为其吸收弹雨与撕咬。',
         2,
         [
-            ['single_ally', 'defense', 30, 1],
-            ['single_ally', 'shield', 15, 1],
+            ['single_ally', 'defense', 32, 1],
+            ['single_ally', 'shield', 16, 1],
             ['self', 'speed', -2, 1],
         ],
         'shield',
@@ -302,8 +302,8 @@ export const publicDefenseTactics: Tactic[] = [
         '单手持盾沉肩入地，合金盾面与地面咬合化为永固工事，免疫大部分碎裂性创伤。',
         3,
         [
-            ['self', 'defense', 45, 1],
-            ['self', 'shield', 25, 1],
+            ['self', 'defense', 48, 1],
+            ['self', 'shield', 28, 1],
             ['self', 'd_sequence', 1, 1],
         ],
         'shield',
@@ -318,8 +318,8 @@ export const publicDefenseTactics: Tactic[] = [
         '双手紧扣重装塔盾驻地，放弃一切虚妄的闪避，以纯粹的装甲厚度吃下所有正面打击。',
         2,
         [
-            ['self', 'defense', 45, 1],
-            ['self', 'shield', 22, 1],
+            ['self', 'defense', 48, 1],
+            ['self', 'shield', 25, 1],
             ['self', 'speed', -3, 1],
         ],
         'both_shield',
@@ -330,9 +330,9 @@ export const publicDefenseTactics: Tactic[] = [
         '如重装装甲车般稳步推展双手重盾，将身后的整条走廊化为绝对庇护安全区。',
         3,
         [
-            ['self', 'defense', 55, 1],
-            ['self', 'shield', 32, 1],
-            ['all_teammates', 'defense', 30, 1],
+            ['self', 'defense', 58, 1],
+            ['self', 'shield', 35, 1],
+            ['all_teammates', 'defense', 32, 1],
             ['self', 'speed', -4, 1],
         ],
         'both_shield',
@@ -343,9 +343,9 @@ export const publicDefenseTactics: Tactic[] = [
         '深渊清理人重装战术：双手塔盾深桩扎入混凝土，硬顶核爆级冲击与巨兽践踏。',
         4,
         [
-            ['self', 'defense', 70, 1],
-            ['self', 'shield', 45, 1],
-            ['all_allies', 'shield', 25, 1],
+            ['self', 'defense', 75, 1],
+            ['self', 'shield', 50, 1],
+            ['all_allies', 'shield', 28, 1],
             ['self', 'speed', -5, 1],
         ],
         'both_shield',
@@ -361,7 +361,7 @@ export const publicDefenseTactics: Tactic[] = [
         1,
         [
             ['self', 'd_sequence', 1, 0],
-            ['self', 'evasion', 15, 1],
+            ['self', 'evasion', 16, 1],
         ],
         'wave',
     ),
@@ -371,8 +371,8 @@ export const publicDefenseTactics: Tactic[] = [
         '以单手刀剑封死正面空隙，以稳固重心化解来袭打击并预备受身反击。',
         2,
         [
-            ['self', 'defense', 22, 1],
-            ['self', 'evasion', 18, 1],
+            ['self', 'defense', 24, 1],
+            ['self', 'evasion', 20, 1],
             ['self', 'd_sequence', 1, 0],
         ],
         'wave',
@@ -387,8 +387,8 @@ export const publicDefenseTactics: Tactic[] = [
         '双手将巨剑横架于胸口，利用宽阔沉重的剑身格挡正面致命劈刺，弥补防御短板。',
         2,
         [
-            ['self', 'defense', 28, 1],
-            ['single_enemy', 'aim', -15, 1],
+            ['self', 'defense', 30, 1],
+            ['single_enemy', 'aim', -16, 1],
         ],
         'both_wave',
     ),
@@ -398,9 +398,9 @@ export const publicDefenseTactics: Tactic[] = [
         '双手轮动重型兵刃划出撕裂空气的风暴回旋，用狂暴风压逼退周遭迫近之敌。',
         3,
         [
-            ['self', 'defense', 32, 1],
+            ['self', 'defense', 35, 1],
             ['all_enemies', 'speed', -3, 1],
-            ['all_enemies', 'aim', -20, 1],
+            ['all_enemies', 'aim', -22, 1],
         ],
         'both_wave',
     ),
@@ -414,7 +414,7 @@ export const publicDefenseTactics: Tactic[] = [
         '以极轻微的金属接触点刺偏敌方兵刃前端，借力滑步拉开安全身位。',
         1,
         [
-            ['self', 'evasion', 20, 1],
+            ['self', 'evasion', 22, 1],
             ['self', 'd_sequence', 1, 0],
         ],
         'prick',
@@ -425,8 +425,8 @@ export const publicDefenseTactics: Tactic[] = [
         '如灵蛇出洞般侧滑避开正面锋芒，贴地滑步卸开敌方攻击轴线。',
         2,
         [
-            ['self', 'evasion', 30, 1],
-            ['self', 'speed', 2, 1],
+            ['self', 'evasion', 32, 1],
+            ['self', 'speed', 3, 1],
             ['self', 'd_sequence', 1, 0],
         ],
         'prick',
@@ -441,9 +441,9 @@ export const publicDefenseTactics: Tactic[] = [
         '双手持握长枪/长戟前推，利用绝对武器纵深逼迫突进的敌人减速止步。',
         2,
         [
-            ['self', 'defense', 22, 1],
+            ['self', 'defense', 24, 1],
             ['single_enemy', 'speed', -4, 1],
-            ['single_enemy', 'aim', -15, 1],
+            ['single_enemy', 'aim', -16, 1],
         ],
         'both_prick',
     ),
@@ -453,10 +453,10 @@ export const publicDefenseTactics: Tactic[] = [
         '双手枪尖颤动如雨封锁整片轨道通道，以高强度物理阻隔卡死逼近敌人的战备节奏。',
         3,
         [
-            ['self', 'defense', 28, 1],
-            ['self', 'evasion', 20, 1],
+            ['self', 'defense', 30, 1],
+            ['self', 'evasion', 22, 1],
             ['single_enemy', 'speed', -4, 1],
-            ['single_enemy', 'aim', -25, 1],
+            ['single_enemy', 'aim', -26, 1],
         ],
         'both_prick',
     ),
@@ -470,8 +470,8 @@ export const publicDefenseTactics: Tactic[] = [
         '近身防卫射击术：紧贴胸口持枪压低身体轮廓，兼顾极小受弹面与灵活防守机动。',
         1,
         [
-            ['self', 'defense', 14, 1],
-            ['self', 'evasion', 12, 1],
+            ['self', 'defense', 16, 1],
+            ['self', 'evasion', 14, 1],
         ],
         'pistol',
     ),
@@ -481,8 +481,8 @@ export const publicDefenseTactics: Tactic[] = [
         '单手速射压制近身追兵的视线，借反冲力向掩体后方急速位移脱离致命距离。',
         2,
         [
-            ['self', 'evasion', 28, 1],
-            ['single_enemy', 'aim', -20, 1],
+            ['self', 'evasion', 30, 1],
+            ['single_enemy', 'aim', -22, 1],
         ],
         'pistol',
     ),
@@ -496,8 +496,8 @@ export const publicDefenseTactics: Tactic[] = [
         '双手托枪向战壕上方喷吐连绵弹幕，以持续的枪口烈焰和跳弹压低敌群攻击意愿。',
         2,
         [
-            ['all_enemies', 'aim', -22, 1],
-            ['self', 'evasion', 20, 1],
+            ['all_enemies', 'aim', -24, 1],
+            ['self', 'evasion', 22, 1],
         ],
         'smg',
     ),
@@ -511,9 +511,9 @@ export const publicDefenseTactics: Tactic[] = [
         '依托枪托形成稳定三角支撑，对准推进走廊进行定点控枪预瞄，封死敌方突进路线。',
         2,
         [
-            ['self', 'defense', 22, 1],
+            ['self', 'defense', 24, 1],
             ['single_enemy', 'speed', -3, 1],
-            ['single_enemy', 'aim', -20, 1],
+            ['single_enemy', 'aim', -22, 1],
         ],
         'assault_rifle',
     ),
@@ -528,8 +528,8 @@ export const publicDefenseTactics: Tactic[] = [
         2,
         [
             ['single_enemy', 'speed', -5, 1],
-            ['single_enemy', 'aim', -25, 1],
-            ['self', 'defense', 12, 1],
+            ['single_enemy', 'aim', -26, 1],
+            ['self', 'defense', 14, 1],
         ],
         'shotgun',
     ),
@@ -544,7 +544,7 @@ export const publicDefenseTactics: Tactic[] = [
         1,
         [
             ['single_enemy', 'speed', -4, 1],
-            ['self', 'defense', 12, 1],
+            ['self', 'defense', 14, 1],
         ],
         'sawed_off',
     ),
@@ -558,8 +558,8 @@ export const publicDefenseTactics: Tactic[] = [
         '披挂热光学吉利织物融入残垣阴影，大幅提升回避并规避近距离锁定。',
         2,
         [
-            ['self', 'evasion', 38, 1],
-            ['all_enemies', 'aim', -15, 1],
+            ['self', 'evasion', 40, 1],
+            ['all_enemies', 'aim', -16, 1],
         ],
         'sniper_rifle',
     ),
@@ -574,7 +574,7 @@ export const publicDefenseTactics: Tactic[] = [
         2,
         [
             ['single_enemy', 'speed', -4, 1],
-            ['self', 'evasion', 22, 1],
+            ['self', 'evasion', 24, 1],
         ],
         'crossbow',
     ),
@@ -588,8 +588,8 @@ export const publicDefenseTactics: Tactic[] = [
         '借由轻盈的步法轻快侧跃闪开近战死角，在半空维持平衡并摆脱受击中心。',
         1,
         [
-            ['self', 'evasion', 22, 1],
-            ['self', 'speed', 2, 1],
+            ['self', 'evasion', 24, 1],
+            ['self', 'speed', 3, 1],
         ],
         'bow',
     ),
@@ -603,7 +603,7 @@ export const publicDefenseTactics: Tactic[] = [
         '掷出大功率强光震爆弹，以 170dB 爆鸣与百万流明致盲波强行瓦解敌方全线进攻。',
         2,
         [
-            ['all_enemies', 'aim', -30, 1],
+            ['all_enemies', 'aim', -32, 1],
             ['all_enemies', 'speed', -2, 1],
         ],
         'throw',
@@ -618,8 +618,8 @@ export const publicDefenseTactics: Tactic[] = [
         '引导微量高维灵能编织为晶体状以太光膜，吸收高额伤害并抵御异常侵蚀。',
         2,
         [
-            ['self', 'shield', 20, 1],
-            ['self', 'defense', 20, 1],
+            ['self', 'shield', 22, 1],
+            ['self', 'defense', 22, 1],
             ['self', 'sanity', -2, 0],
         ],
         'magic',
@@ -632,7 +632,7 @@ export const publicDefenseTactics: Tactic[] = [
         [
             ['self', 'evasion', 50, 1],
             ['self', 'd_sequence', 1, 1],
-            ['self', 'shield', 16, 1],
+            ['self', 'shield', 18, 1],
             ['self', 'sanity', -4, 0],
         ],
         'magic',

@@ -1,4 +1,4 @@
-import type { BattleMap, Cover } from '../../meta';
+import type { BattleMap, Cover } from '../../contract/meta';
 
 /**
  * 铁锈前哨 · 全域战场地图集

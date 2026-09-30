@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, memo } from 'react';
-import { PlayerState, Item, ItemInstance, NecessaryResource, Sanctuary, Node, Entity, CompanionTemplate, CompanionDynamicState, Facility, Resident, SanctuaryEvent, isNodeDangerous } from '../meta';
+import { isNodeDangerous } from '../consts';
+import { CompanionDynamicState, CompanionTemplate, Entity, Facility, FacilityUpgradePayment, InventoryGridReturn, Item, ItemInstance, NecessaryResource, Node, PlayerState, Resident, Sanctuary, SanctuaryEvent } from '../contract';
 import { RARITY_MAP } from '../constants';
-import type { FacilityUpgradePayment, InventoryGridApi } from '../hooks';
 import { AudioService } from '../services';
 
 interface SanctuaryPanelProps {
@@ -14,7 +14,7 @@ interface SanctuaryPanelProps {
     onClose?: () => void;
     getCustomRestConfig?: (hours: number) => any;
     /** 储物网格契约：仓库取出时按格数判定背包是否装得下 */
-    inventoryGrid: InventoryGridApi;
+    inventoryGrid: InventoryGridReturn;
     // 设施系统
     facilities?: Facility[];
     dailyProduction?: Record<string, number>;

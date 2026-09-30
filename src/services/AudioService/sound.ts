@@ -13,7 +13,7 @@ sound.ts
 - 避免爆音：使用较低峰值、包络与软削波
 */
 
-import type { SoundType } from '../../meta'
+import type { SoundType } from '../../contract/meta';
 import {
     clamp,
     createNoiseBuffer,

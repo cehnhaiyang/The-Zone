@@ -1,15 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type {
-    ChainNarrative,
-    HorrorAesthetic,
-    HorrorAtom,
-    HorrorDomain,
-    NarrativeMode,
-    NarrativePacing,
-    PlayerState,
-    PlotPoint,
-    StoryConfig,
-} from '../../meta';
+import type { ChainNarrative, HorrorAesthetic, HorrorAtom, HorrorDomain, NarrativeMode, NarrativePacing, PlayerState, PlotPoint, StoryConfig } from '../../contract/meta';
 import {
     AXIS_PRESETS,
     HORROR_AESTHETICS,

@@ -1,4 +1,4 @@
-import type { Cover, BattleMap } from '../../meta';
+import type { BattleMap, Cover } from '../../contract/meta';
 
 /**
  * 消毒供应室 - 专属掩体常数定义

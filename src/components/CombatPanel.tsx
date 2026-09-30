@@ -38,41 +38,14 @@ import type {
     AnyTactic,
     AttackForecast,
     AttackForecastSource,
-    CombatPosition,
     CounterAdvanceRequest,
     InsertActionWindow,
     MoveDirection,
-} from '../hooks';
-import { getBattleDistance, getCoverAtCell, getSteppedCell, isCellWalkable } from '../hooks';
-import {
-    AccumulateCounter,
-    AttackResult,
-    AttributeType,
-    BattleMap,
-    CombatAlly,
-    CombatDynamicState,
-    CombatEnemy,
-    CombatIntent,
-    CounterType,
-    Cover,
-    DefenseResult,
-    DynamicVitalType,
-    EquipState,
-    IntentType,
-    Tactic,
-    TacticEffectType,
-    Target,
-    VitalType,
-    WeaponType,
-    getAllyTargetId,
-    getPercent,
-    getTacticWeaponType,
-    isAttributeType,
-    isDynamicVitalType,
-    isVitalType,
-    safeNumber,
-    sequenceMinLength,
-} from './../meta';
+} from '../contract';
+import type { CombatPosition } from '../consts';
+import { getBattleDistance, getCoverAtCell, getSteppedCell, isCellWalkable } from '../consts';
+import { getAllyTargetId, getPercent, getTacticWeaponType, isAttributeType, isDynamicVitalType, isVitalType, safeNumber, sequenceMinLength } from '../consts';
+import { AccumulateCounter, AttackResult, AttributeType, BattleMap, CombatAlly, CombatDynamicState, CombatEnemy, CombatIntent, ConsumableEffectType, CounterType, Cover, DefenseResult, DynamicVitalType, EquipState, IntentType, Tactic, TacticEffectType, Target, VitalType, WeaponType } from '../contract';
 
 const combatPanelCss = `
 @import url('https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap');
@@ -653,7 +626,16 @@ const SPECIAL_EFFECT_LABEL: Record<string, string> = {
     shield: '偏转矩阵', battery: '电池修复', integrity: '完整性修复',
     ap: '行动点增减', speed: '速度', damage: '攻击力', defense: '防御力', evasion: '闪避力',
 };
-const STATUS_META: Partial<Record<TacticEffectType, { icon: IconName; label: string; tone: 'buff' | 'debuff' | 'neutral' }>> = {
+/**
+ * 状态徽章可用的效果键。
+ *
+ * 战斗状态的 `CombatStatus.type` 收敛于 `TacticEffectType`；
+ * `battery` / `integrity` 属神经链接仪的消耗品效果（`ConsumableEffectType`），
+ * 战斗链路不会产出，但保留其映射，使同类数值若以状态形式出现时
+ * 仍能沿用统一文案与色调。
+ */
+type StatusMetaKey = TacticEffectType | ConsumableEffectType;
+const STATUS_META: Partial<Record<StatusMetaKey, { icon: IconName; label: string; tone: 'buff' | 'debuff' | 'neutral' }>> = {
     shield: { icon: 'shield', label: '偏转矩阵', tone: 'buff' },
     hp: { icon: 'heart', label: '生命再生', tone: 'buff' },
     sanity: { icon: 'brain', label: '理智再生', tone: 'buff' },
@@ -1181,10 +1163,9 @@ const BattleGrid: React.FC<{
                             ];
                             const highlightedCell = isInRange(x, lane);
                             const cellTitle = cover
-                                ? `${cover.name}（覆盖率 ${Math.round(safeNumber(cover.coverRate) * 100)}%${
-                                    cover.hp !== undefined
-                                        ? ` · 耐久 ${Math.round(safeNumber(cover.hp))}/${Math.round(safeNumber(cover.canBeDestoryed ?? cover.hp))}`
-                                        : ' · 不可摧毁'
+                                ? `${cover.name}（覆盖率 ${Math.round(safeNumber(cover.coverRate) * 100)}%${cover.hp !== undefined
+                                    ? ` · 耐久 ${Math.round(safeNumber(cover.hp))}/${Math.round(safeNumber(cover.canBeDestoryed ?? cover.hp))}`
+                                    : ' · 不可摧毁'
                                 }）`
                                 : `纵深 ${x} · ${lane + 1} 轨`;
                             return (
@@ -2127,7 +2108,7 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
     getTacticsFor, canUseTactic, executeTactic, endPlayerPhase, getVisibleResultSequence, getPredictionDepthFor, getAttackForecast, pendingDefense,
     onGenerateEnemyVisual, onRandomSwitchEnemyVisual, isEnemyVisualGenerating,
     positions, battleMap, covers, getUnitRange, getMoveCost, onMoveAlly,
-    counterPrompt, onResolveCounterPrompt, counterSkip, onToggleCounterSkip, 
+    counterPrompt, onResolveCounterPrompt, counterSkip, onToggleCounterSkip,
     insertAction, onEndInsertAction,
 }) => {
     const [selectedTactic, setSelectedTactic] = useState<AnyTactic | null>(null);
@@ -2380,7 +2361,7 @@ const CombatActivePanel: React.FC<CombatPanelProps> = ({
             if (!hasTarget) return `射程外 · 需接近至 ${formatNumber(activeRange)} 格`;
         }
         return undefined;
-    }, [isBusy, isPlayerPhase, isInsertingUnit, insertAction, activeAllyEntry, activeRange, aliveEnemies, isOutOfRange, effectiveActiveId ]);
+    }, [isBusy, isPlayerPhase, isInsertingUnit, insertAction, activeAllyEntry, activeRange, aliveEnemies, isOutOfRange, effectiveActiveId]);
 
     /** 蓄反 / 差反询问发起者名称（player / 同伴 id）。 */
     const counterActorName = useMemo(() => {

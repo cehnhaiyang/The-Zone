@@ -1,22 +1,6 @@
-import { normalizeEquipState, resolvePlotPointNet, safeDeepClone } from '../meta';
-import type {
-    PlayerState,
-    PlotPoint,
-    StoryConfig,
-    StoryArc,
-    ArchivedStoryArc,
-    ChainNarrative,
-    Entity,
-    CompanionTemplate,
-    CompanionDynamicState,
-    NarrativePacing,
-    NarrativePhase,
-    EmotionalTone,
-    DyNarrative,
-    StateTrend,
-    DynamicVitalType,
-    Vital,
-} from '../meta';
+import { normalizeEquipState, resolvePlotPointNet, safeDeepClone } from '../consts';
+;
+import type { ArchivedStoryArc, ChainNarrative, CompanionDynamicState, CompanionTemplate, DyNarrative, DynamicVitalType, EmotionalTone, Entity, NarrativePacing, NarrativePhase, PlayerState, PlotPoint, StateTrend, StoryArc, StoryConfig, Vital } from '../contract';
 import {
     getSeverity,
     HP_STATE,

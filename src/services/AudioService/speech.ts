@@ -7,10 +7,7 @@
  * @see ./interface.copy.ts
  */
 
-import {
-    EmotionalTone,
-    Mood,
-} from '../../meta'
+import { EmotionalTone, Mood } from '../../contract/meta';
 
 import type { NoiseColor } from './tools'
 
