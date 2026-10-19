@@ -862,3 +862,5 @@ export type LogType =
     | 'ai-gen'
     | 'hallucination'
     | 'mental'
+
+export type HardnessType = '休闲' | '简单' | '标准' | '普通' | '困难' | '极难' | '噩梦' | '地狱'

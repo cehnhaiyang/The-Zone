@@ -18,6 +18,7 @@
 import type { Dispatch, SetStateAction } from 'react'
 
 import {
+    HardnessType,
     TacticType,
     AffinityPhase,
     QuestStatus,
@@ -562,7 +563,16 @@ export interface OriginTemplate {
     player: PlayerTemplate
     sanctuary: SanctuaryTemplate
     companion?: CompanionTemplate[]
-
+    hardness: {
+        // 探索难度
+        exploration: HardnessType
+        // 解谜难度
+        puzzle: HardnessType
+        // 生存难度
+        survive: HardnessType
+        // 战斗难度
+        combat: HardnessType
+    }
 }
 
 /**

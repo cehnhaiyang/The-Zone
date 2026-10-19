@@ -5,13 +5,12 @@ import type { PlayerTemplate } from '../../contract/meta';
  *
  * 核心定位：超高真实法术爆发、极度脆弱、以生命与理智献祭超验因果力量
  * 玩法特色：
- *   - 跳过物理常驻护甲与防御序列的即时真实法术输出 (Instant Magic)
+ *   - 跳过物理常驻护甲与防御序列的即时真实法术输出 (Instant Magic, $range = 0$)
  *   - 意志（will）驱动的巨额法术伤害放大系数：
- *     $$\text{True Damage} = \lfloor \text{WeaponDamage} \times (1 + \lfloor will / 10 \rfloor \times 0.5) \times combatBonus \times 0.75 \rfloor$$
- *   - 深度共鸣高维异变遗物（利用 cthulhu 亲和性代偿血肉融合与认知侵蚀的反噬）
+ *   - 深度共鸣高维异变遗物（利用 cthulhu 亲和性代偿血肉融合、认知侵蚀与因果倒错的反噬）
  * 风险收益：
  *   - 生理极限处于残废边缘（maxHp 55），容错率极低，抗击打能力微弱
- *   - 启动爆发后能在数回合内对高护甲及深渊实体造成不可逆的毁灭性抹杀
+ *   - 通过「鲜血契约」献祭生命回充行动点并拉升攻击序列，可在单回合内倾泻毁灭性真实伤害
  */
 export const PLAYER_OCCULTIST: PlayerTemplate = {
     id: 'occultist',
@@ -23,7 +22,7 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
         attribute: {
             // [0 ~ 5] 残废区间：严重缺乏物理训练，长期沉浸于禁断典籍与真菌侵蚀，负重能力极低
             strength: 2,
-            // [10 ~ 20] 标准底线：神经传导勉强及格，满足基础行动点 AP = floor(speed/5) = 2，并达到差反机制启动门槛 (speed >= 10)
+            // [10 ~ 20] 标准底线：神经传导勉强及格，满足基础行动点 AP = floor(10/5) = 2，并达到差反机制启动门槛 (speed >= 10)
             agility: 10,
             // [20 ~ 30] 顶尖学者：通晓古苏美尔秘文与非欧拓扑几何，大幅降低废墟搜查与推理的精力消耗
             wisdom: 28,
@@ -37,12 +36,12 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
         vital: {
             // 残废极限 [50 档位]：肉体脏器严重衰竭，无法承受重型物理钝击与撕扯
             maxHp: 55,
-            // 脆弱阈值：常年遭受深渊耳语轰击，距狂乱与神经崩溃仅一步之遥
+            // 脆弱阈值：常年遭受深渊耳语轰击，佩戴旧印护符 (+15) 后勉强维持在 95 点准正常水位
             maxSanity: 80,
-            // 序列长度 $L = \lfloor 60 / 10 \rfloor = 6$：行动序列短，战术爆发容错极紧凑
+            // 序列长度 L = floor(60 / 10) = 6：行动序列短促精悍，依赖短期爆发快速终结战斗
             maxStamina: 60,
-            // 精神疲惫：中枢神经系统承受高维震颤，精力亏空与疲劳积累速度偏快
-            maxVigor: 70
+            // 精神专注：学者的精神韧性支撑其解读古籍，但面对高强度连续搜查仍易疲惫
+            maxVigor: 75
         },
         inventory: [
             {
@@ -52,17 +51,19 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
                 type: 'material',
                 grade: 'prototype',
                 size: [1, 1],
-                cognitiveErosionState: 2
+                cognitiveErosionState: 2,
+                causalInversionState: 1
             },
             {
                 id: 'incense_bundle',
                 name: '安神沉木药香',
-                desc: '以深渊黑苔提取液与干枯鼠尾草手工研磨压制的香束，点燃后青烟凝而不散，能有效舒缓受惊震荡的中枢神经。',
+                desc: '以深渊黑苔提取液与干枯鼠尾草手工研磨压制的香束，点燃后青烟凝而不散，能有效舒缓受惊震荡的中枢神经并提振精神。',
                 type: 'consumable',
                 grade: 'standard',
                 size: [1, 1],
                 effects: [
-                    ['sanity', 35]
+                    ['sanity', 35],
+                    ['vigor', 15]
                 ]
             },
             {
@@ -72,11 +73,24 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
                 type: 'consumable',
                 grade: 'prototype',
                 size: [1, 1],
-                fleshFusionState: 1,
+                fleshFusionState: 2,
                 effects: [
                     ['will', 6, 3],
                     ['sanity', -15],
-                    ['hp', -10]
+                    ['hp', -8]
+                ]
+            },
+            {
+                id: 'salvaged_capacitor_cell',
+                name: '蚀刻电容电池',
+                desc: '从遇难基金会观测员遗体上剥离的改装电池，外壳刻有稳压符文，可为神经链接仪补充急需的电力并微调电极。',
+                type: 'consumable',
+                grade: 'reinforced',
+                size: [1, 1],
+                cognitiveErosionState: 1,
+                effects: [
+                    ['battery', 40],
+                    ['integrity', 10]
                 ]
             },
             {
@@ -99,7 +113,7 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
                     desc: '以深渊黑曜石精细打磨的仪式法器，锋刃内部天然寄生着活体菌丝脉络。攻击时完全跳脱物理防御序列与常驻护甲，直接以超验意志撕碎目标的生命因果本质。',
                     type: 'weapon',
                     grade: 'prototype',
-                    size: [1, 1],
+                    size: [2, 1],
                     weaponType: 'magic',
                     weaponDamageType: 'instant',
                     range: 0, // 魔法类武器统一规范：range = 0（无弹道衰减，跨越空间全图定点打击）
@@ -108,10 +122,11 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
                         chance: 0.15,
                         bonus: 7
                     },
-                    maxUses: 60,
-                    currentUses: 60,
-                    fleshFusionState: 2,       // 深度绑定右臂异化真菌，提供额外暴击倾向
-                    cognitiveErosionState: 3   // 强认知侵蚀，大幅增幅法术威力，但持续抽取使用者心智
+                    maxUses: 65,
+                    currentUses: 65,
+                    fleshFusionState: 2,       // 深度绑定右臂异化真菌，与高 cthulhu 属性共鸣
+                    cognitiveErosionState: 3,  // 强认知侵蚀，大幅增幅法术威力
+                    causalInversionState: 1    // 微弱因果倒错，偏转施法轨迹
                 },
                 side: null
             },
@@ -124,7 +139,7 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
                     type: 'armor',
                     grade: 'salvaged',
                     size: [2, 2],
-                    defense: 0.05, // 仅提供 5% 象征性物理减免，表现肉体防护的极端脆弱
+                    defense: 0.05, // 仅提供 5% 象征性物理减免，体现肉体防护的极端脆弱
                     maxUses: 60,
                     currentUses: 60,
                     cognitiveErosionState: 1
@@ -135,10 +150,11 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
                     instanceId: 'player_old_talisman_1',
                     id: 'old_talisman',
                     name: '旧印雕骨护符',
-                    desc: '由深海不可知古生物骨骼雕刻而成的五角符文，表面触感冰冷。',
+                    desc: '由深海不可知古生物骨骼雕刻而成的五角符文，表面触感冰冷，锚定着佩戴者摇摇欲坠的意识边界。',
                     type: 'accessory',
-                    grade: 'military',
+                    grade: 'foundation',
                     size: [1, 1],
+                    cognitiveErosionState: 1,
                     effects: [
                         ['maxSanity', 15],
                         ['will', 2] // 核心机制件：将 will 补正至 30 (floor(30/10) = 3)，法术倍率自 2.0x 质变为 2.5x
@@ -151,7 +167,7 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
                 type: 'A',
                 id: 'occultist_void_bolt',
                 name: '虚空贯穿',
-                desc: '以右臂菌丝引导高维裂隙的反冲应力，直接击穿目标的因果轴心。因法术本就跳过物理护甲，此击转而引发神经震荡，重创目标的攻击出力与移动速度。',
+                desc: '以右臂菌丝引导高维裂隙的反冲应力，直接击穿目标的因果轴心。因法术本身跳过物理护甲，此击转而引发深层神经震荡，重创目标的攻击出力与移动速度。',
                 apCost: 2,
                 requireWeapon: 'magic',
                 tacticEffect: [
@@ -163,23 +179,25 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
                 type: 'U',
                 id: 'occultist_blood_pact',
                 name: '鲜血契约',
-                desc: '以黑曜石短刃划破手腕，将活体温热鲜血献祭给右臂的寄生真菌，将肉体的剧烈痛苦直接转化为下一轮法术爆发的狂暴杀伤力与暴击倾向。',
+                desc: '以黑曜石短刃划破手腕，将温热鲜血献祭给右臂的寄生真菌。剧痛将在本回合立即催生额外的行动点，并大幅拉升后续法术的杀伤力与因果判定档位。',
                 apCost: 1,
                 tacticEffect: [
-                    ['self', 'hp', -8, 0],       // 立即献祭 8 点宝贵生命
-                    ['self', 'damage', 8, 2],   // 攻击力大幅暴涨，全面放大爆发伤害池
-                    ['self', 'crit_chance', 0.15, 2] // 提升暴击概率
+                    ['self', 'hp', -8, 0],         // 立即献祭 8 点宝贵生命
+                    ['self', 'ap', 2, 0],          // 立即回充 2 点 AP（净增 1 AP），支撑单回合高费法术连发
+                    ['self', 'damage', 6, 2],      // 攻击力大幅暴涨，全面放大真实伤害基数
+                    ['self', 'a_sequence', 1, 1]   // 下一次攻击序列判定结果提升 1 档
                 ]
             },
             {
                 type: 'D',
                 id: 'occultist_ritual_barrier',
                 name: '旧印结界',
-                desc: '以指尖精血在虚空中勾勒五角旧印，构筑抵挡物理轰击与精神冲击的排斥护盾，并在符文闭合时平复动荡的心智。',
+                desc: '以指尖精血在虚空中勾勒五角旧印，构筑抵挡物理轰击与精神冲击的排斥护盾，偏转受击因果并在符文闭合时平复动荡的心智。',
                 apCost: 1,
                 tacticEffect: [
-                    ['self', 'shield', 24, 2], // 独立护盾层，先于生命值吸收一切伤害
-                    ['self', 'sanity', 10, 0]  // 平复 10 点理智，缓解施法反噬与耳语侵蚀
+                    ['self', 'shield', 24, 2],     // 独立护盾层，先于生命值吸收伤害
+                    ['self', 'd_sequence', 1, 1],  // 本次防御序列判定结果提升 1 档
+                    ['self', 'sanity', 10, 0]      // 平复 10 点理智，缓解施法反噬与耳语侵蚀
                 ]
             },
             {
@@ -190,8 +208,8 @@ export const PLAYER_OCCULTIST: PlayerTemplate = {
                 apCost: 2,
                 requireWeapon: 'magic',
                 tacticEffect: [
-                    ['all_enemies', 'speed', -3, 2],    // 全体减速 3 点，逆转战局节奏
-                    ['all_enemies', 'evasion', -0.20, 2] // 全体额外免伤（闪避率）降低 20%，为全队集火创造必中窗口
+                    ['all_enemies', 'speed', -3, 2],    // 全体减速 3 点，压制敌方行动点与蓄反能力
+                    ['all_enemies', 'evasion', -0.20, 2] // 全体额外免伤（闪避率）降低 20%，为全队集火创造窗口
                 ]
             }
         ]

@@ -11,25 +11,27 @@ import {
     loot,
     quest,
     npc,
+    tactic,
     createReplacement,
     roam,
     sanctuary,
     svg
-} from './sanctuaryFactory'
+} from './sanctuaryFactory';
 
 /**
  * 铁锈前哨 (Rust Outpost)
  *
- * 核心拓扑与规约：
- * 1. 结构拓扑：安保检查站中枢(1)、指挥区(9)、生活区(10)、工程舱(8)、深层掩体(10，高危物理锁定)、野战医务室(1)、主防爆门(1)，共计整 40 个节点。
- * 2. 威胁曲线：地表边缘 1~6 级 → 重工程走廊 5~7 级 → 深层辐射掩体 7~11 级 + 关底高维实体。
- * 3. 物质与异态：八阶工造层级与深渊正交异态（血肉融合、认知侵蚀、因果倒错）全面落地。
- * 4. 实体规约：克苏鲁系敌人意图分布精准归一化至 100；不可动安保炮塔严格遵循 ImmovableEnemyTemplate。
+ * 起源难度定位与架构规约：
+ * 1. 对应起源：老兵 Barnes（突击进攻型）与随行守护者 Unit-734（重装防御型）。
+ * 2. 探索难度 (Exploration - 困难)：40 节点网络拓扑，由地表检查站深入地下七千米收容区，威胁度由 1 级平滑递增至 11 级与叙事级遭遇。
+ * 3. 解谜难度 (Puzzle - 普通)：专为老兵偏弱的理论逻辑定制的硬核军工电气工程与密码学谜题，提示与文档在区域内严密自洽闭环。
+ * 4. 生存难度 (Survive - 困难)：初始 6 人维持紧绷的 4 天口粮配给；5 大设施构成能源、纯水、军粮与药品的闭环生态，发电机运转伴随侵蚀度持续上升。
+ * 5. 战斗难度 (Combat - 极难)：直面军方「铁壁」生化变异体、自律机炮与零号高维回声；武器射程严格遵循 12 档物理射程分配矩阵。
  */
 export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
     'bunker',
     '铁锈前哨',
-    '一座冷战时期开凿的地下加固防空洞，曾是大灾变前夕军方驻扎的钢铁壁垒。在深渊基金会技术顾问的深度介入下，这里秘密启动了代号「铁壁」的生化武装工程——试图利用深渊星神质提取液、清理人遗留的试作型神经链接仪核心与高维信号残片锻造不朽单兵。降临波峰到来时，收容单元发生维度坍塌，军方高层紧急下达全封锁与就地处决令。如今地表部分沦为拾荒者与生还者的避风港，而深层走廊深处，某些未曾死透的造物仍在紫外灯管下缓慢增殖。',
+    '一座冷战时期开凿的地下加固防空洞，曾是大灾变前夕军方驻扎的钢铁壁垒。在深渊基金会技术顾问的深度介入下，这里秘密启动了代号「铁壁」的生化武装工程——试图利用深渊星神质稀释液、清理人遗留的试作型神经链接仪核心与高维信号残片锻造不朽单兵。降临波峰到来时，收容单元发生维度坍塌，军方高层紧急下达全封锁与就地处决令。如今表层防区沦为拾荒者与生还者的避风港，而深层走廊深处，某些未曾死透的造物仍在紫外灯管下缓慢增殖。',
     '以安保检查站为地面防线中枢，向内辐射指挥中枢走廊（8个情报作战分区）、生活区干道（9个生存维稳分区）、重装备工程走廊（7个动力维护分区）；工程走廊末端由重型气动锁闭隔绝深层掩体走廊（9个绝密生物与零号收容分区）；中枢外侧另设野战医务室与通往外界荒原的主防爆门。',
     'Military Bunker, Industrial Rust, Cold War Aesthetics, Dim Emergency Lighting, UV Deep Labs, Volumetric Fog, Cinematic Horror',
     {
@@ -42,23 +44,23 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
         uniqueResources: [
             uRes(
                 'medicine',
-                '药品',
-                '药剂调配站回收再加工的过期药剂与残余药材，可用于抑制感染并缓解神经刺痛。',
+                '战备药品',
+                '药剂调配站回收再加工的过期抗生素与神经安定针剂，可用于抑制感染并缓解脑电刺痛。',
                 svg('<rect x="3" y="9" width="18" height="7" rx="3.5"/><path d="M12 9v7"/>'),
                 14
             ),
             uRes(
                 'electricity',
-                '电力',
-                '以微型聚变核心作为稳压中枢的混合发电机输出的高压电流，维系防爆门与通风系统运转。',
+                '动力电能',
+                '以微型聚变核心作为稳压中枢的混合发电机输出的高压电流，维系防爆气闭门与通风循环系统运转。',
                 svg('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'),
                 72,
                 0.1
             ),
             uRes(
                 'scraps',
-                '废料',
-                '报废军械、装甲残片与不明金属压成的可用坯料，是前哨加固工事与升级设施的核心货币。',
+                '军用废料',
+                '报废装甲残片、穿甲弹壳与耐酸合金压成的可用坯料，是前哨加固工事与升级设施的核心硬通货。',
                 svg('<path d="M4 7h16v10H4z"/><path d="M8 7v10M16 7v10"/>'),
                 80
             )
@@ -79,72 +81,140 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 I.data(
                     'checkpoint_log',
                     '检查站值班日志',
-                    '一本被咖啡渍和黑色指纹覆盖的值班记录，纸质发脆。',
-                    '第 1 天：防爆门关闭。外部电磁通讯断续。第 3 天：清理人频道彻底消失。第 5 天：有人声称在监视器里看见门外站着自己的家人。第 7 天：严禁记录门外传来的任何呼唤。补充：如果安检机自行亮起绿灯，闭上眼，不要看摄像头。',
+                    '一本被机油和黑色指纹覆盖的值班记录，纸质干脆发黄。',
+                    '第 1 天：主防爆门关闭。外部无线电通讯全部失联。第 3 天：清理人特勤频道彻底沉寂。第 5 天：值班哨兵声称在监控屏幕上看见自己死去的长官正站在防爆门外敬礼。第 7 天：严禁记录门外传来的任何呼唤。最后批注：如果安检通道的荧光屏自行亮起绿灯，立刻闭眼，绝对不要与扫描探头对视。',
                     { threshold: 5 }
                 )
             ],
             interacts: [
                 act(
                     '整理临时营地',
-                    '你把散落的物资归拢到防爆墙后，检查通风阀读数。短暂的秩序感让你紧绷的神经稍微松弛，手心的冷汗慢慢风干。',
-                    { cost: 20, san: 5 }
+                    '你把散落的弹药箱归拢到防爆墙后，检查通风阀读数。短暂的秩序感让你紧绷的神经稍微松弛，手心的冷汗慢慢风干。',
+                    { cost: 15, san: 6, repeat: 3 }
                 ),
                 act(
                     '核对物资封条',
-                    '你逐一检查箱体封条。多数仍然完好，只有一箱医疗物资的封签被揭开过。胶水下压着一小撮细密的黑色菌丝，正随着气流微微起伏。',
+                    '你逐一检查木箱封签。多数箱体仍然完好，只有一箱医疗物资的封签被暗中揭开过。胶水边缘压着一小撮细密的黑色高维菌丝，正随着你的呼吸微微舒展。',
                     { cost: 10, sound: 'search', san: 2 }
                 )
             ],
             npc: npc(
                 'npc_quartermaster_harper',
                 '军需官哈珀',
-                '前哨站的军需官，负责物资登记与配给分配。他的左臂从肘部以下被替换成粗糙的军工机械义肢，活动时伴随着沉闷的齿轮咬合声。他固执地坚持按战时条令办事，但在条令无法覆盖的灰色地带，他会用沉默代替拒绝。',
+                '前哨站的资深军需官，负责物资登记与战备配给。他的左臂肘部以下被替换为粗糙笨重的军工液压义肢，微型伺服电机转动时发出沉闷的咬合声。他固执地坚持按战时条令办事，但在条令无法覆盖的灰色废土中，他习惯用沉默代替默许。',
                 'Middle-aged military quartermaster with a crude mechanical forearm, oil-stained uniform, tired but disciplined eyes, checkpoint dim lighting',
                 {
                     gender: 'male',
+                    style: 'defense',
                     trust: 35,
-                    attrs: { strength: 14, agility: 12, wisdom: 18, awareness: 22, will: 16, cthulhu: 4 },
-                    vitals: { maxHp: 120, maxSanity: 110, maxStamina: 105, maxVigor: 110 },
+                    attrs: { strength: 24, agility: 14, wisdom: 22, awareness: 26, will: 24, cthulhu: 4 },
+                    vitals: { maxHp: 190, maxSanity: 160, maxStamina: 170, maxVigor: 160 },
+                    weapons: {
+                        main: I.weapon(
+                            'harper_wrench',
+                            '重型液压管钳',
+                            '哈珀用机械义肢挥动的特制高碳钢重型扳手，敲击声沉闷如钟。',
+                            'wave',
+                            1,
+                            18,
+                            [0.12, 8],
+                            35,
+                            { grade: 'reinforced', hitRevise: 6 }
+                        ),
+                        side: I.weapon(
+                            'harper_revolver',
+                            '军需官短管左轮',
+                            '随身携带的防身短管转轮手枪，结构简单可靠，绝不卡壳。',
+                            'pistol',
+                            4,
+                            20,
+                            [0.18, 12],
+                            24,
+                            { damageType: 'range', grade: 'military' }
+                        )
+                    },
+                    armors: I.armor(
+                        'quartermaster_apron',
+                        '防破片工兵护甲',
+                        '内衬凯夫拉纤维与轻型钢板的工兵背心，沾满防锈机油。',
+                        0.2,
+                        22,
+                        { grade: 'reinforced', size: [2, 2] }
+                    ),
+                    inventory: [
+                        I.consumable('emergency_ration', '应急军用罐头', '密封良好的马口铁军用红烧肉罐头，保质期虽然过期但内部依然真空完好。', [
+                            ['hp', 15],
+                            ['stamina', 15]
+                        ]),
+                        I.consumable('clean_water_flask', '军用密封水壶', '装满多重超滤后纯净水的不锈钢军用水壶，能有效驱散焦渴与疲惫。', [
+                            ['sanity', 10],
+                            ['hp', 5]
+                        ]),
+                        I.material('repair_parts', '工兵标准备件包', '一组经过防锈浸油处理的军用高强度螺栓、密封垫圈与精密轴承。', {
+                            grade: 'reinforced',
+                            size: [2, 1]
+                        })
+                    ],
+                    tactics: [
+                        tactic(
+                            'U',
+                            'tactic_field_supply',
+                            '战地紧急配给',
+                            '哈珀快速分发战备兴奋剂与加固插板，稳固友方阵线并提升全队防御。',
+                            2,
+                            {
+                                effects: [
+                                    ['all_allies', 'shield', 12, 2],
+                                    ['all_allies', 'defense', 10, 2]
+                                ]
+                            }
+                        )
+                    ],
                     quests: [
                         quest(
                             'supply_manifest',
-                            '哈珀需要重建前哨的物资台账。他要求你从中央指挥室回收封存的军用弹药箱，并从后勤办公室取回最后的配给凭证，以便审计现存物资并加固检查站外围。',
+                            '哈珀需要重建前哨的物资台账。他要求你从中央指挥室回收封存的军用弹药箱，并从后勤办公室取回最后的配给凭证，以便审计现存物资并加固检查站外围防线。',
                             4,
                             [
-                                I.material('ammo_box', '军用弹药箱', '完好的制式弹药封箱，内含未拆封的标准步枪弹药。', {
+                                I.material('ammo_box', '军用弹药箱', '里面整齐装填着军用制式枪弹，铅封完好。', {
                                     grade: 'military',
                                     size: [2, 1]
                                 }),
-                                I.data('supply_requisition', '最后配给凭证', '一张盖着深红印戳的物资调配单，末尾写着「仅用于活人」。')
+                                I.data(
+                                    'supply_requisition',
+                                    '最后配给凭证',
+                                    '盖有军需官与医官双重印鉴的调拨单，纸角已被磨圆。',
+                                    '项目明细：野战净水药片、加固滤芯、军用镇静针剂。最后批注：冷藏储藏室内尚有少量冻结军粮封存。若发现包装箱封条变为手写暗红字样，绝对禁止开箱食用。'
+                                )
                             ],
                             [
                                 I.consumable(
                                     'military_medkit',
                                     '军用急救包',
-                                    '配备止血带、聚维酮碘与急救缝合针的野战医疗包。',
+                                    '配备止血带、聚维酮碘与加压缝合针的野战医疗包，能快速封堵撕裂创口。',
                                     [['hp', 40]],
                                     { grade: 'military', size: [2, 1] }
                                 ),
-                                I.consumable('power_cell', '军用电池', '高容量同位素电容电池，可为设备提供长效电力。', [['battery', 80]], {
+                                I.consumable('power_cell', '军用电池', '高容量同位素电容电池，可为外设与神经链接仪提供长效电力。', [['battery', 80]], {
                                     grade: 'military'
                                 })
                             ]
                         ),
                         quest(
                             'black_inventory',
-                            '哈珀必须确认深层掩体内的「铁壁」实验究竟失控到了何种地步。他需要你深入隔离层带回一份完整的异变组织样本。他无法承诺这能换来方舟的救援，但至少能让死者不再背负叛逃的污名。',
+                            '哈珀必须确认深层掩体内的「铁壁」实验究竟失控到了何种地步。他需要你深入高危生化实验室带回一份完整的异变组织样本。他无法承诺这能换来方舟的救援，但至少能让死者不再背负叛逃的污名。',
                             8,
                             [
-                                I.material('mutated_tissue', '异变组织样本', '从铁壁实验体残骸上剥离的活性组织，封存在防爆管内。', {
-                                    grade: 'prototype'
+                                I.material('mutated_tissue', '异变组织样本', '具有极高科研价值与未知深渊活性的组织，封存在防爆管内。', {
+                                    grade: 'prototype',
+                                    fleshFusion: 50
                                 })
                             ],
                             [
                                 I.accessory(
                                     'neural_filter_mk2',
                                     '改良神经过滤插件',
-                                    '哈珀用清理人遗留晶片改装的过滤模块，能更有效地阻断高维认知污染。',
+                                    '哈珀用清理人遗留晶片改装的过滤模块，能更有效地阻断高维认知污染与低语震颤。',
                                     [['maxSanity', 35], ['will', 5]],
                                     { grade: 'corporate' }
                                 )
@@ -175,7 +245,7 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
     node(
         'command_sector',
         '指挥中枢走廊',
-        '铺着防滑钢板的加固走廊，两旁墙壁上贴满泛黄的战术避险挂图。上方一整排状态指示灯已近熄灭，只有尽头的一盏应急红灯在以规律的三短一长频率闪烁，像是一串永远无法完成的莫尔斯求救信号。',
+        '铺着防滑带筋钢板的加固走廊，两旁墙壁上贴满泛黄的战术避险挂图。上方一整排状态指示灯已近熄灭，只有尽头的一盏应急红灯在以规律的三短一长频率闪烁，像是一串永远无法完成的莫尔斯求救信号。',
         'Steel-plated floor corridor, faded tactical posters, lists of names crossed out in red marker, status lights mostly dead, one blinking red',
         {
             danger: danger.level(2),
@@ -194,6 +264,11 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     '检查状态指示灯',
                     '你靠近红灯观察，发现灯罩内部落满死去的飞蛾尸体。就在你试图抄录其闪烁规律时，电流突然爆鸣，灯光瞬间熄灭，走廊陷入数秒绝对死寂的黑暗。',
                     { cost: 5, sound: 'error', san: -2 }
+                ),
+                act(
+                    '审视墙面阵亡名单',
+                    '名单上的名字被红笔逐一划去，你在最下方发现了哈珀用铅笔补上的一行小字：「还在喘气的都算在编」。你深吸一口气，握紧了手中的武器。',
+                    { cost: 5, sound: 'ui_click', san: 2 }
                 )
             ]
         }
@@ -211,13 +286,13 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 I.weapon(
                     'officer_pistol',
                     '军官配枪',
-                    '一把保养完好、配重精确的 M1911 手枪，枪柄胡桃木贴片上刻着一行模糊的祷词。',
+                    '一把保养完好、配重精确的 M1911 半自动手枪，枪柄胡桃木贴片上刻着一行模糊的祷词。副手留空时获命中加成，且未移动前首发抢攻不耗 AP。',
                     'pistol',
                     5,
                     24,
                     [0.2, 16],
                     28,
-                    { damageType: 'range', grade: 'military', threshold: 20 }
+                    { damageType: 'range', grade: 'military', threshold: 18, hitRevise: 5 }
                 ),
                 I.material('ammo_box', '军用弹药箱', '里面整齐装填着军用制式枪弹，铅封完好。', {
                     grade: 'military',
@@ -229,7 +304,7 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     'hidden_plan',
                     '防御部署图',
                     '一张染有暗红血斑的蓝图，详细标注了掩体内部的暗格与安防盲区。',
-                    '机密·阅后即焚。7号防区失守，全员后撤至掩体深层并降下铅防爆门。严禁向任何未持认证卡者开门。补充：外部通讯已完全中断72小时。昨夜防爆门外传来整齐的踢正步声，但雷达上什么都没有。',
+                    '机密·阅后即焚（2023年10月制）。7号防区失守，全员后撤至掩体深层并降下铅防爆门。严禁向任何未持认证卡者开门。补充：外部通讯已完全中断72小时。昨夜防爆门外传来整齐的踢正步声，但雷达上什么都没有。',
                     { grade: 'military', threshold: 15 }
                 )
             ],
@@ -257,6 +332,17 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     '记录了撤离前夕几个关键摄像头的异常报告。',
                     '03:14 监控04画面撕裂。03:22 监控05捕捉到走廊墙面像肺泡一样舒张。03:40 监控07（深层掩体隔离门）显示内侧铰链被融化，但门禁传感器依然锁死在闭合状态。',
                     { threshold: 10 }
+                ),
+                I.weapon(
+                    'riot_baton',
+                    '特勤防暴警棍',
+                    '安保人员遗落的加固合金警棍，挥击重心稳固，适合在狭窄走廊内近身格挡与痛击。',
+                    'wave',
+                    1,
+                    14,
+                    [0.1, 6],
+                    28,
+                    { grade: 'reinforced', size: [2, 1], threshold: 14, hitRevise: 6 }
                 )
             ],
             interacts: [
@@ -282,10 +368,10 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     threshold: 15,
                     audio: '这里是铁锈前哨……重复，防御协议已彻底失效。如果外界还有活人听到这条讯号，不要尝试搜救，立即引爆竖井炸药，将深层的东西和我们一起深埋。'
                 }),
-                I.material('signal_decoder', '便携信号解码器', '轻便的军用算法转译机，能够破解基础凯撒与置换密码。', {
+                I.material('signal_decoder', '便携信号解码器', '轻便的军用算法转译机，能够破解基础凯撒移位与置换密码。', {
                     grade: 'military',
                     size: [2, 1],
-                    threshold: 20
+                    threshold: 16
                 })
             ],
             interacts: [
@@ -296,10 +382,15 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 ),
                 act(
                     '破解通讯加密',
-                    '密文成功解密为「FALLBACK」（全线撤退），终端随之吐出一张带有后勤高阶认证签名的通行凭证。理性与逻辑的胜利驱散了心中的一丝阴霾。',
+                    '密文成功解密为「FALLBACK」（全线撤退），终端随之弹出一枚备用的加密电台高能电池组。理性与逻辑的胜利驱散了心中的一丝阴霾。',
                     {
                         cost: 15,
                         san: 10,
+                        gain: [
+                            I.consumable('comms_battery_pack', '军用通讯电池组', '加密终端内置的稳压锂电池模块，可为神经链接仪提供充足电力。', [
+                                ['battery', 60]
+                            ], { grade: 'military' })
+                        ],
                         puzzle: P.type(
                             '军方密文拦截',
                             '拦截到一段由前线指挥部发出的紧急字符倒推加密电文：IDOOEDFN。需要解密还原原文指令。',
@@ -328,6 +419,15 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
         'Large sand table tactical map with miniature flags and unit markers, most toppled, detailed bunker model with pencil inscription, drawer slightly open beneath',
         {
             danger: danger.level(2),
+            items: [
+                I.data(
+                    'tactical_briefing',
+                    '铁壁防务简报',
+                    '夹在作战板上的战术评估报告，详细分析了变异体的弱点。',
+                    '战术评估：深层异化体具备极强的再生与高速突进能力，但在狭窄通道内受制于重盾阻截。建议使用单手利刃配合闪避反击，或以霰弹枪在 4 格以内实施近距爆破压制。',
+                    { grade: 'military', threshold: 10 }
+                )
+            ],
             interacts: [
                 act(
                     '搜查沙盘暗屉',
@@ -341,6 +441,11 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                             })
                         ]
                     }
+                ),
+                act(
+                    '复盘沙盘防线布局',
+                    '你对照前哨铅模梳理了各分区的撤离死角与火力掩体分布，对地下掩体的空间结构有了更透彻的把握。',
+                    { cost: 10, sound: 'ui_click', san: 4 }
                 )
             ]
         }
@@ -359,12 +464,12 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     '加密情报光盘',
                     '带有铅硼防辐射外壳的数据介质，指示灯仍在规律闪烁。',
                     '最终分析备忘录：深渊侵蚀非自然灾害，而是一场有规划的星际播种。我们监听到的高维谐振即为唤醒信号。建议立即对所有降落点实施地毯式核清理。附注：提案已被防务巨头否决，理由是「种子已在第三收容区生根」。',
-                    { grade: 'military', threshold: 20 }
+                    { grade: 'military', threshold: 18 }
                 ),
                 I.material('interception_core', '拦截装置核心', '信号拦截仪的核心振荡组件，拆除后能让这台永不停歇的机器彻底闭嘴。', {
                     grade: 'military',
                     size: [2, 1],
-                    threshold: 18
+                    threshold: 16
                 })
             ],
             interacts: [
@@ -396,6 +501,17 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     '沾染暗黑污血的审讯记录，字迹因剧烈手颤而扭曲。',
                     '审讯对象：114号外勤哨兵。提问：为什么拒绝向撤离卡车放行？回答：那不是卡车……里面坐着的不是人！他们的下颌骨在胸口呼吸！他们说话的声音是从胃部翻滚出来的！记录：对象已丧失逻辑，出现严重深渊共鸣，批准就地处决。',
                     { grade: 'military', threshold: 10 }
+                ),
+                I.weapon(
+                    'tactical_riot_shield',
+                    '重型防暴战术盾',
+                    '宪兵审讯组遗留的加厚聚碳酸酯与合金复合防暴盾，观察窗染满暗血。单手装备时可使部分闪避减伤达到满分，代价是完全闪避概率下降。',
+                    'shield',
+                    1,
+                    11,
+                    [0.08, 5],
+                    32,
+                    { grade: 'reinforced', size: [2, 3], threshold: 18, hitRevise: 4 }
                 )
             ],
             interacts: [
@@ -448,6 +564,12 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     '盖有军需官与医官双重印鉴的调拨单，纸角已被磨圆。',
                     '项目明细：野战净水药片、加固滤芯、军用镇静针剂。最后批注：冷藏储藏室内尚有少量冻结军粮封存。若发现包装箱封条变为手写暗红字样，绝对禁止开箱食用。',
                     { threshold: 8 }
+                ),
+                I.storage(
+                    'tactical_field_pack',
+                    '军用模块化挂载包',
+                    '采用耐磨尼龙缝制的军规后勤扩容副包，能有效拓展随身物资携带空间。',
+                    { grade: 'military', size: [2, 2], threshold: 15 }
                 )
             ],
             interacts: [
@@ -497,15 +619,66 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     gender: 'female',
                     style: 'skirmish',
                     trust: 25,
-                    attrs: { strength: 8, agility: 20, wisdom: 16, awareness: 28, will: 10, cthulhu: 6 },
-                    vitals: { maxHp: 90, maxSanity: 95, maxStamina: 100, maxVigor: 95 },
+                    attrs: { strength: 10, agility: 26, wisdom: 18, awareness: 32, will: 15, cthulhu: 6 },
+                    vitals: { maxHp: 130, maxSanity: 135, maxStamina: 165, maxVigor: 150 },
+                    weapons: {
+                        main: I.weapon(
+                            'sasha_carbine',
+                            '通讯兵短管冲锋枪',
+                            '配发给机要通讯兵的 MP5K 短管冲锋枪，紧凑轻便，适合在狭窄坑道内实施高频火力压制。',
+                            'smg',
+                            7,
+                            19,
+                            [0.16, 10],
+                            30,
+                            { damageType: 'range', grade: 'military' }
+                        ),
+                        side: I.weapon(
+                            'utility_dagger',
+                            '电工剥线短刃',
+                            '刃口锋利的特种电工短刀，必要时可作为贴身防卫利器。',
+                            'prick',
+                            1,
+                            10,
+                            [0.22, 6],
+                            22,
+                            { grade: 'standard', size: [1, 1] }
+                        )
+                    },
+                    armors: I.armor(
+                        'recon_jacket',
+                        '防刮侦察夹克',
+                        '内衬防割纤维的轻量化通讯兵夹克，丝毫不影响高速机动。',
+                        0.15,
+                        18,
+                        { grade: 'standard', size: [2, 2] }
+                    ),
+                    inventory: [
+                        I.consumable('record_player_battery', '小型储能电池', '便携电池模块，状态良好。', [['battery', 40]]),
+                        I.consumable('bandage', '医用急救绷带', '经过环氧乙烷灭菌的弹力压迫止血带。', [['hp', 25]])
+                    ],
+                    tactics: [
+                        tactic(
+                            'U',
+                            'tactic_acoustic_ping',
+                            '声波盲区侦测',
+                            '萨莎凭借敏锐的听觉捕捉敌方关节与呼吸声，引导全队规避攻击并锁定破绽。',
+                            2,
+                            {
+                                effects: [
+                                    ['all_allies', 'evasion', 12, 2],
+                                    ['all_allies', 'aim', 10, 2]
+                                ]
+                            }
+                        )
+                    ],
                     quests: [
                         quest(
                             'silent_frequency',
                             '情报拦截室里那台机器自发运转的噪波正日夜钻入萨莎的大脑。她恳求你潜入情报室拆下拦截装置的核心，还她哪怕一个小时的绝对清静。',
                             5,
                             [
-                                I.material('interception_core', '拦截装置核心', '仍在自动发热振荡的情报设备核心部件。', {
+                                I.material('interception_core', '拦截装置核心', '信号拦截仪的核心振荡组件，拆除后能让这台永不停歇的机器彻底闭嘴。', {
                                     grade: 'military',
                                     size: [2, 1]
                                 })
@@ -514,14 +687,18 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                                 I.accessory(
                                     'comm_earpiece',
                                     '战术通讯耳机',
-                                    '萨莎亲手改装并校准阻抗的防噪耳机，能大幅滤除环境恶念。',
-                                    [['awareness', 3], ['maxSanity', 5]],
+                                    '萨莎亲手改装并校准阻抗的防噪耳机，能大幅滤除环境恶念并提升感知。',
+                                    [['awareness', 4], ['maxSanity', 10]],
                                     { grade: 'military' }
                                 )
                             ]
                         )
                     ],
-                    canBeInvited: { trust: 55, isSanctuarySafe: { food: 20 } },
+                    canBeInvited: {
+                        trust: 55,
+                        questsArchived: ['silent_frequency'],
+                        isSanctuarySafe: { food: 20, water: 20 }
+                    },
                     willRoam: roam.route(40, ['barracks', 'mess_hall', 'officers_quarters'])
                 }
             )
@@ -539,12 +716,12 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 I.weapon(
                     'combat_knife',
                     '制式战斗匕首',
-                    '锋刃经过哑光发黑处理的军用格斗刺刀，握把缠有粗糙的防滑帆布绳。',
+                    '锋刃经过哑光发黑处理的军用格斗刺刀，握把缠有粗糙的防滑帆布绳。单手握持且副手留空时冲刺穿刺极其凌厉。',
                     'prick',
                     1,
                     12,
-                    [0.25, 6],
-                    20,
+                    [0.25, 8],
+                    24,
                     { grade: 'military', size: [1, 1], threshold: 10 }
                 ),
                 I.data(
@@ -554,7 +731,7 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     '亲爱的阿梅：这里的情况远比演习报告危险。昨夜巡逻时，老张听到外围树林里有人用我妈妈的声音喊我。我端着枪没出去，但老张翻过了铁丝网。如果这封信最后落到你手里，答应我，离任何防空设施远一点。',
                     { threshold: 5 }
                 ),
-                I.accessory('soldier_helmet', '旧制式芳纶头盔', '悬挂系统经过多次加固的防片头盔，内部衬垫写满阵亡老兵的呼号。', [['maxHp', 10]], {
+                I.accessory('soldier_helmet', '旧制式芳纶头盔', '悬挂系统经过多次加固的防破片头盔，内部衬垫写满阵亡老兵的呼号。', [['maxHp', 10]], {
                     size: [2, 2],
                     threshold: 10
                 })
@@ -624,12 +801,12 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
         {
             danger: danger.level(6),
             items: [
-                I.consumable('painkillers', '强效止痛药', '军用麻醉性镇痛胶囊，能麻痹剧烈伤痛并稳定体征。', [['hp', 15]], { threshold: 15 })
+                I.consumable('painkillers', '强效止痛药', '军用麻醉性镇痛胶囊，能麻痹剧烈伤痛并稳定体征。', [['hp', 15]], { threshold: 12 })
             ],
             interacts: [
                 act(
                     '查阅床头病历挂牌',
-                    '体温记录显示患者在脑电波平直后，体内脏器温度仍在持续升高至摄氏45度。末行批注用发颤的字体写着：「他在里面隔着玻璃叫我的小名，但我三天前亲手核验了他的死亡报告」。',
+                    '体温记录显示患者在脑电波平直后，体内脏器温度仍在持续升高至 $45\ ^\circ\text{C}$。末行批注用发颤的字体写着：「他在里面隔着玻璃叫我的小名，但我三天前亲手核验了他的死亡报告」。',
                     { cost: 5, sound: 'typing_1', san: -5 }
                 ),
                 act(
@@ -650,7 +827,8 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                                     loot: [
                                         loot(
                                             I.material('contaminated_sample', '轻度污染样本', '装在破裂离心管内的深渊活性生物组织。', {
-                                                grade: 'prototype'
+                                                grade: 'prototype',
+                                                fleshFusion: 20
                                             }),
                                             0.8
                                         ),
@@ -680,7 +858,7 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 act(
                     '在木十字架前默祷',
                     '你坐在冰冷的铁折叠椅上，在幽暗的菌毯微光中闭目凝神。周围狂乱的深渊低语退潮般化为白噪音，你听到了自己平稳的心跳，颤抖的双手重新恢复了稳定。',
-                    { cost: 30, san: 15 }
+                    { cost: 30, san: 15, repeat: 2 }
                 )
             ],
             npc: npc(
@@ -692,27 +870,56 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     gender: 'male',
                     style: 'defense',
                     trust: 40,
-                    attrs: { strength: 4, agility: 4, wisdom: 32, awareness: 22, will: 45, cthulhu: 35 },
-                    vitals: { maxHp: 80, maxSanity: 240, maxStamina: 60, maxVigor: 70 },
+                    attrs: { strength: 4, agility: 4, wisdom: 36, awareness: 28, will: 48, cthulhu: 38 },
+                    vitals: { maxHp: 65, maxSanity: 260, maxStamina: 55, maxVigor: 120 },
+                    inventory: [
+                        I.consumable('blessed_water', '祝圣纯水', '经过神甫祈祷与菌丝微滤的纯净水，能抚慰遭受剧烈震荡的神经。', [
+                            ['sanity', 25],
+                            ['hp', 10]
+                        ]),
+                        I.consumable('sedative', '军用中枢镇静剂', '神经安定注射针，能强行压制精神狂乱并补充精力。', [
+                            ['sanity', 18],
+                            ['vigor', 12]
+                        ], { grade: 'military' })
+                    ],
+                    tactics: [
+                        tactic(
+                            'U',
+                            'tactic_solemn_requiem',
+                            '静谧安魂曲',
+                            '神父低声诵念跨越维度的安魂祷词，抚平友方的精神创伤并构筑意志屏障。',
+                            2,
+                            {
+                                effects: [
+                                    ['all_allies', 'sanity', 15, 0],
+                                    ['all_allies', 'd_sequence', 1, 2]
+                                ]
+                            }
+                        )
+                    ],
                     quests: [
                         quest(
                             'echo_of_faith',
                             '托马斯神父希望你能从零号收容区带回军方最初接触异变源头的「最初接触记录」。他渴望证实，这场降临究竟源自人类傲慢的自毁，还是深空彼岸神性对凡尘苦难的真正回应。',
                             9,
                             [
-                                I.data('first_contact_record', '最初接触记录', '封存在钛合金防爆盒内的黑色记录仪核心，表面有被等离子射线灼烧融化的痕迹。', {
-                                    grade: 'corporate'
-                                })
+                                I.data(
+                                    'first_contact_record',
+                                    '最初接触记录',
+                                    '被保存在钛合金防爆盒内的黑色记录仪核心，表面有等离子灼蚀痕迹。',
+                                    '项目代号：深渊凝视。我们从地下七千米深处掘出了它。它本在沉睡，而军方与基金会的联合钻探将其唤醒。当它睁开眼的那一秒，我们这片时空的引力常数就被改写了。它不需要释放毒气，它的存在本身就在否定经典物理学。原谅我们，我们亲手按下了终末的门铃。',
+                                    { grade: 'foundation', cognitiveErosion: 60 }
+                                )
                             ],
                             [
                                 I.consumable('blessed_water', '祝圣纯水', '经过神甫祈祷与菌丝微滤的纯净水，能抚慰遭受剧烈震荡的神经。', [
                                     ['sanity', 25],
                                     ['hp', 10]
-                                ], { grade: 'military' }),
+                                ], { grade: 'standard' }),
                                 I.accessory('martyr_stole', '殉道者圣带', '带有微弱生物荧光的祭披织物，持有时能显著构筑精神锚点。', [
-                                    ['will', 4],
-                                    ['maxSanity', 20]
-                                ], { grade: 'corporate', size: [2, 1] })
+                                    ['will', 5],
+                                    ['maxSanity', 25]
+                                ], { grade: 'foundation', size: [2, 1], cognitiveErosion: 15 })
                             ]
                         )
                     ]
@@ -733,7 +940,7 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     'officer_diary',
                     '少校指挥日记',
                     '一本磨损严重的牛皮封面日记本，记录了封锁命令背后的阴谋。',
-                    '深层掩体的隔离锁死根本不是为了防范生化泄漏——基金会的特派员早就知道会发生什么。他们要的不是防务武器，他们试图借由实验体的肉身让高维存在在三维现实中发出第一个音节。作战室沙盘下有备用钥匙，如果读到这行字的人还没疯，不要相信任何穿着基金会制服的人。',
+                    '2023年10月记：深层掩体的隔离锁死根本不是为了防范生化泄漏——基金会的特派员早就知道会发生什么。他们要的不是防务武器，他们试图借由实验体的肉身让高维存在在三维现实中发出第一个音节。作战室沙盘下有备用磁卡，如果读到这行字的人还没疯，不要相信任何穿着基金会制服的人。',
                     { grade: 'military', threshold: 10 }
                 ),
                 I.consumable('record_player_battery', '小型储能电池', '军官私藏的便携电池模块，状态良好。', [['battery', 40]], {
@@ -787,10 +994,18 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
         {
             danger: danger.level(3),
             items: [
-                I.consumable('decon_solution', '高效洗消液', '配发给重装防化防务部队的广谱去污浓缩剂。', [
+                I.consumable('decon_solution', '高效洗消液', '配发给重装防化部队的广谱去污浓缩剂。', [
                     ['sanity', 8],
                     ['hp', 5]
-                ], { threshold: 8 })
+                ], { threshold: 8 }),
+                I.armor(
+                    'hazmat_protective_suit',
+                    '密封防化作业服',
+                    '涂有氯丁橡胶阻隔层的重型防化服，虽对穿甲弹防护有限，但能有效隔绝酸液腐蚀与撕咬。',
+                    0.16,
+                    18,
+                    { grade: 'reinforced', size: [2, 3], threshold: 16 }
+                )
             ],
             interacts: [
                 act(
@@ -837,12 +1052,15 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
     node(
         'cold_storage',
         '冷藏储藏室',
-        '厚重的冷库门锁已结满白霜。这里的冷气沉降如浓雾，悬挂在半空的重型不锈钢肉钩在毫无气流的环境下无声地轻轻摆动。尽管温度计读数直逼零下二十度，金属货架表层却凝结着诡异的温热蒸汽。',
+        '厚重的冷库门锁已结满白霜。这里的冷气沉降如浓雾，悬挂在半空的重型不锈钢肉钩在毫无气流的环境下无声地轻轻摆动。尽管温度计读数直逼 $-20\ ^\circ\text{C}$，金属货架表层却凝结着诡异的温热蒸汽。',
         'Cold storage room in military bunker, frosted metal shelves, hanging supply bags, meat hooks swaying slightly, warm mist on cold surfaces, eerie industrial lighting',
         {
             danger: danger.level(4),
             items: [
-                I.consumable('frozen_ration', '速冻军粮块', '在极低温下妥善封存的高能量冷冻战备军粮，解冻后可安全食用。', [['hp', 12]], {
+                I.consumable('frozen_ration', '速冻军粮块', '在极低温下妥善封存的高能量冷冻战备军粮，解冻后可安全食用。', [
+                    ['hp', 12],
+                    ['stamina', 10]
+                ], {
                     threshold: 8
                 })
             ],
@@ -854,7 +1072,12 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                         cost: 10,
                         sound: 'search',
                         san: -4,
-                        gain: [I.consumable('frozen_ration', '速冻军粮块', '妥善封存的高能量冷冻战备军粮。', [['hp', 12]])]
+                        gain: [
+                            I.consumable('frozen_ration', '速冻军粮块', '妥善封存的高能量冷冻战备军粮。', [
+                                ['hp', 12],
+                                ['stamina', 10]
+                            ])
+                        ]
                     }
                 )
             ]
@@ -884,9 +1107,9 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 I.consumable(
                     'field_repair_kit',
                     '神经链接维修套件',
-                    '配发给技术工兵的高阻微焊套件，内含导电生物硅胶与微电极晶片，可修复受损的神经链接仪。',
+                    '配发给技术工兵的高阻微焊套件，内含导电生物硅胶与微电极晶片，可修复受损的神经链接仪完整度。',
                     [['integrity', 25]],
-                    { grade: 'military', size: [2, 1], threshold: 18 }
+                    { grade: 'military', size: [2, 1], threshold: 16 }
                 )
             ],
             interacts: [
@@ -914,13 +1137,13 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
             facility: {
                 id: 'facility_bunker_bio_generator',
                 name: '柴油-生物混合发电机',
-                desc: '以微型聚变核心作为稳压中枢，外接巨型船用燃烧室的改装动力源。它吞噬柴油、有机废弃物乃至深渊残渣，换取前哨宝贵的电能。',
+                desc: '以微型聚变核心作为稳压中枢，外接巨型船用燃烧室的改装动力源。它吞噬柴油、有机废弃物乃至深渊残渣，换取前哨宝贵的电能，但副产物会加速前哨的深渊侵蚀。',
                 function: { electricity: 14, erosion: 2 }
             },
             items: [
                 I.consumable('power_cell', '军用电池', '高容量密封电容组，能迅速恢复外设电力。', [['battery', 80]], {
                     grade: 'military',
-                    threshold: 20
+                    threshold: 18
                 }),
                 I.material('fuel_reserve', '重柴油储备桶', '密封完好的军用重油桶，是驱动前哨重型发电机的基石材料。', {
                     size: [2, 2],
@@ -936,14 +1159,19 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 ),
                 act(
                     '接驳应急冷却线路',
-                    '随着接线扣紧，冷却液泵发出深沉有力的轰鸣，温度指针迅速从暴躁的红线回落至安全区间。白色的高压照明重新洒满车间，你的手腕虽然被电火花灼出红印，但成功挽救了动力网。',
+                    '随着接线扣紧，冷却液泵发出深沉有力的轰鸣，温度指针迅速从暴躁的红线回落至安全区间。白色的高压照明重新洒满车间，闷热的废气被强力抽离，你感到呼吸顺畅了许多，并从检修槽中取出了一枚备用电池。',
                     {
                         cost: 20,
-                        hp: 10,
-                        san: 5,
+                        hp: 5,
+                        san: 8,
+                        gain: [
+                            I.consumable('power_cell', '军用电池', '高容量密封电容组，能迅速恢复外设电力。', [['battery', 80]], {
+                                grade: 'military'
+                            })
+                        ],
                         puzzle: P.choice(
                             '冷却重置',
-                            '动力机组的高压冷却线路短路熔断，必须重新将三相插座与主控回路正确并联。线缆：红线、绿线、蓝线；接口：HV（高压火线）、GND（安全接地）、COOL（温控逻辑）。请按顺序选出正确的接驳标准：',
+                            '动力机组的高压冷却线路短路熔断，必须重新将三相插座与主控回路正确并联。线缆：红线、绿线、蓝线；接口：1-HV（高压火线）、2-GND（安全接地）、3-COOL（温控逻辑）。请按顺序选出正确的接驳标准：',
                             ['1-红 2-蓝 3-绿', '1-红 2-绿 3-蓝', '1-绿 2-蓝 3-红', '1-蓝 2-绿 3-红'],
                             '1-红 2-绿 3-蓝',
                             {
@@ -975,21 +1203,32 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 I.armor(
                     'tactical_vest',
                     '四级战术防弹背心',
-                    '内置碳化硼陶瓷插板的重型战术防弹衣，能抵御大口径穿甲弹的动能冲击。',
+                    '内置碳化硼陶瓷插板的重型战术防弹衣，能抵御大口径穿甲弹的动能冲击，提供恒定 25% 减免。',
                     0.25,
                     25,
                     { grade: 'military', size: [3, 3], threshold: 15 }
                 ),
                 I.weapon(
+                    'trench_shotgun',
+                    'M870 战壕霰弹枪',
+                    '军用近战压制霰弹枪，装填大号鹿弹。除主目标外可对锥形范围内其他目标造成均摊溅射伤害，最佳暴击距离为 1 格，超过 4 格无法暴击。',
+                    'shotgun',
+                    4,
+                    32,
+                    [0.24, 18],
+                    20,
+                    { damageType: 'range', grade: 'military', size: [3, 1], threshold: 20 }
+                ),
+                I.weapon(
                     'frag_grenade',
                     'M67 破片手雷',
-                    '军用高爆手雷，拉开保险销投掷后引发范围破片打击。单次投掷消耗品。',
+                    '军用高爆手雷，拉开保险销投掷后引发范围破片打击。单次投掷消耗品，有效射程 3 格。',
                     'throw',
                     3,
                     38,
                     [0.1, 12],
                     1,
-                    { damageType: 'range', grade: 'military', size: [1, 1], threshold: 20 }
+                    { damageType: 'range', grade: 'military', size: [1, 1], threshold: 18 }
                 ),
                 I.accessory('bio_mask', '防化过滤面罩', '配发给防化部队的全封闭防毒面具，内置多层活性炭与树脂滤芯。', [['maxSanity', 20]], {
                     grade: 'military',
@@ -1001,7 +1240,7 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     '弹道防护头盔',
                     '配有夜视仪基座与抗破片悬挂的重型防暴头盔。',
                     [['maxHp', 15], ['awareness', 2]],
-                    { grade: 'military', size: [2, 2], threshold: 18 }
+                    { grade: 'military', size: [2, 2], threshold: 16 }
                 )
             ],
             interacts: [
@@ -1021,6 +1260,13 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
         'Massive ventilation hub with giant rusty fan blades, dust-covered control panel, gloomy lighting, airborne particulate matter visible in the light beams',
         {
             danger: danger.level(5),
+            items: [
+                I.material('hepa_filter_core', '工业级高效滤芯', '用于拦截放射性微尘与深渊孢子的复合玻璃纤维滤芯。', {
+                    grade: 'reinforced',
+                    size: [2, 1],
+                    threshold: 12
+                })
+            ],
             interacts: [
                 act(
                     '校准主循环风机序列',
@@ -1028,6 +1274,7 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     {
                         cost: 15,
                         hp: 10,
+                        san: 6,
                         puzzle: P.cloze(
                             '主循环风机重启',
                             '风机电控板遭遇高压脉冲损坏，部分启停控制时钟数据丢失。必须根据残余的差值递增规律补全数组空缺以激活气流重载程序：[1], [2], [?], [7], [11]',
@@ -1063,6 +1310,13 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 desc: '搭建在工程走廊与废料池之间的水压冲切机，把重型装甲残片与武器废料冲压成标准化加固板。',
                 function: { scraps: 8, electricity: -2, erosion: 1 }
             },
+            items: [
+                I.material('corroded_scrap_bundle', '耐酸合金坯料', '经受住强酸洗消液浸泡而未融毁的高密度合金块。', {
+                    grade: 'military',
+                    size: [2, 1],
+                    threshold: 10
+                })
+            ],
             interacts: [
                 act(
                     '打捞废液中的遗体装备',
@@ -1089,7 +1343,8 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                                     loot: [
                                         loot(
                                             I.material('corrosive_gland', '腐蚀性强酸腺体', '深渊聚合体体内生成的耐酸腺泡，可提炼极度致命的炼金试剂。', {
-                                                grade: 'military'
+                                                grade: 'military',
+                                                fleshFusion: 25
                                             }),
                                             0.9
                                         ),
@@ -1125,7 +1380,7 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 }),
                 I.consumable('maintenance_capacitor', '工程维修电容', '为工程外骨骼备用的高抗阻电容器，可稳压修补神经链接仪。', [['integrity', 15]], {
                     grade: 'military',
-                    threshold: 16
+                    threshold: 15
                 })
             ],
             interacts: [
@@ -1249,6 +1504,17 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     '清理人神经链接仪残件',
                     '从阵亡清理人颅骨上撬下的试作型神经链接仪核心。电极虽然大半烧焦，但认知过滤芯片仍保留了部分解构算法——这是经历「第二次看见」后留存的冷酷物证。',
                     { grade: 'foundation', threshold: 15, cognitiveErosion: 35 }
+                ),
+                I.weapon(
+                    'cleaner_suppressed_smg',
+                    '清理人微声冲锋枪',
+                    '深渊基金会外勤清理部队标配的短管微声冲锋枪，采用亚音速穿甲弹与铅硼涂层机匣。具备追加点射特性，可在 AP 充裕时连续消耗 1 AP 重掷并取最优判定结算。',
+                    'smg',
+                    7,
+                    25,
+                    [0.2, 14],
+                    26,
+                    { damageType: 'range', grade: 'foundation', size: [2, 1], threshold: 22, cognitiveErosion: 12 }
                 )
             ],
             interacts: [
@@ -1271,7 +1537,8 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                                     loot: [
                                         loot(
                                             I.material('contaminated_sample', '轻度污染样本', '深渊活性生物组织。', {
-                                                grade: 'prototype'
+                                                grade: 'prototype',
+                                                fleshFusion: 20
                                             }),
                                             0.5
                                         )
@@ -1289,10 +1556,16 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                         sound: 'search',
                         san: -4,
                         gain: [
-                            I.consumable('anti_erosion_injector', '广谱抗侵蚀注射剂', '深渊基金会配发给清理人特遣队的试作型阻断剂，能在短时间内极强地重塑理性防线。', [
-                                ['sanity', 35],
-                                ['hp', 15]
-                            ], { grade: 'foundation' })
+                            I.consumable(
+                                'anti_erosion_injector',
+                                '广谱抗侵蚀注射剂',
+                                '深渊基金会配发给清理人特遣队的试作型阻断剂，能在短时间内极强地重塑理性防线。',
+                                [
+                                    ['sanity', 35],
+                                    ['hp', 15]
+                                ],
+                                { grade: 'foundation' }
+                            )
                         ]
                     }
                 )
@@ -1310,22 +1583,29 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
             danger: danger.ambush(10, 0.4),
             items: [
                 I.data(
+                    'memory_core_fragment',
+                    '烧蚀的记忆核心',
+                    '一块表面布满电弧烧痕的固态存储单元，标签上烙印着「铁壁-734」绝密字样。这正是随行同伴 Unit-734 追寻一生的执念之物。',
+                    '【铁壁计划机要备忘录】受试者 Unit-734 已完成第 3 阶段机械切除。恐惧抑制率 99.4%。注意：其脑干深处仍残留对幼童与平民的非理性保护本能。若遭遇基金会清理部队，立即启动销毁滑道。重复：切勿唤醒其旧世界真名。',
+                    { grade: 'foundation', size: [1, 1], threshold: 16, cognitiveErosion: 20 }
+                ),
+                I.data(
                     'military_experiment_log',
                     '铁壁绝密实验日志',
                     '带有基金会与军方联合印鉴的活页夹，大段段落被强酸墨水涂销。',
-                    '项目代号：铁壁。目标：借助深渊星神质实现肉体物理常数改写。第 17 天：样本通过敲击玻璃模仿人类莫尔斯码。第 23 天：主玻璃舱破裂，两名高级研究员在 40 秒内完成组织同化。第 24 天：军令到达，即刻执行绝对封锁，所有感染人员就地处决。第 25 天：[整页被深蓝血迹浸透]。',
-                    { grade: 'corporate', threshold: 20 }
+                    '项目代号：铁壁（立项基准：2023年10月）。目标：借助深渊星神质实现肉体物理常数改写。第 17 天：样本通过敲击玻璃模仿人类莫尔斯码。第 23 天：主玻璃舱破裂，两名高级研究员在 40 秒内完成组织同化。第 24 天（2023年10月24日）：军令到达，即刻执行绝对封锁，所有感染人员就地处决。第 25 天：[整页被深蓝血迹浸透]。',
+                    { grade: 'corporate', threshold: 18 }
                 ),
                 I.consumable('bio_stimulant', '实验型强化药剂', '贴有「仅供铁壁特勤组」标签的高浓度肾上腺素合成物，能狂暴压榨肉体生机。', [['hp', 45]], {
                     grade: 'military',
-                    threshold: 25
+                    threshold: 22
                 }),
                 I.accessory(
                     'neural_filter_prototype',
                     '神经过滤原型插件',
                     '从清理人高级指挥官面甲上拆下的芯片，外壳蚀刻着基金会第一序列资产编号。',
                     [['maxSanity', 40], ['will', 6]],
-                    { grade: 'prototype', threshold: 25 }
+                    { grade: 'prototype', threshold: 24, cognitiveErosion: 18 }
                 )
             ],
             interacts: [
@@ -1339,7 +1619,7 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                         spawnEnemy: [
                             enemy.cthulhu(
                                 'iron_wall_specimen',
-                                '铁壁实验体-Γ',
+                                '铁壁实验体-Gamma',
                                 '曾经的生化首席科学家。如今上半身完全被深青色的深渊珊瑚晶簇刺穿同化，晶簇尖端生长着无数未成熟的感光眼胞。其四肢反曲贴地飞奔，骨节与水泥摩擦迸发出刺耳的刮擦声。',
                                 'A horrifying humanoid mutation, upper half covered in blue-green coral-like alien growths, underdeveloped eyeballs sprouting at coral branch ends, exposed bone and torn hazmat suit, dim UV lighting',
                                 [30, 34, 18, 20, 2],
@@ -1355,7 +1635,8 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                                         ),
                                         loot(
                                             I.consumable('unstable_stimulant', '不稳定兴奋注射剂', '从实验体残骸体内抽取的变异体液，药力极其狂暴。', [['hp', 30]], {
-                                                grade: 'military'
+                                                grade: 'military',
+                                                fleshFusion: 15
                                             }),
                                             0.35
                                         ),
@@ -1379,7 +1660,7 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
     node(
         'cryo_chamber',
         '低温冻存室',
-        '十余座加压液氮冷冻立柜在极寒死寂中喷吐着刺骨白雾。大部分冻存舱的重型铅盖被从内部生生顶开变形，只剩下08、09、10三座舱门保持着闭锁状态。透过冰晶封冻的石英观察口，内部的浸泡物不具备任何已知的脊椎结构，更像是一团悬浮在零下二百度虚空中的黑色几何噩梦。',
+        '十余座加压液氮冷冻立柜在极寒死寂中喷吐着刺骨白雾。大部分冻存舱的重型铅盖被从内部生生顶开变形，只剩下 08、09、10 三座舱门保持着闭锁状态。透过冰晶封冻的石英观察口，内部的浸泡物不具备任何已知的脊椎结构，更像是一团悬浮在 $-200\ ^\circ\text{C}$ 虚空中的黑色几何噩梦。',
         'Rows of liquid nitrogen cryogenic pods in darkness, most pods opened from inside, three sealed pods with frost-covered viewports showing amorphous dark shapes, white vapor',
         {
             danger: danger.level(11),
@@ -1387,7 +1668,7 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 I.material('cryo_specimen', '液氮冻存标本', '密封在极低温双层真空瓶内的半透明深渊组织，即便在严寒中仍在发生微观蠕动。', {
                     grade: 'prototype',
                     size: [2, 1],
-                    threshold: 25,
+                    threshold: 22,
                     fleshFusion: 55
                 }),
                 I.data(
@@ -1395,17 +1676,17 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     '冻存样本交接单',
                     '被严寒冻脆的塑料文档夹，字迹斑驳。',
                     '单元 01~07：已脱离收容，确认处于游荡活跃态。单元 08~10：绝对休眠。终极协议：任何情况下严禁开启 08 号舱。手写补注：08 号样本昨晚在液氮循环泵停机的一分钟里，隔着金属舱壁微笑了。',
-                    { threshold: 15 }
+                    { threshold: 14 }
                 ),
                 I.consumable('cryo_sealant', '低温密封凝胶', '配发给低温舱密封工程的特种耐寒凝胶，涂抹于神经穴位能瞬间驱散昏沉。', [
                     ['sanity', 20],
                     ['vigor', 20]
-                ], { grade: 'military', threshold: 20 })
+                ], { grade: 'military', threshold: 18 })
             ],
             interacts: [
                 act(
                     '凝视 08 号密封冷冻舱',
-                    '你抹去石英视窗上的白霜。舱内悬浮的一团非欧结晶正缓慢舒张。就在你指尖贴在玻璃上的瞬间，冷冻液内部也浮起了一只苍白的人形轮廓，严丝合缝地隔着玻璃将手掌贴在了你的掌心对面！舱顶的电子温度计数字骤降十度。',
+                    '你抹去石英视窗上的白霜。舱内悬浮的一团非欧结晶正缓慢舒张。就在你指尖贴在玻璃上的瞬间，冷冻液内部也浮起了一只苍白的人形轮廓，严丝合缝地隔着玻璃将手掌贴在了你的掌心对面！舱顶的电子温度计数字骤降 $10\ ^\circ\text{C}$。',
                     { cost: 5, sound: 'terrifying', san: -12 }
                 )
             ]
@@ -1422,7 +1703,7 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 enemy.immovable(
                     'security_turret',
                     '自律安保炮塔',
-                    '基座焊死在承重钢柱上的重型自律双联机炮。厚重的合金装甲与红外目标解算模块仍在一丝不苟地执行着最后的保密净化条例。它不具备任何机动能力，但射程与穿甲力极度致命。',
+                    '基座焊死在承重钢柱上的重型自律双联机炮。厚重的合金装甲与红外目标解算模块仍在一丝不苟地执行着最后的保密净化条例。它不具备机动能力，但射程与穿甲力极度致命。',
                     'Automated security turret bolted between server racks, red optical sensor sweeping, heavy armored housing, dim green server lights',
                     [16, 28, 42, 10],
                     {
@@ -1451,18 +1732,30 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     '铁壁核心数据盘',
                     '密封在铅封外壳内的核心数据库镜像盘，记录了实验失控的最终推导。',
                     '项目终局推导：深渊高维存在并非外星生物侵略，它更像是一种物理学底层常数的重塑。我们捕获的信号不是命令，而是它睁开眼睛时引力场泛起的涟漪。我们以为在研究它，而实际上，我们的神经系统不过是它在此方宇宙投影出的一排琴键。',
-                    { grade: 'military', threshold: 20 }
+                    { grade: 'military', threshold: 18 }
                 )
             ],
             interacts: [
                 act(
                     '破解主服务器加密',
-                    '红色警戒锁死界面在一声清脆的蜂鸣后变为绿色。你完整导出了铁壁项目的核心日志，得知了军方曾主动向信号源发射邀请脉冲的骇人真相。看清一切后，你心中的恐惧逐渐被冰冷的清醒取代。',
+                    '红色警戒锁死界面在一声清脆的蜂鸣后变为绿色。你完整导出了铁壁项目的核心日志，并从主控机柜插槽中拔出了一枚完好的基金会高阶防务算力模组。看清军方曾主动向信号源发射邀请脉冲的真相后，你心中的恐惧逐渐被冰冷的清醒取代。',
                     {
                         cost: 15,
                         sound: 'typing_1',
-                        san: 5,
+                        san: 8,
                         reqItems: ['signal_decoder'],
+                        gain: [
+                            I.accessory(
+                                'tactical_ballistic_chip',
+                                '铁壁弹道解算芯片',
+                                '从主服务器阵列中拆出的军工协处理器，接入神经链接仪后能显著辅助威胁洞察与反应速度。',
+                                [
+                                    ['awareness', 4],
+                                    ['agility', 3]
+                                ],
+                                { grade: 'corporate', size: [1, 1] }
+                            )
+                        ],
                         puzzle: P.type(
                             '铁壁加密终端',
                             '屏幕光标规律跳动：请输入「铁壁协议」执行封锁与处决命令的基准日期。根据已搜集的情报，该项目立项于 2023 年 10 月初，并在全面失控的第 24 天正式下达全域封锁指令。请按系统约定的 DDMMYY 格式键入 6 位数字代码：',
@@ -1526,12 +1819,12 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 I.weapon(
                     'training_knife',
                     '合金格斗训练刀',
-                    '全钢打造的未开刃训练刺刀，虽无锐利刀锋，但坚固厚重。',
+                    '全钢打造的未开刃训练刺刀，虽无锐利刀锋，但坚固厚重。单手持握刺击顺手。',
                     'prick',
                     1,
                     8,
                     [0.15, 4],
-                    15,
+                    20,
                     { size: [1, 1], threshold: 5 }
                 ),
                 I.data(
@@ -1563,18 +1856,18 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 I.weapon(
                     'charred_iron_pipe',
                     '碳化重型拨火棍',
-                    '高炉配用的粗壮耐热铸铁拨棍，前端在千度高温下碳化硬化，挥舞时势大力沉。',
+                    '高炉配用的粗壮耐热铸铁拨棍，前端在千度高温下碳化硬化，挥舞时势大力沉。单手挥动可享冲刺提伤与稳定命中。',
                     'wave',
                     1,
                     16,
                     [0.1, 8],
-                    20,
-                    { size: [3, 1], threshold: 8 }
+                    25,
+                    { size: [3, 1], threshold: 8, hitRevise: 5 }
                 ),
                 I.material('refractory_plate', '特种耐火合金衬板', '从焚化炉内胆剥落的耐高温合金模块，质地极度坚韧。', {
                     grade: 'military',
                     size: [2, 2],
-                    threshold: 15,
+                    threshold: 14,
                     qty: 2
                 })
             ],
@@ -1600,13 +1893,14 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     '零号回声',
                     '从破碎球体内降临的高维存在物质化投影。它没有恒定的外形，而是由上千具死者的怨念骨肉、破碎的引力场透镜与虚空黑晶揉捏而成的重力畸变体。其周身的光线狂暴弯曲，每一次空间闪烁都伴随着直接震颤脑髓的低频尖啸。',
                     'A horrific floating amalgamation of human flesh and dark swirling gravity distortion, no fixed shape, tormented faces emerging and dissolving within the mass, air warping violently around it, intense cosmic horror aesthetic',
-                    [48, 62, 38, 40, 8],
+                    [42, 54, 30, 28, 6],
                     {
                         intents: { attack: 46, defense: 8, buff: 18, debuff: 20, observe: 8 },
                         loot: [
                             loot(
                                 I.material('zero_core', '零号奇点核心', '散发着深邃黑紫光晕的非欧晶体，其内部不断进行着自我拓扑重构。', {
-                                    grade: 'corporate',
+                                    grade: 'prototype',
+                                    cognitiveErosion: 40,
                                     causalInversion: 70
                                 }),
                                 1.0
@@ -1622,10 +1916,10 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                                 I.accessory(
                                     'echo_lens',
                                     '零号回声透镜',
-                                    '由零号回声残骸凝铸出的目镜片，佩戴后能够抵御高强度的精神崩塌。',
+                                    '由零号回声残骸凝铸出的目镜片，佩戴后能够洞穿因果迷雾并抵御高强度的精神崩塌。',
                                     [['will', 8], ['maxSanity', 25]],
                                     {
-                                        grade: 'corporate',
+                                        grade: 'prototype',
                                         cognitiveErosion: 45,
                                         causalInversion: 30
                                     }
@@ -1643,7 +1937,33 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     '最初接触记录',
                     '被保存在钛合金防爆盒内的黑色记录仪核心，表面有等离子灼蚀痕迹。',
                     '项目代号：深渊凝视。我们从地下七千米深处掘出了它。它本在沉睡，而军方与基金会的联合钻探将其唤醒。当它睁开眼的那一秒，我们这片时空的引力常数就被改写了。它不需要释放毒气，它的存在本身就在否定经典物理学。原谅我们，我们亲手按下了终末的门铃。',
-                    { grade: 'corporate', threshold: 20, cognitiveErosion: 60 }
+                    { grade: 'foundation', threshold: 18, cognitiveErosion: 60 }
+                )
+            ],
+            interacts: [
+                act(
+                    '检视破裂的钛合金球体内壁',
+                    '你忍受着耳膜嗡鸣靠近球体裂口。内壁没有任何机械固定栓，只有无数道由人类指骨化石与黑色拓扑晶体交织而成的血管网络。在球体底部，你撬下了一块尚未完全失活的基金会隔离护甲插板。',
+                    {
+                        cost: 15,
+                        sound: 'search',
+                        san: -8,
+                        gain: [
+                            I.armor(
+                                'foundation_containment_vest',
+                                '基金会铅硼收容胸甲',
+                                '深渊基金会零号收容组专用的内衬铅硼合金重型胸甲，表面布满抗引力畸变的几何蚀刻，提供极高的物理防护。',
+                                0.32,
+                                30,
+                                { grade: 'foundation', size: [3, 3], cognitiveErosion: 20 }
+                            )
+                        ]
+                    }
+                ),
+                act(
+                    '切断残余的谐振诱导线圈',
+                    '你用武器砸碎了球体基座下仍在微微发红的谐振发生器。刺耳的超低频蜂鸣声终于消散，收容室内扭曲的光线恢复了正常折射，你的头脑重获久违的清明。',
+                    { cost: 10, sound: 'item_break', san: 12 }
                 )
             ]
         }
@@ -1662,7 +1982,7 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     '特派观察员日志',
                     '被铆钉固定在观测台上的牛皮记录本，部分纸页边缘被高温炙烤卷曲。',
                     '观察记录第 41 次：零号不再撞击容器。它开始将自身分子的振动频率调整得与球体钛合金完全一致。第 44 次：石英视窗内侧浮现出五指手印，我们确认无人进入过内部。第 45 次：手印的指纹与我本人的右手完全相同。结论：停止直视，拔枪自决。',
-                    { grade: 'corporate', threshold: 18 }
+                    { grade: 'corporate', threshold: 16 }
                 )
             ],
             interacts: [
@@ -1687,7 +2007,8 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                     grade: 'salvaged',
                     size: [2, 1],
                     threshold: 12,
-                    qty: 2
+                    qty: 2,
+                    fleshFusion: 15
                 })
             ],
             interacts: [
@@ -1709,9 +2030,10 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                                     intents: { attack: 48, defense: 18, buff: 6, debuff: 16, observe: 12 },
                                     loot: [
                                         loot(
-                                            I.material('contaminated_scrap', '污染合金重块', '残骸中剥离的金属块。', {
+                                            I.material('biohazard_scrap', '污染合金重块', '残骸中剥离的金属块。', {
                                                 grade: 'salvaged',
-                                                size: [2, 1]
+                                                size: [2, 1],
+                                                fleshFusion: 15
                                             }),
                                             0.8
                                         ),
@@ -1745,23 +2067,24 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
                 I.consumable('bandage', '医用急救绷带', '经过环氧乙烷灭菌的弹力压迫止血带，能有效恢复物理生命。', [['hp', 25]], {
                     threshold: 5
                 }),
-                I.consumable('painkillers', '强效止痛药', '军用麻醉性镇痛胶囊。恢复少量 HP。', [['hp', 15]], { threshold: 10 }),
+                I.consumable('painkillers', '强效止痛药', '军用麻醉性镇痛胶囊。恢复少量 HP。', [['hp', 15]], { threshold: 8 }),
                 I.consumable('sedative', '军用中枢镇静剂', '标签被撕毁大半的神经安定注射针，能强行压制精神狂乱并补充精力。', [
                     ['sanity', 18],
                     ['vigor', 12]
-                ], { grade: 'military', threshold: 12 })
+                ], { grade: 'military', threshold: 10 })
             ],
             interacts: [
                 act(
                     '处理外伤创口',
                     '你用棉球蘸着碘伏清理伤口边缘的坏死组织并扎紧绷带。钻心的剧痛让你头脑清醒，渗血总算被彻底止住了。',
-                    { cost: 20, sound: 'item_use', hp: 10 }
+                    { cost: 20, sound: 'item_use', hp: 10, repeat: 2 }
                 ),
                 act(
                     '撬开角落加固药箱',
                     '挂锁锁梁锈蚀严重，在撬棍的猛力扳动下应声断裂。箱内整齐码放着一套高规格野战急救套件。此外还有三支无标签的淡绿色荧光针剂，出于对深渊异化的本能戒备，你只取走了急救包。',
                     {
                         cost: 15,
+                        sound: 'unlock',
                         gain: [
                             I.consumable('military_medkit', '军用急救包', '完好的野战外伤急救套件。', [['hp', 40]], {
                                 grade: 'military',
@@ -1790,7 +2113,7 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
             ],
             interacts: [
                 act(
-                    '贴耳倾听门外动静',
+                    '贴耳倾听',
                     '你将耳朵贴近冰冷的铅门。门外沉重的低吼与无数指甲抓挠合金的杂音突然瞬间归于绝对寂静。三秒后，门外传来了极其礼貌、带有完美人类节奏的敲门声——扣门三下。接着，一个你曾在旧世界极其熟悉的声音在门缝外轻轻呼唤着你的名字。',
                     { cost: 5, sound: 'terrifying', san: -10 }
                 )
@@ -1798,4 +2121,4 @@ export const ZONE_BUNKER: SanctuaryTemplate = sanctuary(
             exits: [E.to('security_checkpoint', '返回安保检查站'), E.transfer('强行开启大门踏入荒原')]
         }
     )
-)
+);
